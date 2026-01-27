@@ -4,9 +4,10 @@ A [Moltbot](https://github.com/moltbot/moltbot) skill for interacting with Tlon/
 
 ## Features
 
-- **Contacts**: List, get, and update contact profiles (nicknames, bios, avatars)
+- **Groups**: Create groups, invite members, manage membership
+- **Activity**: View mentions, replies, and unread notifications
+- **Contacts**: List, get, and update contact profiles
 - **Channels**: List channels and groups you have access to
-- **Profile Management**: Update your own profile fields
 
 ## Installation
 
@@ -25,30 +26,83 @@ Set environment variables or configure in your Moltbot setup:
 
 ```bash
 export URBIT_URL="https://your-ship.tlon.network"
+export URBIT_SHIP="~your-ship"
 export URBIT_CODE="sampel-ticlyt-migfun-falmel"  # Your +code
 ```
 
 ## Usage
 
-The skill provides CLI scripts that Moltbot can invoke:
+### Groups
+
+```bash
+# List all your groups
+npx ts-node scripts/groups.ts list
+
+# Create a new group
+npx ts-node scripts/groups.ts create "My Group" --description "A cool group"
+
+# Get group info (members, channels, pending invites)
+npx ts-node scripts/groups.ts info ~your-ship/group-slug
+
+# Invite members to a group
+npx ts-node scripts/groups.ts invite ~your-ship/group-slug ~friend1 ~friend2
+
+# Leave a group
+npx ts-node scripts/groups.ts leave ~host-ship/group-slug
+```
+
+### Activity / Notifications
+
+```bash
+# Get recent mentions (where you were @mentioned)
+npx ts-node scripts/activity.ts mentions --limit 10
+
+# Get recent replies to your posts
+npx ts-node scripts/activity.ts replies --limit 10
+
+# Get all recent activity
+npx ts-node scripts/activity.ts all --limit 10
+
+# Get unread counts by channel/group
+npx ts-node scripts/activity.ts unreads
+```
+
+### Contacts
 
 ```bash
 # List all contacts
-./scripts/run.sh contacts list
+npx ts-node scripts/contacts.ts list
 
-# Get a specific contact
-./scripts/run.sh contacts get ~sampel-palnet
+# Get a specific contact's profile
+npx ts-node scripts/contacts.ts get ~sampel-palnet
 
-# Update your nickname
-./scripts/run.sh contacts update --nickname "My Name"
+# Update your profile
+npx ts-node scripts/contacts.ts update-profile --nickname "My Name" --bio "About me"
 
-# List channels
-./scripts/run.sh channels list
+# Update your avatar
+npx ts-node scripts/contacts.ts update-profile --avatar "https://example.com/avatar.png"
+```
+
+### Channels
+
+```bash
+# List DMs
+npx ts-node scripts/channels.ts dms
+
+# List group DMs
+npx ts-node scripts/channels.ts group-dms
+
+# List subscribed groups
+npx ts-node scripts/channels.ts groups
 ```
 
 ## Complements the Tlon Plugin
 
-This skill handles read operations and profile management. For messaging, use the [Tlon channel plugin](https://github.com/tloncorp/moltbot-tlon).
+This skill handles read operations, notifications, and group management. For messaging, use the [Tlon channel plugin](https://github.com/tloncorp/moltbot-tlon).
+
+## API Reference
+
+See [references/urbit-api.md](references/urbit-api.md) for Urbit HTTP API details.
 
 ## License
 
