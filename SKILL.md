@@ -57,6 +57,28 @@ npx ts-node scripts/channels.ts group-dms
 npx ts-node scripts/channels.ts groups
 ```
 
+### Activity / Notifications
+
+**Get recent mentions:**
+```bash
+npx ts-node scripts/activity.ts mentions [--limit N]
+```
+
+**Get recent replies:**
+```bash
+npx ts-node scripts/activity.ts replies [--limit N]
+```
+
+**Get all recent activity:**
+```bash
+npx ts-node scripts/activity.ts all [--limit N]
+```
+
+**Get unread counts:**
+```bash
+npx ts-node scripts/activity.ts unreads
+```
+
 ### Messages
 
 **Get recent messages from a DM:**

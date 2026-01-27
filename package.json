@@ -8,12 +8,12 @@
     "channels": "npx ts-node scripts/channels.ts"
   },
   "dependencies": {
-    "@urbit/http-api": "^3.0.0",
-    "@urbit/aura": "^3.0.0"
+    "@urbit/aura": "^3.0.0",
+    "@urbit/http-api": "^3.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "ts-node": "^10.9.0",
-    "typescript": "^5.0.0"
+    "@types/node": "^20.19.30",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
   }
 }
