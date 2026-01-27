@@ -57,6 +57,33 @@ npx ts-node scripts/channels.ts group-dms
 npx ts-node scripts/channels.ts groups
 ```
 
+### Groups
+
+**List your groups:**
+```bash
+npx ts-node scripts/groups.ts list
+```
+
+**Create a new group:**
+```bash
+npx ts-node scripts/groups.ts create "Group Name" [--description "..."]
+```
+
+**Get group info:**
+```bash
+npx ts-node scripts/groups.ts info ~ship/group-slug
+```
+
+**Invite members:**
+```bash
+npx ts-node scripts/groups.ts invite ~ship/group-slug ~invitee1 ~invitee2
+```
+
+**Leave a group:**
+```bash
+npx ts-node scripts/groups.ts leave ~ship/group-slug
+```
+
 ### Activity / Notifications
 
 **Get recent mentions:**
