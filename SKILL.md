@@ -118,6 +118,38 @@ npx ts-node scripts/messages.ts dm ~sampel-palnet --limit 20
 npx ts-node scripts/messages.ts search "query" --channel chat/~host/channel-name
 ```
 
+### Notebooks (Diary Channels)
+
+**Post to a notebook:**
+```bash
+npx ts-node scripts/notebook-post.ts diary/~host/channel-name "Post Title"
+```
+
+**Post with a cover image:**
+```bash
+npx ts-node scripts/notebook-post.ts diary/~host/channel-name "Post Title" --image https://example.com/cover.png
+```
+
+**Post with rich content from a JSON file:**
+```bash
+npx ts-node scripts/notebook-post.ts diary/~host/channel-name "Post Title" --content article.json
+```
+
+**Post with content from stdin:**
+```bash
+echo '[{"inline":["Hello, world!"]}]' | npx ts-node scripts/notebook-post.ts diary/~host/channel-name "Post Title" --stdin
+```
+
+Content format is Tlon's Story structure - an array of verses:
+```json
+[
+  { "inline": ["Plain text or ", { "bold": ["bold"] }, " text"] },
+  { "block": { "header": { "tag": "h2", "content": ["Section Title"] } } },
+  { "block": { "code": { "code": "const x = 1;", "lang": "javascript" } } },
+  { "inline": [{ "blockquote": ["A wise quote"] }] }
+]
+```
+
 ## API Reference
 
 See [references/urbit-api.md](references/urbit-api.md) for Urbit HTTP API details.
