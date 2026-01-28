@@ -113,10 +113,25 @@ npx ts-node scripts/activity.ts unreads
 npx ts-node scripts/messages.ts dm ~sampel-palnet --limit 20
 ```
 
-**Search messages:**
+**Get recent messages from a channel:**
+```bash
+npx ts-node scripts/messages.ts channel chat/~host/channel-slug --limit 20
+```
+
+**Fetch full message history (same as channel):**
+```bash
+npx ts-node scripts/messages.ts history "chat/~host/channel-slug" --limit 50
+```
+
+**Search messages in a channel:**
 ```bash
 npx ts-node scripts/messages.ts search "query" --channel chat/~host/channel-name
 ```
+
+Channel format:
+- DMs: `chat/~ship/dm` (auto-converted from `dm ~ship`)
+- Group channels: `chat/~host/channel-slug`
+- Examples: `chat/~nocsyx-lassul/bongtable`, `chat/~host/general`
 
 ### Notebooks (Diary Channels)
 
