@@ -1,0 +1,27 @@
+{
+  "name": "tlon",
+  "description": "Read-only Tlon/Urbit API access. Use for checking activity, listing channels/groups, fetching message history, and looking up contacts.",
+  "command": "tlon-run",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "args": {
+        "type": "string",
+        "description": "Command and arguments to pass to tlon-run. Examples: 'activity mentions --limit 10', 'channels dms', 'contacts get ~sampel-palnet', 'groups list', 'messages dm ~friend --limit 20'"
+      }
+    },
+    "required": ["args"]
+  },
+  "examples": [
+    {"args": "activity mentions --limit 10"},
+    {"args": "activity unreads"},
+    {"args": "channels dms"},
+    {"args": "channels groups"},
+    {"args": "contacts list"},
+    {"args": "contacts get ~sampel-palnet"},
+    {"args": "groups list"},
+    {"args": "groups info ~host-ship/group-slug"},
+    {"args": "messages dm ~friend --limit 20"},
+    {"args": "messages channel chat/~host/slug --limit 20"}
+  ]
+}

@@ -4,101 +4,138 @@ A [Moltbot](https://github.com/moltbot/moltbot) skill for interacting with Tlon/
 
 ## Features
 
-- **Groups**: Create groups, invite members, manage membership
 - **Activity**: View mentions, replies, and unread notifications
-- **Contacts**: List, get, and update contact profiles
-- **Channels**: List channels and groups you have access to
+- **Channels**: List DMs, group DMs, and subscribed groups
+- **Contacts**: List and lookup contact profiles
+- **Groups**: List groups and view group details
+- **Messages**: Fetch message history from channels
 
-## Installation
+## Deployment (Hosted / K8s)
+
+For hosted moltbot deployments where the agent should not have exec privileges, use the `tlon-run` wrapper which provides a safe, validated interface to read-only operations.
+
+### Installation
 
 ```bash
-# Clone to your skills directory
-git clone https://github.com/tloncorp/tlon-skill.git ~/clawd/skills/tlon
+# In your container/pod
+./install.sh
+```
 
-# Install dependencies
-cd ~/clawd/skills/tlon
+Or in a Dockerfile:
+
+```dockerfile
+COPY tlon-skill /usr/local/share/moltbot/skills/tlon
+WORKDIR /usr/local/share/moltbot/skills/tlon
+RUN npm ci && ln -s /usr/local/share/moltbot/skills/tlon/bin/tlon-run /usr/local/bin/tlon-run
+```
+
+### Moltbot Configuration
+
+Configure moltbot to use the `tlon` tool (which calls `tlon-run`) while denying exec/bash:
+
+```json
+{
+  "skills": {
+    "load": {
+      "extraDirs": ["/usr/local/share/moltbot/skills"]
+    }
+  },
+  "tools": {
+    "allow": ["tlon", "web_fetch", "web_search", "read"],
+    "deny": ["exec", "bash", "process", "write", "edit"]
+  }
+}
+```
+
+### Environment Variables
+
+Set these in your pod/container:
+
+```bash
+URBIT_URL="http://127.0.0.1:8080"  # Urbit ship in same pod
+URBIT_SHIP="~your-ship"
+URBIT_CODE="sampel-ticlyt-migfun-falmel"
+```
+
+### Safe Commands (via tlon-run)
+
+See [SKILL.md](SKILL.md) for the complete list of safe, read-only commands:
+
+```bash
+tlon-run activity mentions --limit 10
+tlon-run channels dms
+tlon-run contacts get ~sampel-palnet
+tlon-run groups list
+tlon-run messages dm ~friend --limit 20
+```
+
+---
+
+## Local Development
+
+For local development with full access to all scripts:
+
+### Setup
+
+```bash
+git clone https://github.com/tloncorp/tlon-skill.git
+cd tlon-skill
 npm install
 ```
 
-## Configuration
-
-Set environment variables or configure in your Moltbot setup:
+### Configuration
 
 ```bash
 export URBIT_URL="https://your-ship.tlon.network"
 export URBIT_SHIP="~your-ship"
-export URBIT_CODE="sampel-ticlyt-migfun-falmel"  # Your +code
+export URBIT_CODE="sampel-ticlyt-migfun-falmel"
 ```
 
-## Usage
+### All Scripts
 
-### Groups
+#### Groups
 
 ```bash
-# List all your groups
 npx ts-node scripts/groups.ts list
-
-# Create a new group
 npx ts-node scripts/groups.ts create "My Group" --description "A cool group"
-
-# Get group info (members, channels, pending invites)
 npx ts-node scripts/groups.ts info ~your-ship/group-slug
-
-# Invite members to a group
 npx ts-node scripts/groups.ts invite ~your-ship/group-slug ~friend1 ~friend2
-
-# Leave a group
 npx ts-node scripts/groups.ts leave ~host-ship/group-slug
 ```
 
-### Activity / Notifications
+#### Activity
 
 ```bash
-# Get recent mentions (where you were @mentioned)
 npx ts-node scripts/activity.ts mentions --limit 10
-
-# Get recent replies to your posts
 npx ts-node scripts/activity.ts replies --limit 10
-
-# Get all recent activity
 npx ts-node scripts/activity.ts all --limit 10
-
-# Get unread counts by channel/group
 npx ts-node scripts/activity.ts unreads
 ```
 
-### Contacts
+#### Contacts
 
 ```bash
-# List all contacts
 npx ts-node scripts/contacts.ts list
-
-# Get a specific contact's profile
+npx ts-node scripts/contacts.ts self
 npx ts-node scripts/contacts.ts get ~sampel-palnet
-
-# Update your profile
-npx ts-node scripts/contacts.ts update-profile --nickname "My Name" --bio "About me"
-
-# Update your avatar
-npx ts-node scripts/contacts.ts update-profile --avatar "https://example.com/avatar.png"
+npx ts-node scripts/contacts.ts update-profile --nickname "Name" --bio "About me"
 ```
 
-### Channels
+#### Channels
 
 ```bash
-# List DMs
 npx ts-node scripts/channels.ts dms
-
-# List group DMs
 npx ts-node scripts/channels.ts group-dms
-
-# List subscribed groups
 npx ts-node scripts/channels.ts groups
+npx ts-node scripts/channels.ts all
 ```
 
-## Complements the Tlon Plugin
+#### Messages
 
-This skill handles read operations, notifications, and group management. For messaging, use the [Tlon channel plugin](https://github.com/tloncorp/moltbot-tlon).
+```bash
+npx ts-node scripts/messages.ts dm ~sampel-palnet --limit 20
+npx ts-node scripts/messages.ts channel chat/~host/channel-slug --limit 20
+```
 
 ## API Reference
 

@@ -1,176 +1,93 @@
 ---
 name: tlon
-description: Interact with Tlon/Urbit beyond the channel plugin. Use for contacts (get/update profiles, nicknames, avatars), listing channels/groups, fetching message history, and ship lookups. Complements the Tlon channel - use this skill for read operations and profile management.
+description: Read-only access to Tlon/Urbit data. Use for checking activity, listing channels/groups, fetching message history, and looking up contacts.
 ---
 
-# Tlon Skill
+# Tlon Skill (Safe)
 
-Provides direct Urbit API access beyond what the Tlon channel plugin offers.
+Use the `tlon-run` command for all Tlon read operations.
 
-## Setup
+**Do NOT use `npx`, `ts-node`, `npm`, `bash`, `sh`, or any other shell commands.**
 
-Scripts require these environment variables (from gateway config):
-- `URBIT_URL` - Ship URL (e.g., `https://myship.tlon.network`)
-- `URBIT_SHIP` - Ship name (e.g., `~sampel-palnet`)
-- `URBIT_CODE` - Ship access code
+## Commands
 
-The skill reads these from your Tlon channel config automatically.
+### Activity
 
-## Available Scripts
+Check recent notifications and unread counts.
 
-### Contacts
-
-**Get all contacts:**
 ```bash
-npx ts-node scripts/contacts.ts list
-```
-
-**Get a specific contact's profile:**
-```bash
-npx ts-node scripts/contacts.ts get ~sampel-palnet
-```
-
-**Update your profile:**
-```bash
-npx ts-node scripts/contacts.ts update-profile --nickname "My Name" --bio "About me" --status "Available"
-```
-
-**Update your avatar:**
-```bash
-npx ts-node scripts/contacts.ts update-profile --avatar "https://example.com/avatar.png"
+tlon-run activity mentions --limit 10   # Recent mentions (limit <= 25)
+tlon-run activity replies --limit 10    # Recent replies (limit <= 25)
+tlon-run activity all --limit 10        # All recent activity (limit <= 25)
+tlon-run activity unreads               # Unread counts per channel
 ```
 
 ### Channels
 
-**List DMs:**
+List available channels and groups.
+
 ```bash
-npx ts-node scripts/channels.ts dms
+tlon-run channels dms        # List direct message contacts
+tlon-run channels group-dms  # List group DMs (clubs)
+tlon-run channels groups     # List subscribed groups with channels
+tlon-run channels all        # List everything
 ```
 
-**List group DMs:**
+### Contacts
+
+Look up profiles and contacts.
+
 ```bash
-npx ts-node scripts/channels.ts group-dms
+tlon-run contacts list           # List all contacts
+tlon-run contacts self           # Get your own profile
+tlon-run contacts get ~sampel    # Get a specific contact's profile
 ```
 
-**List subscribed groups:**
-```bash
-npx ts-node scripts/channels.ts groups
-```
+Ship name format: `~prefix` or `~prefix-suffix` (e.g., `~zod`, `~sampel-palnet`)
 
 ### Groups
 
-**List your groups:**
+List and inspect groups (read-only).
+
 ```bash
-npx ts-node scripts/groups.ts list
+tlon-run groups list                      # List your groups
+tlon-run groups info ~host-ship/slug      # Get group details and members
 ```
 
-**Create a new group:**
-```bash
-npx ts-node scripts/groups.ts create "Group Name" [--description "..."]
-```
-
-**Get group info:**
-```bash
-npx ts-node scripts/groups.ts info ~ship/group-slug
-```
-
-**Invite members:**
-```bash
-npx ts-node scripts/groups.ts invite ~ship/group-slug ~invitee1 ~invitee2
-```
-
-**Leave a group:**
-```bash
-npx ts-node scripts/groups.ts leave ~ship/group-slug
-```
-
-### Activity / Notifications
-
-**Get recent mentions:**
-```bash
-npx ts-node scripts/activity.ts mentions [--limit N]
-```
-
-**Get recent replies:**
-```bash
-npx ts-node scripts/activity.ts replies [--limit N]
-```
-
-**Get all recent activity:**
-```bash
-npx ts-node scripts/activity.ts all [--limit N]
-```
-
-**Get unread counts:**
-```bash
-npx ts-node scripts/activity.ts unreads
-```
+Group format: `~host-ship/group-slug` (e.g., `~nocsyx-lassul/bongtable`)
 
 ### Messages
 
-**Get recent messages from a DM:**
+Fetch message history from channels.
+
 ```bash
-npx ts-node scripts/messages.ts dm ~sampel-palnet --limit 20
+tlon-run messages dm ~sampel-palnet --limit 20              # DM history (limit <= 50)
+tlon-run messages channel chat/~host/channel --limit 20     # Channel history (limit <= 50)
+tlon-run messages history chat/~host/channel --limit 20     # Same as channel
 ```
 
-**Get recent messages from a channel:**
-```bash
-npx ts-node scripts/messages.ts channel chat/~host/channel-slug --limit 20
-```
+Channel format: `{chat|diary|heap}/~host-ship/channel-slug`
 
-**Fetch full message history (same as channel):**
-```bash
-npx ts-node scripts/messages.ts history "chat/~host/channel-slug" --limit 50
-```
+Examples:
+- `chat/~nocsyx-lassul/general`
+- `diary/~sampel-palnet/blog`
 
-**Search messages in a channel:**
-```bash
-npx ts-node scripts/messages.ts search "query" --channel chat/~host/channel-name
-```
+## Limits
 
-Channel format:
-- DMs: `chat/~ship/dm` (auto-converted from `dm ~ship`)
-- Group channels: `chat/~host/channel-slug`
-- Examples: `chat/~nocsyx-lassul/bongtable`, `chat/~host/general`
+- Activity commands: max 25 items
+- Message commands: max 50 items
+- All limits must be positive integers
 
-### Notebooks (Diary Channels)
+## Safety Rules
 
-**Post to a notebook:**
-```bash
-npx ts-node scripts/notebook-post.ts diary/~host/channel-name "Post Title"
-```
+1. Only use the `tlon-run` commands listed above
+2. Never attempt to run `npx`, `npm`, `ts-node`, `bash`, `sh`, or other executables
+3. This skill is read-only - no modifications to profiles, groups, or messages
+4. All inputs are validated; invalid formats will be rejected
 
-**Post with a cover image:**
-```bash
-npx ts-node scripts/notebook-post.ts diary/~host/channel-name "Post Title" --image https://example.com/cover.png
-```
+## Error Handling
 
-**Post with rich content from a JSON file:**
-```bash
-npx ts-node scripts/notebook-post.ts diary/~host/channel-name "Post Title" --content article.json
-```
-
-**Post with content from stdin:**
-```bash
-echo '[{"inline":["Hello, world!"]}]' | npx ts-node scripts/notebook-post.ts diary/~host/channel-name "Post Title" --stdin
-```
-
-Content format is Tlon's Story structure - an array of verses:
-```json
-[
-  { "inline": ["Plain text or ", { "bold": ["bold"] }, " text"] },
-  { "block": { "header": { "tag": "h2", "content": ["Section Title"] } } },
-  { "block": { "code": { "code": "const x = 1;", "lang": "javascript" } } },
-  { "inline": [{ "blockquote": ["A wise quote"] }] }
-]
-```
-
-## API Reference
-
-See [references/urbit-api.md](references/urbit-api.md) for Urbit HTTP API details.
-
-## Notes
-
-- All ship names should include the `~` prefix
-- Profile updates sync to peers automatically via the contacts agent
-- This skill is read-heavy; for sending messages, use the `message` tool with `channel=tlon`
+If a command fails:
+- Check the ship/group/channel format matches the examples
+- Ensure the resource exists and you have access
+- Limits must be within the allowed range
