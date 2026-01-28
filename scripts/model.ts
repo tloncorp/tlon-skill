@@ -7,20 +7,33 @@ const configPath = join(homedir(), '.clawdbot', 'clawdbot.json');
 const statePath = join(homedir(), '.clawdbot', '.model-state.json');
 
 interface ModelAlias {
-  sonnet: string;
-  opus: string;
-  haiku: string;
-  gemini: string;
   [key: string]: string;
 }
 
-const modelAliases: ModelAlias = {
-  'sonnet': 'anthropic/claude-sonnet-4-5',
-  'opus': 'anthropic/claude-opus-4-5',
-  'haiku': 'anthropic/claude-haiku-4-5',
-  'gemini': 'google/gemini-3-pro-preview',
-  'gemini-flash': 'google/gemini-3-flash-preview'
-};
+function getModelAliases(): ModelAlias {
+  try {
+    const config = JSON.parse(readFileSync(configPath, 'utf8'));
+    const models = config.agents?.defaults?.models || {};
+    const aliases: ModelAlias = {};
+
+    // Build aliases from config
+    for (const [modelName, modelConfig] of Object.entries(models)) {
+      const alias = (modelConfig as any)?.alias;
+      if (alias) {
+        aliases[alias] = modelName;
+      }
+    }
+
+    return aliases;
+  } catch (err) {
+    // Fallback to common aliases if config read fails
+    return {
+      'sonnet': 'anthropic/claude-sonnet-4-5',
+      'opus': 'anthropic/claude-opus-4-5',
+      'haiku': 'anthropic/claude-haiku-4-5'
+    };
+  }
+}
 
 function getCurrentModel(): string {
   try {
@@ -81,6 +94,7 @@ function setModel(modelInput: string, saveOriginal: boolean = true): void {
     }
 
     // Resolve alias to full model name
+    const modelAliases = getModelAliases();
     const fullModelName = modelAliases[modelInput.toLowerCase()] || modelInput;
 
     // Validate model exists in config
@@ -104,7 +118,8 @@ function setModel(modelInput: string, saveOriginal: boolean = true): void {
       console.log(`✓ Model changed to ${fullModelName}`);
     }
 
-    const alias = Object.entries(modelAliases).find(([_, v]) => v === fullModelName)?.[0] || 'none';
+    const aliases = getModelAliases();
+    const alias = Object.entries(aliases).find(([_, v]) => v === fullModelName)?.[0] || 'none';
     console.log(`  Alias: ${alias}`);
     console.log(`\n⚠️  Restart gateway for changes to take effect:`);
     console.log(`   clawdbot gateway restart`);
@@ -152,12 +167,11 @@ function main() {
       } catch {}
     }
 
-    console.log('\nAvailable models:');
-    console.log('  sonnet       - Claude Sonnet 4.5 (default)');
-    console.log('  opus         - Claude Opus 4.5');
-    console.log('  haiku        - Claude Haiku 4.5');
-    console.log('  gemini       - Gemini 3 Pro');
-    console.log('  gemini-flash - Gemini 3 Flash');
+    console.log('\nAvailable models (from config):');
+    const aliases = getModelAliases();
+    for (const [alias, fullName] of Object.entries(aliases)) {
+      console.log(`  ${alias.padEnd(15)} - ${fullName}`);
+    }
     console.log('\nCommands:');
     console.log('  npx ts-node scripts/model.ts [model]  - Switch model (saves original)');
     console.log('  npx ts-node scripts/model.ts restore  - Restore original model');
