@@ -1,6 +1,0 @@
-{
-  "id": "tlon-run",
-  "name": "Tlon Run",
-  "description": "tlon_run tool for read-only Tlon API access",
-  "version": "1.0.0"
-}
