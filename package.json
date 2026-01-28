@@ -4,8 +4,7 @@
   "description": "Tlon/Urbit skill scripts for Clawdbot",
   "type": "commonjs",
   "scripts": {
-    "contacts": "npx ts-node scripts/contacts.ts",
-    "channels": "npx ts-node scripts/channels.ts"
+    "build": "tsc"
   },
   "dependencies": {
     "@urbit/aura": "^3.0.0",
