@@ -3,6 +3,9 @@
  * Uses direct fetch with cookie auth (same approach as Tlon plugin)
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
+
 export interface UrbitConfig {
   url: string;
   ship: string;
@@ -13,9 +16,29 @@ let config: UrbitConfig | null = null;
 let authCookie: string | null = null;
 
 /**
- * Get config from environment
+ * Get config from ship file or environment
+ *
+ * Priority:
+ * 1. TLON_CONFIG_FILE env var (direct path to config file)
+ * 2. TLON_SHIP + TLON_SKILL_DIR (loads ships/<ship>.json)
+ * 3. Legacy URBIT_URL/URBIT_SHIP/URBIT_CODE env vars
  */
 export function getConfig(): UrbitConfig {
+  // Option 1: Direct config file path
+  const configFile = process.env.TLON_CONFIG_FILE;
+  if (configFile) {
+    return loadConfigFile(configFile);
+  }
+
+  // Option 2: Ship name + skill dir
+  const shipName = process.env.TLON_SHIP;
+  const skillDir = process.env.TLON_SKILL_DIR;
+  if (shipName && skillDir) {
+    const shipFile = path.join(skillDir, 'ships', `${shipName.replace(/^~/, '')}.json`);
+    return loadConfigFile(shipFile);
+  }
+
+  // Option 3: Legacy env vars
   const url = process.env.URBIT_URL;
   const ship = process.env.URBIT_SHIP;
   const code = process.env.URBIT_CODE;
@@ -25,8 +48,34 @@ export function getConfig(): UrbitConfig {
   }
 
   throw new Error(
-    "Missing Urbit config. Set URBIT_URL, URBIT_SHIP, and URBIT_CODE environment variables."
+    "Missing Urbit config. Set TLON_CONFIG_FILE, or TLON_SHIP + TLON_SKILL_DIR, or URBIT_URL/URBIT_SHIP/URBIT_CODE."
   );
+}
+
+function loadConfigFile(filePath: string): UrbitConfig {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`Ship config not found: ${filePath}`);
+  }
+
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const data = JSON.parse(content);
+
+    if (!data.url || !data.ship || !data.code) {
+      throw new Error(`Invalid config: must have url, ship, and code`);
+    }
+
+    return {
+      url: data.url,
+      ship: data.ship.replace(/^~/, ""),
+      code: data.code,
+    };
+  } catch (err: any) {
+    if (err.message.includes('Invalid config') || err.message.includes('not found')) {
+      throw err;
+    }
+    throw new Error(`Failed to parse config ${filePath}: ${err.message}`);
+  }
 }
 
 /**

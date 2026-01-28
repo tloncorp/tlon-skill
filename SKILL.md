@@ -9,6 +9,16 @@ Use the `tlon-run` command for all Tlon read operations.
 
 **Do NOT use `npx`, `ts-node`, `npm`, `bash`, `sh`, or any other shell commands.**
 
+## Ship Selection
+
+If multiple ships are configured, specify which one to use:
+
+```bash
+tlon-run --ship ~pinser-botter-nisrun-filnul activity mentions
+```
+
+If only one ship is configured (or TLON_SHIP is set), the flag is optional.
+
 ## Commands
 
 ### Activity

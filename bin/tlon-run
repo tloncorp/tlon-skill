@@ -6,9 +6,70 @@ set -euo pipefail
 
 SKILL_DIR="${TLON_SKILL_DIR:-/usr/local/share/moltbot/skills/tlon}"
 TS_NODE="$SKILL_DIR/node_modules/.bin/ts-node"
+PIER_ROOT="${PIER_ROOT:-/pier}"
 
 # Hard fail if ts-node isn't present
 [ -x "$TS_NODE" ] || { echo "error: tlon-skill not installed at $SKILL_DIR"; exit 2; }
+
+# Export skill dir for TypeScript scripts
+export TLON_SKILL_DIR="$SKILL_DIR"
+
+# Auto-initialize ship configs if none exist and we're in a pier environment
+init_ships_if_needed() {
+  local ships_dir="$SKILL_DIR/ships"
+  local has_configs=false
+
+  # Check if any real config files exist (not example.json)
+  if [ -d "$ships_dir" ]; then
+    for f in "$ships_dir"/*.json; do
+      [ -f "$f" ] || continue
+      [ "$(basename "$f")" = "example.json" ] && continue
+      has_configs=true
+      break
+    done
+  fi
+
+  # If no configs and pier exists, run init
+  if [ "$has_configs" = false ] && [ -d "$PIER_ROOT" ]; then
+    local init_script="$SKILL_DIR/scripts/init-ships.mjs"
+    if [ -f "$init_script" ]; then
+      echo "[tlon-run] no ship configs found, initializing from $PIER_ROOT..."
+      node "$init_script" || { echo "error: failed to initialize ship configs"; exit 2; }
+    fi
+  fi
+}
+
+# Handle --ship flag (must be first argument)
+if [ "${1:-}" = "--ship" ]; then
+  TLON_SHIP="${2:-}"
+  [ -n "$TLON_SHIP" ] || { echo "error: --ship requires a ship name"; exit 2; }
+  shift 2
+fi
+
+# Auto-init before checking for ship config
+init_ships_if_needed
+
+# If no TLON_SHIP specified, try to auto-detect from available configs
+if [ -z "${TLON_SHIP:-}" ]; then
+  ships_dir="$SKILL_DIR/ships"
+  if [ -d "$ships_dir" ]; then
+    # Find first non-example config
+    for f in "$ships_dir"/*.json; do
+      [ -f "$f" ] || continue
+      [ "$(basename "$f")" = "example.json" ] && continue
+      # Extract ship name from filename
+      TLON_SHIP="$(basename "$f" .json)"
+      break
+    done
+  fi
+fi
+
+# Validate ship config exists (if TLON_SHIP is set)
+if [ -n "${TLON_SHIP:-}" ]; then
+  SHIP_FILE="$SKILL_DIR/ships/${TLON_SHIP#\~}.json"
+  [ -f "$SHIP_FILE" ] || { echo "error: ship config not found: $SHIP_FILE"; exit 2; }
+  export TLON_SHIP="${TLON_SHIP#\~}"
+fi
 
 # Validation helpers
 validate_ship() {
@@ -42,6 +103,14 @@ cmd="${1:-}"
 shift || true
 
 case "$cmd" in
+  init)
+    # Force re-initialization of ship configs
+    echo "[tlon-run] initializing ship configs from $PIER_ROOT..."
+    node "$SKILL_DIR/scripts/init-ships.mjs" || { echo "error: init failed"; exit 2; }
+    echo "[tlon-run] done"
+    exit 0
+    ;;
+
   activity)
     sub="${1:-}"
     shift || true
@@ -158,7 +227,10 @@ case "$cmd" in
     cat <<'EOF'
 tlon-run: Safe Tlon API wrapper (read-only)
 
+Usage: tlon-run [--ship ~name] <command> [args...]
+
 Commands:
+  init                                         - Generate ship configs from /pier
   activity {mentions|replies|all} [--limit N]  - Get activity feed (N <= 25)
   activity unreads                             - Get unread counts
   channels {dms|group-dms|groups|all}          - List channels
@@ -171,21 +243,32 @@ Commands:
   messages channel chat/~host/slug [--limit N] - Get channel history (N <= 50)
   messages history chat/~host/slug [--limit N] - Same as channel
 
+Ship Config:
+  Configs are auto-generated from /pier on first run.
+  Manual init: tlon-run init
+
+  Files stored in: <skill-dir>/ships/<ship-name>.json
+  Format: {"url": "http://127.0.0.1:8080", "ship": "~ship-name", "code": "xxxx-xxxx-xxxx-xxxx"}
+
+  Specify ship via --ship flag or TLON_SHIP env var (auto-detected if only one ship).
+
 Environment:
   TLON_SKILL_DIR  Override skill directory (default: /usr/local/share/moltbot/skills/tlon)
+  TLON_SHIP       Default ship name (without ~)
+  PIER_ROOT       Pier directory for auto-init (default: /pier)
 EOF
     exit 0
     ;;
 
   "")
     echo "error: no command specified"
-    echo "usage: tlon-run {activity|channels|contacts|groups|messages|help}"
+    echo "usage: tlon-run {init|activity|channels|contacts|groups|messages|help}"
     exit 2
     ;;
 
   *)
     echo "error: unknown command '$cmd'"
-    echo "usage: tlon-run {activity|channels|contacts|groups|messages|help}"
+    echo "usage: tlon-run {init|activity|channels|contacts|groups|messages|help}"
     exit 2
     ;;
 esac

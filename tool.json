@@ -7,7 +7,7 @@
     "properties": {
       "args": {
         "type": "string",
-        "description": "Command and arguments to pass to tlon-run. Examples: 'activity mentions --limit 10', 'channels dms', 'contacts get ~sampel-palnet', 'groups list', 'messages dm ~friend --limit 20'"
+        "description": "Command and arguments. Optional --ship flag first if multiple ships configured. Examples: 'activity mentions --limit 10', '--ship ~myship channels dms', 'contacts get ~sampel-palnet'"
       }
     },
     "required": ["args"]
@@ -22,6 +22,7 @@
     {"args": "groups list"},
     {"args": "groups info ~host-ship/group-slug"},
     {"args": "messages dm ~friend --limit 20"},
-    {"args": "messages channel chat/~host/slug --limit 20"}
+    {"args": "messages channel chat/~host/slug --limit 20"},
+    {"args": "--ship ~pinser-botter-nisrun-filnul activity mentions"}
   ]
 }
