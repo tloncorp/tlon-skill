@@ -1,6 +1,6 @@
 ---
 name: tlon
-description: Interact with Tlon/Urbit beyond the channel plugin. Use for contacts (get/update profiles, nicknames, avatars), listing channels/groups, fetching message history, and ship lookups. Complements the Tlon channel - use this skill for read operations and profile management.
+description: Interact with Tlon/Urbit beyond the channel plugin. Use for contacts (get/update profiles, nicknames, avatars), listing channels/groups, fetching message history, posting to channels, sending DMs, and ship lookups. Complements the Tlon channel - use this skill for read operations, profile management, and direct API access.
 ---
 
 # Tlon Skill
@@ -18,6 +18,75 @@ The skill reads these from your Tlon channel config automatically.
 
 ## Available Scripts
 
+### Posting to Channels
+
+**Send a message to a channel:**
+```bash
+npx ts-node scripts/posts.ts send chat/~host/channel-name "Hello everyone!"
+```
+
+**Reply to a post:**
+```bash
+npx ts-node scripts/posts.ts reply chat/~host/channel-name <post-id> "Great point!"
+```
+
+**React to a post:**
+```bash
+npx ts-node scripts/posts.ts react chat/~host/channel-name <post-id> 👍
+```
+
+**Remove a reaction:**
+```bash
+npx ts-node scripts/posts.ts unreact chat/~host/channel-name <post-id>
+```
+
+**Delete a post:**
+```bash
+npx ts-node scripts/posts.ts delete chat/~host/channel-name <post-id>
+```
+
+### Direct Messages
+
+**Send a DM:**
+```bash
+npx ts-node scripts/dms.ts send ~sampel-palnet "Hey, how's it going?"
+```
+
+**Reply in a DM thread:**
+```bash
+npx ts-node scripts/dms.ts reply ~sampel-palnet <post-id> "Thanks for the reply!"
+```
+
+**React to a DM:**
+```bash
+npx ts-node scripts/dms.ts react ~sampel-palnet <post-id> ❤️
+```
+
+**Remove reaction from a DM:**
+```bash
+npx ts-node scripts/dms.ts unreact ~sampel-palnet <post-id>
+```
+
+**Delete a DM:**
+```bash
+npx ts-node scripts/dms.ts delete ~sampel-palnet <post-id>
+```
+
+**Accept a DM invite:**
+```bash
+npx ts-node scripts/dms.ts accept ~sampel-palnet
+```
+
+**Decline a DM invite:**
+```bash
+npx ts-node scripts/dms.ts decline ~sampel-palnet
+```
+
+**Send to a group DM (club):**
+```bash
+npx ts-node scripts/dms.ts send 0v4.club-id "Message to the group"
+```
+
 ### Contacts
 
 **Get all contacts:**
@@ -28,6 +97,21 @@ npx ts-node scripts/contacts.ts list
 **Get a specific contact's profile:**
 ```bash
 npx ts-node scripts/contacts.ts get ~sampel-palnet
+```
+
+**Add a contact:**
+```bash
+npx ts-node scripts/contacts.ts add ~sampel-palnet
+```
+
+**Remove a contact:**
+```bash
+npx ts-node scripts/contacts.ts remove ~sampel-palnet
+```
+
+**Sync (fetch) profiles from ships:**
+```bash
+npx ts-node scripts/contacts.ts sync ~sampel-palnet ~zod
 ```
 
 **Update your profile:**
@@ -176,6 +260,8 @@ See [references/urbit-api.md](references/urbit-api.md) for Urbit HTTP API detail
 
 ## Notes
 
-- All ship names should include the `~` prefix
+- All ship names should include the `~` prefix (scripts will normalize if missing)
 - Profile updates sync to peers automatically via the contacts agent
-- This skill is read-heavy; for sending messages, use the `message` tool with `channel=tlon`
+- Post IDs are Unix timestamps in milliseconds
+- For sending messages via the Moltbot message tool, use `channel=tlon`
+- Channel nests follow format: `<kind>/~<host>/<name>` where kind is chat, diary, or heap
