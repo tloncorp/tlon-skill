@@ -168,9 +168,78 @@ npx ts-node scripts/groups.ts invite ~ship/group-slug ~invitee1 ~invitee2
 npx ts-node scripts/groups.ts leave ~ship/group-slug
 ```
 
+**Join a group:**
+```bash
+npx ts-node scripts/groups.ts join ~ship/group-slug
+```
+
 **Add a channel to a group:**
 ```bash
 npx ts-node scripts/groups.ts add-channel ~ship/group-slug "Channel Name" [--kind chat|diary|heap] [--description "..."]
+```
+
+### Group Administration (Host Only)
+
+**Delete a group:**
+```bash
+npx ts-node scripts/groups.ts delete ~ship/group-slug
+```
+
+**Update group metadata:**
+```bash
+npx ts-node scripts/groups.ts update ~ship/group-slug --title "New Title" [--description "..."] [--image "https://..."]
+```
+
+**Kick members:**
+```bash
+npx ts-node scripts/groups.ts kick ~ship/group-slug ~member1 ~member2
+```
+
+**Ban members:**
+```bash
+npx ts-node scripts/groups.ts ban ~ship/group-slug ~member1 ~member2
+```
+
+**Unban members:**
+```bash
+npx ts-node scripts/groups.ts unban ~ship/group-slug ~member1 ~member2
+```
+
+**Set group privacy:**
+```bash
+npx ts-node scripts/groups.ts set-privacy ~ship/group-slug public|private|secret
+```
+
+**Accept join requests (for private groups):**
+```bash
+npx ts-node scripts/groups.ts accept-join ~ship/group-slug ~requester1 ~requester2
+```
+
+**Reject join requests:**
+```bash
+npx ts-node scripts/groups.ts reject-join ~ship/group-slug ~requester1 ~requester2
+```
+
+### Role Management
+
+**Add a role:**
+```bash
+npx ts-node scripts/groups.ts add-role ~ship/group-slug role-id --title "Role Name" [--description "..."]
+```
+
+**Delete a role:**
+```bash
+npx ts-node scripts/groups.ts delete-role ~ship/group-slug role-id
+```
+
+**Assign role to members:**
+```bash
+npx ts-node scripts/groups.ts assign-role ~ship/group-slug role-id ~member1 ~member2
+```
+
+**Remove role from members:**
+```bash
+npx ts-node scripts/groups.ts remove-role ~ship/group-slug role-id ~member1 ~member2
 ```
 
 ### Activity / Notifications
