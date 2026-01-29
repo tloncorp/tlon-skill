@@ -41,7 +41,7 @@ Configure moltbot to use the `tlon` tool (which calls `tlon-run`) while denying 
     }
   },
   "tools": {
-    "allow": ["tlon", "web_fetch", "web_search", "read"],
+    "allow": ["tlon_run", "web_fetch", "web_search", "read"],
     "deny": ["exec", "bash", "process", "write", "edit"]
   }
 }
@@ -57,9 +57,9 @@ URBIT_SHIP="~your-ship"
 URBIT_CODE="sampel-ticlyt-migfun-falmel"
 ```
 
-### Safe Commands (via tlon-run)
+### Wrapper commands
 
-See [SKILL.md](SKILL.md) for the complete list of safe, read-only commands:
+See [SKILL.md](SKILL.md) for the complete list of wrapped commands:
 
 ```bash
 tlon-run activity mentions --limit 10

@@ -1,6 +1,6 @@
 {
   "name": "tlon",
-  "description": "Read-only Tlon/Urbit API access. Use for checking activity, listing channels/groups, fetching message history, and looking up contacts.",
+  "description": "Tlon/Urbit API access. Use for checking activity, listing channels/groups, fetching message history, and looking up contacts.",
   "command": "tlon-run",
   "parameters": {
     "type": "object",
