@@ -20,6 +20,19 @@ function generatePostId(): string {
   return Date.now().toString();
 }
 
+// Format a post ID as @ud (with dots every 3 digits)
+// This is required for reactions to work properly
+function formatUd(id: string): string {
+  // Remove any existing dots
+  const clean = id.replace(/\./g, '');
+  // Add dots every 3 digits from the right
+  const parts: string[] = [];
+  for (let i = clean.length; i > 0; i -= 3) {
+    parts.unshift(clean.slice(Math.max(0, i - 3), i));
+  }
+  return parts.join('.');
+}
+
 // Parse content into Story format (array of verses)
 function parseContent(message: string): any[] {
   // Simple implementation: treat as inline text with @mentions and linebreaks
@@ -152,6 +165,7 @@ async function reactToPost(
   react: string
 ): Promise<{ success: boolean; error?: string }> {
   const ship = getCurrentShip();
+  const formattedId = formatUd(postId);
 
   try {
     await poke({
@@ -163,7 +177,7 @@ async function reactToPost(
           action: {
             post: {
               "add-react": {
-                id: postId,
+                id: formattedId,
                 react,
                 ship,
               },
@@ -185,6 +199,7 @@ async function unreactToPost(
   postId: string
 ): Promise<{ success: boolean; error?: string }> {
   const ship = getCurrentShip();
+  const formattedId = formatUd(postId);
 
   try {
     await poke({
@@ -196,7 +211,7 @@ async function unreactToPost(
           action: {
             post: {
               "del-react": {
-                id: postId,
+                id: formattedId,
                 ship,
               },
             },
