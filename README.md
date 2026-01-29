@@ -96,6 +96,43 @@ npx ts-node scripts/channels.ts group-dms
 npx ts-node scripts/channels.ts groups
 ```
 
+### Channel Summarizer
+
+Summarize recent activity in any channel with privacy controls. Private/secret channels can only be summarized by authorized ships.
+
+```bash
+# Summarize last 50 messages
+npx ts-node scripts/summarize.ts --channel chat/~host/channel-name
+
+# Summarize specific count
+npx ts-node scripts/summarize.ts --channel chat/~host/channel-name --count 100
+
+# Specify requester (defaults to URBIT_SHIP)
+npx ts-node scripts/summarize.ts --channel chat/~host/channel-name --requester ~malmur-halmex
+```
+
+**Privacy Controls:**
+- Public channels: Anyone can summarize
+- Private/Secret channels: Only authorized ships (set via `SUMMARIZER_AUTH_SHIPS` env var)
+
+**Example Output:**
+```
+📋 Channel Summary: chat/~dabben-larbet/hosting-6173
+**Group:** ~dabben-larbet/tlon
+**Privacy:** secret
+
+**Period:** Last 38 messages
+**Date Range:** 1/27/2026 to 1/29/2026
+
+**Key Topics:**
+- Prometheus
+- Bot
+- Hosting
+- Feature
+
+**Active Participants:** ~malmur-halmex, ~bitter-bitduc, ~sitful-hatred
+```
+
 ## Complements the Tlon Plugin
 
 This skill handles read operations, notifications, and group management. For messaging, use the [Tlon channel plugin](https://github.com/tloncorp/moltbot-tlon).
