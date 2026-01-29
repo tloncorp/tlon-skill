@@ -211,6 +211,68 @@ async function leaveGroup(groupId: string) {
   console.log(`✅ Left group.`);
 }
 
+// Add a channel to an existing group
+// Uses channel-action-1 mark to 'channels' app (from packages/shared/src/api/channelsApi.ts)
+async function addChannel(groupId: string, title: string, kind: 'chat' | 'diary' | 'heap' = 'chat', description: string = '') {
+  const config = getConfig();
+  const ship = getCurrentShip();
+  const slug = generateGroupSlug();
+  const name = slug; // channel name/slug
+  const nest = `${kind}/${ship}/${name}`;
+  const shipWithoutTilde = ship.replace('~', '');
+  
+  console.log(`Adding channel "${title}" to group ${groupId}...`);
+  
+  const { execSync } = require('child_process');
+  
+  // channel-action-1 create payload (from urbit/channel.ts Create interface)
+  const createPayload = {
+    create: {
+      kind,
+      group: groupId,
+      name,
+      title,
+      description,
+      meta: null,
+      readers: [],
+      writers: [],
+    },
+  };
+  
+  const jsonPayload = JSON.stringify([{
+    id: 1,
+    action: 'poke',
+    ship: shipWithoutTilde,
+    app: 'channels',
+    mark: 'channel-action-1',
+    json: createPayload,
+  }]);
+  
+  const timestamp = Date.now();
+  
+  const curlCmd = `
+    curl -s -X POST "${config.url}/~/login" \
+      -H "Content-Type: application/x-www-form-urlencoded" \
+      -d "password=${config.code}" \
+      -c /tmp/urbit-skill-cookies.txt > /dev/null && \
+    curl -s -X PUT "${config.url}/~/channel/skill-channel-add-${timestamp}" \
+      -H "Content-Type: application/json" \
+      -b /tmp/urbit-skill-cookies.txt \
+      -d '${jsonPayload.replace(/'/g, "'\\''")}'
+  `;
+  
+  try {
+    execSync(curlCmd, { encoding: 'utf-8', timeout: 30000, shell: '/bin/bash' });
+    console.log(`✅ Channel created!`);
+    console.log(`   Nest: ${nest}`);
+    console.log(`   Title: ${title}`);
+    console.log(`   Group: ${groupId}`);
+    return nest;
+  } catch (err: any) {
+    throw new Error(`Failed to add channel: ${err.message}`);
+  }
+}
+
 // Main
 async function main() {
   const args = process.argv.slice(2);
@@ -267,6 +329,27 @@ async function main() {
       break;
     }
     
+    case 'add-channel': {
+      const groupId = args[1];
+      const title = args[2];
+      if (!groupId || !title) {
+        console.error('Usage: groups.ts add-channel <group-id> "Channel Name" [--kind chat|diary|heap] [--description "..."]');
+        process.exit(1);
+      }
+      let kind: 'chat' | 'diary' | 'heap' = 'chat';
+      let description = '';
+      const kindIdx = args.indexOf('--kind');
+      if (kindIdx !== -1 && args[kindIdx + 1]) {
+        kind = args[kindIdx + 1] as 'chat' | 'diary' | 'heap';
+      }
+      const descIdx = args.indexOf('--description');
+      if (descIdx !== -1 && args[descIdx + 1]) {
+        description = args[descIdx + 1];
+      }
+      await addChannel(groupId, title, kind, description);
+      break;
+    }
+    
     default:
       console.log('Usage:');
       console.log('  npx ts-node scripts/groups.ts list');
@@ -274,6 +357,7 @@ async function main() {
       console.log('  npx ts-node scripts/groups.ts invite <group-id> <ship> [<ship2> ...]');
       console.log('  npx ts-node scripts/groups.ts info <group-id>');
       console.log('  npx ts-node scripts/groups.ts leave <group-id>');
+      console.log('  npx ts-node scripts/groups.ts add-channel <group-id> "Channel Name" [--kind chat|diary|heap] [--description "..."]');
       process.exit(1);
   }
 }

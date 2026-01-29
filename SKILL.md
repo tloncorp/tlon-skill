@@ -84,6 +84,11 @@ npx ts-node scripts/groups.ts invite ~ship/group-slug ~invitee1 ~invitee2
 npx ts-node scripts/groups.ts leave ~ship/group-slug
 ```
 
+**Add a channel to a group:**
+```bash
+npx ts-node scripts/groups.ts add-channel ~ship/group-slug "Channel Name" [--kind chat|diary|heap] [--description "..."]
+```
+
 ### Activity / Notifications
 
 **Get recent mentions:**
