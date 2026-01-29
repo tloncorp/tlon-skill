@@ -3,6 +3,10 @@
  * Uses direct fetch with cookie auth (same approach as Tlon plugin)
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+
 export interface UrbitConfig {
   url: string;
   ship: string;
@@ -13,9 +17,44 @@ let config: UrbitConfig | null = null;
 let authCookie: string | null = null;
 
 /**
- * Get config from environment
+ * Try to read Tlon credentials from Moltbot config
+ */
+function getConfigFromMoltbot(): UrbitConfig | null {
+  // Check common Moltbot config locations
+  const configPaths = [
+    process.env.MOLTBOT_CONFIG,
+    path.join(os.homedir(), '.clawdbot', 'moltbot.json'),
+    path.join(os.homedir(), '.moltbot', 'moltbot.json'),
+  ].filter(Boolean) as string[];
+
+  for (const configPath of configPaths) {
+    try {
+      if (!fs.existsSync(configPath)) continue;
+      
+      const raw = fs.readFileSync(configPath, 'utf-8');
+      const parsed = JSON.parse(raw);
+      
+      const tlon = parsed?.channels?.tlon;
+      if (tlon?.url && tlon?.ship && tlon?.code) {
+        return {
+          url: tlon.url,
+          ship: tlon.ship.replace(/^~/, ''),
+          code: tlon.code,
+        };
+      }
+    } catch {
+      // Continue to next path
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Get config from environment variables, or fall back to Moltbot config
  */
 export function getConfig(): UrbitConfig {
+  // 1. Check environment variables first
   const url = process.env.URBIT_URL;
   const ship = process.env.URBIT_SHIP;
   const code = process.env.URBIT_CODE;
@@ -24,8 +63,16 @@ export function getConfig(): UrbitConfig {
     return { url, ship: ship.replace(/^~/, ""), code };
   }
 
+  // 2. Fall back to Moltbot config
+  const moltbotConfig = getConfigFromMoltbot();
+  if (moltbotConfig) {
+    return moltbotConfig;
+  }
+
   throw new Error(
-    "Missing Urbit config. Set URBIT_URL, URBIT_SHIP, and URBIT_CODE environment variables."
+    "Missing Urbit config. Either:\n" +
+    "  - Set URBIT_URL, URBIT_SHIP, and URBIT_CODE environment variables, or\n" +
+    "  - Configure Tlon channel in Moltbot (~/.clawdbot/moltbot.json)"
   );
 }
 
