@@ -25,6 +25,10 @@ Commands:
   contacts get ~ship                           - Get a contact's profile
   groups list                                  - List your groups
   groups info ~host/slug                       - Get group details
+  groups create "Name" [--description "..."]   - Create a new group
+  groups invite ~host/slug ~ship1 ~ship2       - Invite members
+  groups leave ~host/slug                      - Leave a group
+  groups add-channel ~host/slug "Name" [opts]  - Add a channel to a group
   messages dm ~ship [--limit N]                - Get DM history (N <= 50)
   messages channel chat/~host/slug [--limit N] - Get channel history (N <= 50)
   messages history chat/~host/slug [--limit N] - Same as channel
@@ -178,9 +182,42 @@ case "$cmd" in
         validate_group "$grp"
         exec node "$DIST_DIR/groups.js" info "$grp"
         ;;
+      create)
+        name="${1:-}"
+        [ -n "$name" ] || { echo "error: missing group name"; echo "usage: tlon-run groups create \"Group Name\" [--description \"...\"]"; exit 2; }
+        shift
+        # Pass remaining args (--description) through
+        exec node "$DIST_DIR/groups.js" create "$name" "$@"
+        ;;
+      invite)
+        grp="${1:-}"
+        [ -n "$grp" ] || { echo "error: missing group"; echo "usage: tlon-run groups invite ~host-ship/slug ~ship1 ~ship2"; exit 2; }
+        validate_group "$grp"
+        shift
+        [ $# -ge 1 ] || { echo "error: missing invitees"; exit 2; }
+        for inv in "$@"; do validate_ship "$inv"; done
+        exec node "$DIST_DIR/groups.js" invite "$grp" "$@"
+        ;;
+      leave)
+        grp="${1:-}"
+        [ -n "$grp" ] || { echo "error: missing group"; echo "usage: tlon-run groups leave ~host-ship/slug"; exit 2; }
+        validate_group "$grp"
+        exec node "$DIST_DIR/groups.js" leave "$grp"
+        ;;
+      add-channel)
+        grp="${1:-}"
+        [ -n "$grp" ] || { echo "error: missing group"; echo "usage: tlon-run groups add-channel ~host-ship/slug \"Channel Name\" [--kind chat|diary|heap] [--description \"...\"]"; exit 2; }
+        validate_group "$grp"
+        shift
+        title="${1:-}"
+        [ -n "$title" ] || { echo "error: missing channel title"; exit 2; }
+        shift
+        # Pass remaining args (--kind, --description) through
+        exec node "$DIST_DIR/groups.js" add-channel "$grp" "$title" "$@"
+        ;;
       *)
         echo "error: unknown groups subcommand '$sub'"
-        echo "usage: tlon-run groups {list|info ~host/slug}"
+        echo "usage: tlon-run groups {list|info|create|invite|leave|add-channel}"
         exit 2
         ;;
     esac
