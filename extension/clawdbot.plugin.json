@@ -2,5 +2,10 @@
   "id": "tlon-run",
   "name": "Tlon Run",
   "description": "tlon_run tool for read-only Tlon API access",
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "configSchema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  }
 }
