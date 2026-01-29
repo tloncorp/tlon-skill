@@ -62,8 +62,12 @@ Ship name format: `~prefix` or `~prefix-suffix` (e.g., `~zod`, `~sampel-palnet`)
 List and inspect groups.
 
 ```bash
-tlon-run groups list                      # List your groups
-tlon-run groups info ~host-ship/slug      # Get group details and members
+tlon-run groups list                                                          # List your groups
+tlon-run groups info ~host-ship/slug                                          # Get group details and members
+tlon-run groups create "Group Name" [--description "..."]                     # Create a new group
+tlon-run groups invite ~host-ship/slug ~invitee1 ~invitee2                    # Invite members
+tlon-run groups leave ~host-ship/slug                                         # Leave a group
+tlon-run groups add-channel ~host-ship/slug "Name" [--kind chat] [--description "..."]  # Add a channel
 ```
 
 Group format: `~host-ship/group-slug` (e.g., `~nocsyx-lassul/bongtable`)
