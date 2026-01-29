@@ -1,15 +1,17 @@
 ---
 name: tlon
-description: Read-only access to Tlon/Urbit data. Use for checking activity, listing channels/groups, fetching message history, and looking up contacts.
+description: Access Tlon/Urbit via the tlon-run tool. Use for checking activity, listing channels/groups, fetching message history, looking up contacts, and performing actions.
 ---
 
-# Tlon Skill (Safe)
+# Tlon Skill
 
-Use the `tlon-run` command for all Tlon read operations.
+Use the `tlon-run` command for all Tlon operations.
 
 **Do NOT use `npx`, `ts-node`, `npm`, `bash`, `sh`, or any other shell commands.**
 
 ## Ship Selection
+
+Multiple ships can be registered via json files in the config dir. Check `skills/tlon/ships/` to see the list of available ships.
 
 If multiple ships are configured, specify which one to use:
 
@@ -57,7 +59,7 @@ Ship name format: `~prefix` or `~prefix-suffix` (e.g., `~zod`, `~sampel-palnet`)
 
 ### Groups
 
-List and inspect groups (read-only).
+List and inspect groups.
 
 ```bash
 tlon-run groups list                      # List your groups
@@ -92,8 +94,7 @@ Examples:
 
 1. Only use the `tlon-run` commands listed above
 2. Never attempt to run `npx`, `npm`, `ts-node`, `bash`, `sh`, or other executables
-3. This skill is read-only - no modifications to profiles, groups, or messages
-4. All inputs are validated; invalid formats will be rejected
+3. All inputs are validated; invalid formats will be rejected
 
 ## Error Handling
 
