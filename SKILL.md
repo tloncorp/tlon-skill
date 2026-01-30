@@ -141,6 +141,21 @@ npx ts-node scripts/channels.ts group-dms
 npx ts-node scripts/channels.ts groups
 ```
 
+**Get channel info:**
+```bash
+npx ts-node scripts/channels.ts info chat/~host/channel-name
+```
+
+**Update channel metadata:**
+```bash
+npx ts-node scripts/channels.ts update chat/~host/channel-name --title "New Title" [--description "..."]
+```
+
+**Delete a channel (must be group admin):**
+```bash
+npx ts-node scripts/channels.ts delete chat/~host/channel-name
+```
+
 ### Groups
 
 **List your groups:**
@@ -322,6 +337,53 @@ Content format is Tlon's Story structure - an array of verses:
   { "inline": [{ "blockquote": ["A wise quote"] }] }
 ]
 ```
+
+### Moltbot Settings (Hot-Reload Config)
+
+Manage Moltbot's Tlon plugin settings via Urbit's settings-store. Changes apply immediately without gateway restart.
+
+**View current settings:**
+```bash
+npx ts-node scripts/settings.ts get
+```
+
+**Allow a ship to DM the bot:**
+```bash
+npx ts-node scripts/settings.ts allow-dm ~nocsyx-lassul
+```
+
+**Remove DM access:**
+```bash
+npx ts-node scripts/settings.ts remove-dm ~sampel-palnet
+```
+
+**Add a channel to watch:**
+```bash
+npx ts-node scripts/settings.ts allow-channel chat/~nocsyx-lassul/bongtable
+```
+
+**Open a channel to all (anyone can interact):**
+```bash
+npx ts-node scripts/settings.ts open-channel chat/~nocsyx-lassul/bongtable
+```
+
+**Restrict a channel to specific ships:**
+```bash
+npx ts-node scripts/settings.ts restrict-channel chat/~host/channel ~ship1 ~ship2
+```
+
+**Authorize a ship for commands (default auth):**
+```bash
+npx ts-node scripts/settings.ts authorize-ship ~nocsyx-lassul
+```
+
+**Set arbitrary setting:**
+```bash
+npx ts-node scripts/settings.ts set showModelSig true
+npx ts-node scripts/settings.ts set autoDiscover false
+```
+
+Settings are stored in `%settings-store` under desk `moltbot`, bucket `tlon`. The Tlon plugin subscribes to changes and applies them immediately.
 
 ## API Reference
 
