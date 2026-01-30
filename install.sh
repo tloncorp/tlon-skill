@@ -29,6 +29,13 @@ npm ci --production=false
 echo "Creating symlink: $BIN_DIR/tlon-run -> $DEST_DIR/bin/tlon-run"
 ln -sf "$DEST_DIR/bin/tlon-run" "$BIN_DIR/tlon-run"
 
+if ! command -v click &> /dev/null; then
+  curl -L -o click https://raw.githubusercontent.com/urbit/tools/refs/heads/master/pkg/click/click
+  curl -L -o click-format https://raw.githubusercontent.com/urbit/tools/refs/heads/master/pkg/click/click-format
+  chmod +x click click-format
+  mv click click-format "$BIN_DIR/" || true
+fi
+
 # Verify installation
 if command -v tlon-run &>/dev/null; then
   echo "tlon-run installed successfully"
