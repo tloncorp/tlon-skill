@@ -9,6 +9,7 @@ A [Moltbot](https://github.com/moltbot/moltbot) skill for interacting with Tlon/
 - **Contacts**: List and lookup contact profiles
 - **Groups**: List groups and view group details
 - **Messages**: Fetch message history from channels
+- **Click**: Low-level ship operations (OTA, desk management, group admin, DMs, etc.) via the `click` protocol
 
 ## Deployment (Hosted / K8s)
 
@@ -68,6 +69,31 @@ tlon-run contacts get ~sampel-palnet
 tlon-run groups list
 tlon-run messages dm ~friend --limit 20
 ```
+
+### Click (Ship Operations)
+
+The `click` subcommand wraps the Urbit `click` binary to run Hoon threads directly on the ship's pier. This requires the `pierPath` field in the ship config (set automatically by `sidecar-init`).
+
+```bash
+tlon-run click get-code                                        # Get ship access code
+tlon-run click get-vats                                        # Get installed desk versions
+tlon-run click bump                                            # Force OTA check
+tlon-run click ota base kids ~datfen                           # OTA update a desk
+tlon-run click mount base                                      # Mount desk to filesystem
+tlon-run click unmount base                                    # Unmount desk
+tlon-run click commit base                                     # Commit desk changes
+tlon-run click revive groups                                   # Revive a suspended desk
+tlon-run click is-agent-running groups                         # Check if agent is running
+tlon-run click moon-key doznec                                 # Get boot key for a moon
+tlon-run click merge-remote ~datfen base kids                  # Merge remote desk
+tlon-run click merge-to-kids                                   # Merge %base into %kids
+tlon-run click get-remote-hash ~datfen base                    # Get desk hash from remote
+tlon-run click dump-agent-eggs chat                            # Dump agent state
+tlon-run click load-agent-eggs chat                            # Load agent state
+tlon-run click eval '=/  m  (strand ,vase)  (pure:m !>(~))'   # Run arbitrary Hoon thread
+```
+
+Output is returned raw from click. Urbit loobeans: `0` = true, `1` = false.
 
 ---
 

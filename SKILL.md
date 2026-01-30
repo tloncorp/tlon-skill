@@ -88,6 +88,39 @@ Examples:
 - `chat/~nocsyx-lassul/general`
 - `diary/~sampel-palnet/blog`
 
+### Click (Ship Operations)
+
+Low-level ship operations via synchronous khan threads. Output is returned raw, so it needs to be parsed.
+
+```bash
+tlon-run click get-code                                    # Get ship access code
+tlon-run click get-vats                                    # Get installed desk versions
+tlon-run click bump                                        # Bump kiln (force OTA check)
+tlon-run click ota <local-desk> <remote-desk> ~source      # OTA update a desk
+tlon-run click commit <desk>                               # Commit desk changes
+tlon-run click mount <desk>                                # Mount a desk to filesystem
+tlon-run click unmount <desk>                              # Unmount a desk
+tlon-run click revive <desk>                               # Revive a suspended desk
+tlon-run click merge-remote ~source <src-desk> <dst-desk>  # Merge remote desk
+tlon-run click merge-to-kids                               # Merge %base into %kids
+tlon-run click is-agent-running <agent>                    # Check if agent is running (0=yes, 1=no)
+tlon-run click moon-key <moon-prefix>                      # Get boot key for a moon
+tlon-run click get-remote-hash ~source <desk>              # Get desk hash from remote ship
+tlon-run click dump-agent-eggs <agent>                     # Dump agent state to jam file
+tlon-run click load-agent-eggs <agent>                     # Load agent state from jam file
+tlon-run click eval '<hoon thread>'                        # Run arbitrary Hoon thread
+```
+
+**Raw Hoon**
+
+```bash
+tlon-run click eval '=/  m  (strand ,vase)  (pure:m !>(~))'  # Run arbitrary Hoon thread
+```
+
+Pass a Hoon thread string directly to click, exactly as you would with `click -k <pier>`. No validation is applied to the Hoon text.
+
+Note: Click output uses Urbit loobeans where `0` = true/yes and `1` = false/no.
+
 ## Limits
 
 - Activity commands: max 25 items
