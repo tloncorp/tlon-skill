@@ -214,6 +214,8 @@ case "$cmd" in
         exec node "$DIST_DIR/channels.js" delete "$chan"
         ;;
       *) echo "error: unknown channels subcommand '$sub'"; echo "usage: tlon-run channels {dms|group-dms|groups|all|info|update|delete}"; exit 2 ;;
+    esac
+    ;;
 
   contacts)
     sub="${1:-}"
