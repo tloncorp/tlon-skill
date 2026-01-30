@@ -40,6 +40,14 @@ Commands:
   settings {allow-channel|remove-channel}      - Channel watch list
   settings {open-channel|restrict-channel}     - Channel access
   settings {authorize-ship|deauthorize-ship}   - Default auth
+  soul {read|replace|append} [content]          - Edit SOUL.md
+  user {read|replace|append} [content]          - Edit USER.md
+  tools {read|replace|append} [content]         - Edit TOOLS.md
+  agents {read|replace|append} [content]        - Edit AGENTS.md
+  bootstrap {read|replace|append} [content]     - Edit BOOTSTRAP.md
+  heartbeat {read|replace|append} [content]     - Edit HEARTBEAT.md
+  identity {read|replace|append} [content]      - Edit IDENTITY.md
+  memory {read|replace|append} [content]        - Edit MEMORY.md
   click <operation> [args...]                  - Ship operations via click
 
 Ship Selection:
@@ -54,6 +62,49 @@ Environment:
   TLON_SKILL_DIR  Override skill directory (default: /usr/local/share/moltbot/skills/tlon)
   TLON_SHIP       Default ship name (without ~)
 EOF
+    exit 0
+    ;;
+esac
+
+# Workspace file commands (no ship/dist needed)
+resolve_workspace_file() {
+  local name="$1"
+  [[ "$name" =~ ^[A-Za-z][A-Za-z0-9_-]*$ ]] || { echo "error: invalid file name '$name'"; exit 2; }
+  [ -n "$WORKSPACE_DIR" ] || { echo "error: WORKSPACE_DIR not set"; exit 2; }
+  [ -d "$WORKSPACE_DIR" ] || { echo "error: workspace not found: $WORKSPACE_DIR"; exit 2; }
+  echo "$WORKSPACE_DIR/${name}.md"
+}
+
+case "${1:-}" in
+  soul|user|tools|agents|bootstrap|heartbeat|identity|memory)
+    cmd="$1"
+    shift
+    file_name="$(echo "$cmd" | tr '[:lower:]' '[:upper:]')"
+    target="$(resolve_workspace_file "$file_name")"
+    sub="${1:-}"
+    shift || true
+    case "$sub" in
+      read)
+        [ -f "$target" ] && cat "$target" || echo "(empty)"
+        ;;
+      replace)
+        content="${1:-}"
+        [ -n "$content" ] || { echo "error: missing content"; exit 2; }
+        printf '%s\n' "$content" > "$target"
+        echo "ok: replaced ${file_name}.md"
+        ;;
+      append)
+        content="${1:-}"
+        [ -n "$content" ] || { echo "error: missing content"; exit 2; }
+        printf '\n%s\n' "$content" >> "$target"
+        echo "ok: appended to ${file_name}.md"
+        ;;
+      *)
+        echo "error: unknown subcommand '$sub'"
+        echo "usage: tlon-run $cmd {read|replace|append} [content]"
+        exit 2
+        ;;
+    esac
     exit 0
     ;;
 esac
@@ -839,15 +890,44 @@ case "$cmd" in
     esac
     ;;
 
+  soul|user|tools|agents|bootstrap|heartbeat|identity|memory)
+    file_name="$(echo "$cmd" | tr '[:lower:]' '[:upper:]')"
+    target="$(resolve_workspace_file "$file_name")"
+    sub="${1:-}"
+    shift || true
+    case "$sub" in
+      read)
+        [ -f "$target" ] && cat "$target" || echo "(empty)"
+        ;;
+      replace)
+        content="${1:-}"
+        [ -n "$content" ] || { echo "error: missing content"; exit 2; }
+        printf '%s\n' "$content" > "$target"
+        echo "ok: replaced ${file_name}.md"
+        ;;
+      append)
+        content="${1:-}"
+        [ -n "$content" ] || { echo "error: missing content"; exit 2; }
+        printf '\n%s\n' "$content" >> "$target"
+        echo "ok: appended to ${file_name}.md"
+        ;;
+      *)
+        echo "error: unknown subcommand '$sub'"
+        echo "usage: tlon-run $cmd {read|replace|append} [content]"
+        exit 2
+        ;;
+    esac
+    ;;
+
   "")
     echo "error: no command specified"
-    echo "usage: tlon-run {activity|channels|contacts|groups|messages|dms|posts|notebook|settings|click|help}"
+    echo "usage: tlon-run {activity|channels|contacts|groups|messages|dms|posts|notebook|settings|soul|user|tools|agents|bootstrap|heartbeat|identity|memory|click|help}"
     exit 2
     ;;
 
   *)
     echo "error: unknown command '$cmd'"
-    echo "usage: tlon-run {activity|channels|contacts|groups|messages|dms|posts|notebook|settings|click|help}"
+    echo "usage: tlon-run {activity|channels|contacts|groups|messages|dms|posts|notebook|settings|soul|user|tools|agents|bootstrap|heartbeat|identity|memory|click|help}"
     exit 2
     ;;
 esac

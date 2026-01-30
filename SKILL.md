@@ -181,6 +181,25 @@ Examples:
 - `chat/~nocsyx-lassul/general`
 - `diary/~sampel-palnet/blog`
 
+### Workspace Files
+
+Edit your own workspace files (SOUL.md, USER.md, TOOLS.md, AGENTS.md, etc.).
+
+```bash
+tlon-run soul read                    # Read SOUL.md
+tlon-run soul replace "new content"   # Replace SOUL.md contents
+tlon-run soul append "extra notes"    # Append to SOUL.md
+
+tlon-run user read                    # Same operations for USER.md
+tlon-run tools read                   # TOOLS.md
+tlon-run agents read                  # AGENTS.md
+tlon-run heartbeat replace "..."      # HEARTBEAT.md
+tlon-run identity read                # IDENTITY.md
+tlon-run memory read                  # MEMORY.md
+```
+
+Works for any workspace .md file. Content persists across sessions.
+
 ### Click (Ship Operations)
 
 Low-level ship operations via synchronous khan threads. Output is returned raw, so it needs to be parsed.
