@@ -69,9 +69,9 @@ esac
 # Workspace file commands (no ship/dist needed)
 resolve_workspace_file() {
   local name="$1"
-  [[ "$name" =~ ^[A-Za-z][A-Za-z0-9_-]*$ ]] || { echo "error: invalid file name '$name'"; exit 2; }
-  [ -n "$WORKSPACE_DIR" ] || { echo "error: WORKSPACE_DIR not set"; exit 2; }
-  [ -d "$WORKSPACE_DIR" ] || { echo "error: workspace not found: $WORKSPACE_DIR"; exit 2; }
+  [[ "$name" =~ ^[A-Za-z][A-Za-z0-9_-]*$ ]] || { echo "error: invalid file name '$name'" >&2; exit 2; }
+  [ -n "${WORKSPACE_DIR:-}" ] || { echo "error: WORKSPACE_DIR not set" >&2; exit 2; }
+  [ -d "$WORKSPACE_DIR" ] || { echo "error: workspace not found: $WORKSPACE_DIR" >&2; exit 2; }
   echo "$WORKSPACE_DIR/${name}.md"
 }
 
@@ -885,35 +885,6 @@ case "$cmd" in
       *)
         echo "error: unknown click operation '$op'"
         echo "usage: tlon-run click <operation> [args...]"
-        exit 2
-        ;;
-    esac
-    ;;
-
-  soul|user|tools|agents|bootstrap|heartbeat|identity|memory)
-    file_name="$(echo "$cmd" | tr '[:lower:]' '[:upper:]')"
-    target="$(resolve_workspace_file "$file_name")"
-    sub="${1:-}"
-    shift || true
-    case "$sub" in
-      read)
-        [ -f "$target" ] && cat "$target" || echo "(empty)"
-        ;;
-      replace)
-        content="${1:-}"
-        [ -n "$content" ] || { echo "error: missing content"; exit 2; }
-        printf '%s\n' "$content" > "$target"
-        echo "ok: replaced ${file_name}.md"
-        ;;
-      append)
-        content="${1:-}"
-        [ -n "$content" ] || { echo "error: missing content"; exit 2; }
-        printf '\n%s\n' "$content" >> "$target"
-        echo "ok: appended to ${file_name}.md"
-        ;;
-      *)
-        echo "error: unknown subcommand '$sub'"
-        echo "usage: tlon-run $cmd {read|replace|append} [content]"
         exit 2
         ;;
     esac
