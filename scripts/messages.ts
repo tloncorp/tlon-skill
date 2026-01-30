@@ -203,11 +203,86 @@ function formatTime(timeVal: string | number): string {
   }
 }
 
-// Get a DM channel ID
-function getDmChannelId(ship: string): string {
+// Fetch DM messages via the chat agent (not channels)
+async function fetchDmMessages(ship: string, limit: number = 20, resolveCites: boolean = false): Promise<void> {
+  getConfig();
   const normalizedShip = normalizeShip(ship);
-  // DMs are stored as chat/~ship/dm
-  return `chat/${normalizedShip.slice(1)}/dm`;
+
+  console.log(`Fetching DMs with: ${normalizedShip}`);
+  console.log(`Limit: ${limit}${resolveCites ? ' (resolving quotes)' : ''}\n`);
+
+  try {
+    // DMs use the chat agent, not channels
+    const data = await scry<any>({
+      app: 'chat',
+      path: `/dm/${normalizedShip}/writs/newest/${limit}/outline`,
+    });
+
+    if (!data) {
+      console.log('No messages found.');
+      return;
+    }
+
+    // Parse writs from response
+    const writsObj = data.writs || data.posts || data;
+    let entries: [string, any][];
+
+    if (typeof writsObj === 'object' && !Array.isArray(writsObj)) {
+      entries = Object.entries(writsObj);
+    } else if (Array.isArray(writsObj)) {
+      entries = writsObj.map((item: any, i: number) => [String(i), item]);
+    } else {
+      console.log('No messages found.');
+      return;
+    }
+
+    // Sort by sent time (oldest first for reading chronologically)
+    entries.sort((a, b) => {
+      const timeA = a[1]?.essay?.sent || a[1]?.memo?.sent || 0;
+      const timeB = b[1]?.essay?.sent || b[1]?.memo?.sent || 0;
+      return timeA - timeB;
+    });
+
+    const recent = entries.slice(-limit);
+
+    if (recent.length === 0) {
+      console.log('No messages found.');
+      return;
+    }
+
+    console.log(`=== DMs with ${normalizedShip} (${recent.length}) ===\n`);
+
+    for (const [id, item] of recent) {
+      const essay = item.essay || item.memo || item;
+      const seal = item.seal;
+      const author = essay?.author || "unknown";
+      const time = essay?.sent ? formatTime(essay.sent) : 'unknown';
+      const replyRef = seal?.meta?.replyCount ? ` (${seal.meta.replyCount} replies)` : '';
+
+      let quotedText = '';
+      if (resolveCites && essay?.content) {
+        const cites = extractCites(essay.content);
+        for (const cite of cites) {
+          const citedContent = await fetchCiteContent(cite);
+          if (citedContent) {
+            const citeAuthor = cite.author || 'unknown';
+            quotedText += `> ${citeAuthor} wrote: ${citedContent.substring(0, 200)}${citedContent.length > 200 ? '...' : ''}\n`;
+          }
+        }
+      }
+
+      const text = extractText(essay?.content || []);
+
+      console.log(`[${author}] ${time}${replyRef}`);
+      if (quotedText) console.log(quotedText);
+      console.log(text.substring(0, 500));
+      if (text.length > 500) console.log('...');
+      console.log('');
+    }
+  } catch (error: any) {
+    console.log(`Error: ${error.message}`);
+    console.log('Note: Ensure the ship name is correct (e.g., ~sampel-palnet)');
+  }
 }
 
 // Extract all cites from content for resolution
@@ -348,8 +423,7 @@ async function main() {
         console.log('Usage: npx ts-node scripts/messages.ts dm ~ship [--limit N] [--resolve-cites]');
         process.exit(1);
       }
-      const dmChannel = getDmChannelId(ship);
-      await fetchMessages(dmChannel, limit, resolveCites);
+      await fetchDmMessages(ship, limit, resolveCites);
       break;
     }
     
