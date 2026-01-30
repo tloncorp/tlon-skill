@@ -470,6 +470,52 @@ async function deleteRole(groupId: string, roleId: string) {
   console.log(`✅ Role "${roleId}" deleted.`);
 }
 
+// Update a role's metadata
+async function updateRole(groupId: string, roleId: string, options: { title?: string; description?: string }) {
+  getConfig();
+  
+  // Get current role info first
+  const group = await scry<GroupV7>({
+    app: 'groups',
+    path: `/v2/ui/groups/${groupId}`,
+  });
+  
+  const currentRole = group.roles?.[roleId];
+  if (!currentRole) {
+    throw new Error(`Role "${roleId}" not found in group ${groupId}`);
+  }
+  
+  const meta = {
+    title: options.title ?? currentRole.title,
+    description: options.description ?? currentRole.description,
+    image: currentRole.image || '',
+    cover: currentRole.cover || '',
+  };
+  
+  console.log(`Updating role "${roleId}" in ${groupId}...`);
+  
+  await poke({
+    app: 'groups',
+    mark: 'group-action-4',
+    json: {
+      group: {
+        flag: groupId,
+        'a-group': {
+          role: {
+            roles: [roleId],
+            'a-role': {
+              edit: meta,
+            },
+          },
+        },
+      },
+    },
+  });
+  
+  console.log(`✅ Role "${roleId}" updated.`);
+  console.log(`   Title: ${meta.title}`);
+}
+
 // Assign a role to members
 async function assignRole(groupId: string, roleId: string, ships: string[]) {
   getConfig();
@@ -828,6 +874,23 @@ async function main() {
       break;
     }
     
+    case 'update-role': {
+      const groupId = args[1];
+      const roleId = args[2];
+      if (!groupId || !roleId) {
+        console.error('Usage: groups.ts update-role <group-id> <role-id> --title "..." [--description "..."]');
+        process.exit(1);
+      }
+      const title = getOption(args, 'title');
+      const description = getOption(args, 'description');
+      if (!title && !description) {
+        console.error('At least one option required: --title or --description');
+        process.exit(1);
+      }
+      await updateRole(groupId, roleId, { title, description });
+      break;
+    }
+    
     case 'assign-role': {
       const groupId = args[1];
       const roleId = args[2];
@@ -925,6 +988,7 @@ async function main() {
       console.log('');
       console.log('Role Management:');
       console.log('  npx ts-node scripts/groups.ts add-role <group-id> <role-id> --title "..." [--description "..."]');
+      console.log('  npx ts-node scripts/groups.ts update-role <group-id> <role-id> --title "..." [--description "..."]');
       console.log('  npx ts-node scripts/groups.ts delete-role <group-id> <role-id>');
       console.log('  npx ts-node scripts/groups.ts assign-role <group-id> <role-id> <ship> [<ship2> ...]');
       console.log('  npx ts-node scripts/groups.ts remove-role <group-id> <role-id> <ship> [<ship2> ...]');
