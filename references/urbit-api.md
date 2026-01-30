@@ -70,10 +70,14 @@ interface ContactBookProfile {
 - `/dm` - List of DM ship names (string[])
 - `/clubs` - Group DMs (Clubs)
 - `/blocked` - Blocked ships
+- `/v3/dm/~ship/writs/newest/{count}/light` - DM message history (light = no replies)
+- `/v3/dm/~ship/writs/newest/{count}/heavy` - DM message history (heavy = with replies)
+- `/v3/club/{clubId}/writs/newest/{count}/light` - Group DM message history
+- `/v2/dm/~ship/writs/writ/id/{author}/{postId}` - Single DM post with replies
 
 ### Poke Marks
-- `chat-dm-action` - Send DM
-- `chat-club-action-0` - Group DM operations
+- `chat-dm-action-1` - Send DM
+- `chat-club-action-1` - Group DM operations
 - `chat-remark-action` - Mark read
 
 ## Groups Agent

@@ -446,31 +446,17 @@ case "$cmd" in
     case "$sub" in
       dm)
         ship="${1:-}"
-        [ -n "$ship" ] || { echo "error: missing ship"; echo "usage: tlon-run messages dm ~ship [--limit N]"; exit 2; }
+        [ -n "$ship" ] || { echo "error: missing ship"; echo "usage: tlon-run messages dm ~ship [--limit N] [--resolve-cites]"; exit 2; }
         validate_ship "$ship"
         shift
-
-        if [ "${1:-}" = "--limit" ]; then
-          limit="${2:-}"
-          validate_limit "$limit" 50
-          exec node "$DIST_DIR/messages.js" dm "$ship" --limit "$limit"
-        else
-          exec node "$DIST_DIR/messages.js" dm "$ship"
-        fi
+        exec node "$DIST_DIR/messages.js" dm "$ship" "$@"
         ;;
       channel|history)
         chan="${1:-}"
-        [ -n "$chan" ] || { echo "error: missing channel"; echo "usage: tlon-run messages channel chat/~host/slug [--limit N]"; exit 2; }
+        [ -n "$chan" ] || { echo "error: missing channel"; echo "usage: tlon-run messages channel chat/~host/slug [--limit N] [--resolve-cites]"; exit 2; }
         validate_channel "$chan"
         shift
-
-        if [ "${1:-}" = "--limit" ]; then
-          limit="${2:-}"
-          validate_limit "$limit" 50
-          exec node "$DIST_DIR/messages.js" "$sub" "$chan" --limit "$limit"
-        else
-          exec node "$DIST_DIR/messages.js" "$sub" "$chan"
-        fi
+        exec node "$DIST_DIR/messages.js" "$sub" "$chan" "$@"
         ;;
       search)
         query="${1:-}"
