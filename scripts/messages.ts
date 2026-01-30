@@ -212,10 +212,10 @@ async function fetchDmMessages(ship: string, limit: number = 20, resolveCites: b
   console.log(`Limit: ${limit}${resolveCites ? ' (resolving quotes)' : ''}\n`);
 
   try {
-    // DMs use the chat agent, not channels
+    // DMs use the chat agent with v3 API, not channels
     const data = await scry<any>({
       app: 'chat',
-      path: `/dm/${normalizedShip}/writs/newest/${limit}/outline`,
+      path: `/v3/dm/${normalizedShip}/writs/newest/${limit}/light`,
     });
 
     if (!data) {
