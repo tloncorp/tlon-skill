@@ -187,18 +187,27 @@ Edit your own workspace files (SOUL.md, USER.md, TOOLS.md, AGENTS.md, etc.).
 
 ```bash
 tlon-run soul read                    # Read SOUL.md
-tlon-run soul replace "new content"   # Replace SOUL.md contents
-tlon-run soul append "extra notes"    # Append to SOUL.md
+tlon-run soul replace "short text"    # Replace from argument (simple strings only)
+tlon-run soul append "short note"     # Append from argument
+
+# For multiline / markdown content, pipe via stdin (preferred):
+cat <<'EOF' | tlon-run soul replace -
+# My Heading
+
+Paragraph with **markdown** and multiple lines.
+EOF
+
+echo "one-liner" | tlon-run memory append -
 
 tlon-run user read                    # Same operations for USER.md
 tlon-run tools read                   # TOOLS.md
 tlon-run agents read                  # AGENTS.md
-tlon-run heartbeat replace "..."      # HEARTBEAT.md
+tlon-run heartbeat read               # HEARTBEAT.md
 tlon-run identity read                # IDENTITY.md
 tlon-run memory read                  # MEMORY.md
 ```
 
-Works for any workspace .md file. Content persists across sessions.
+Content persists across sessions. Pass `-` (or omit the content arg) to read from stdin — **always use stdin for multiline content** to avoid shell quoting issues.
 
 ### Click (Ship Operations)
 

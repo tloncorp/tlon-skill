@@ -40,14 +40,14 @@ Commands:
   settings {allow-channel|remove-channel}      - Channel watch list
   settings {open-channel|restrict-channel}     - Channel access
   settings {authorize-ship|deauthorize-ship}   - Default auth
-  soul {read|replace|append} [content]          - Edit SOUL.md
-  user {read|replace|append} [content]          - Edit USER.md
-  tools {read|replace|append} [content]         - Edit TOOLS.md
-  agents {read|replace|append} [content]        - Edit AGENTS.md
-  bootstrap {read|replace|append} [content]     - Edit BOOTSTRAP.md
-  heartbeat {read|replace|append} [content]     - Edit HEARTBEAT.md
-  identity {read|replace|append} [content]      - Edit IDENTITY.md
-  memory {read|replace|append} [content]        - Edit MEMORY.md
+  soul {read|replace|append} [content|-]         - Edit SOUL.md
+  user {read|replace|append} [content|-]         - Edit USER.md
+  tools {read|replace|append} [content|-]        - Edit TOOLS.md
+  agents {read|replace|append} [content|-]       - Edit AGENTS.md
+  bootstrap {read|replace|append} [content|-]    - Edit BOOTSTRAP.md
+  heartbeat {read|replace|append} [content|-]    - Edit HEARTBEAT.md
+  identity {read|replace|append} [content|-]     - Edit IDENTITY.md
+  memory {read|replace|append} [content|-]       - Edit MEMORY.md
   click <operation> [args...]                  - Ship operations via click
 
 Ship Selection:
@@ -90,25 +90,36 @@ case "${1:-}" in
     target="$(resolve_workspace_file "$file_name")"
     sub="${1:-}"
     shift || true
+    # Read content from arg or stdin (stdin preferred for multiline)
+    read_content() {
+      if [ $# -gt 0 ] && [ -n "$1" ] && [ "$1" != "-" ]; then
+        printf '%s' "$1"
+      elif ! [ -t 0 ]; then
+        cat
+      else
+        echo "error: missing content (pass as argument or pipe via stdin)" >&2
+        exit 2
+      fi
+    }
     case "$sub" in
       read)
         [ -f "$target" ] && cat "$target" || echo "(empty)"
         ;;
       replace)
-        content="${1:-}"
-        [ -n "$content" ] || { echo "error: missing content"; exit 2; }
+        content="$(read_content "${1:-}")"
+        [ -n "$content" ] || { echo "error: empty content"; exit 2; }
         printf '%s\n' "$content" > "$target"
         echo "ok: replaced ${file_name}.md"
         ;;
       append)
-        content="${1:-}"
-        [ -n "$content" ] || { echo "error: missing content"; exit 2; }
+        content="$(read_content "${1:-}")"
+        [ -n "$content" ] || { echo "error: empty content"; exit 2; }
         printf '\n%s\n' "$content" >> "$target"
         echo "ok: appended to ${file_name}.md"
         ;;
       *)
         echo "error: unknown subcommand '$sub'"
-        echo "usage: tlon-run $cmd {read|replace|append} [content]"
+        echo "usage: tlon-run $cmd {read|replace|append} [content | -]"
         exit 2
         ;;
     esac
