@@ -3,10 +3,13 @@
  * Messages API for Tlon
  * 
  * Usage:
- *   npx ts-node scripts/messages.ts dm ~sampel-palnet [--limit N]
- *   npx ts-node scripts/messages.ts channel chat/~host/channel-slug [--limit N]
- *   npx ts-node scripts/messages.ts history "chat/~host/channel-slug" [--limit N]
+ *   npx ts-node scripts/messages.ts dm ~sampel-palnet [--limit N] [--resolve-cites]
+ *   npx ts-node scripts/messages.ts channel chat/~host/channel-slug [--limit N] [--resolve-cites]
+ *   npx ts-node scripts/messages.ts history "chat/~host/channel-slug" [--limit N] [--resolve-cites]
  *   npx ts-node scripts/messages.ts search "query" --channel chat/~host/channel-slug
+ * 
+ * Options:
+ *   --resolve-cites, --quotes   Fetch and display quoted/cited message content
  */
 
 import { scry, getConfig, normalizeShip } from './urbit-client';
@@ -83,6 +86,63 @@ function extractInlines(inlines: any[]): string {
   }).join('');
 }
 
+// Cite types
+interface ParsedCite {
+  type: "chan" | "group" | "desk" | "bait";
+  nest?: string;
+  author?: string;
+  postId?: string;
+  group?: string;
+  where?: string;
+}
+
+// Extract cite info from a cite block
+function parseCite(cite: any): ParsedCite | null {
+  if (!cite || typeof cite !== 'object') return null;
+  
+  if (cite.chan && typeof cite.chan === 'object') {
+    const { nest, where } = cite.chan;
+    const whereMatch = where?.match(/\/msg\/(~[a-z-]+)\/(.+)/);
+    return {
+      type: 'chan',
+      nest,
+      where,
+      author: whereMatch?.[1],
+      postId: whereMatch?.[2],
+    };
+  }
+  if (cite.group && typeof cite.group === 'string') {
+    return { type: 'group', group: cite.group };
+  }
+  if (cite.desk && typeof cite.desk === 'object') {
+    return { type: 'desk', where: cite.desk.where };
+  }
+  if (cite.bait && typeof cite.bait === 'object') {
+    return { type: 'bait', group: cite.bait.group, nest: cite.bait.graph, where: cite.bait.where };
+  }
+  return null;
+}
+
+// Fetch cited message content
+async function fetchCiteContent(cite: ParsedCite): Promise<string | null> {
+  if (cite.type !== 'chan' || !cite.nest || !cite.postId) return null;
+  
+  try {
+    const scryPath = `/v4/${cite.nest}/posts/post/${cite.postId}`;
+    const data = await scry<any>({
+      app: 'channels',
+      path: scryPath,
+    });
+    
+    if (data?.essay?.content) {
+      return extractText(data.essay.content);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function extractBlocks(blocks: any): string {
   // Handle both single block and array of blocks
   const blockArray = Array.isArray(blocks) ? blocks : [blocks];
@@ -92,6 +152,16 @@ function extractBlocks(blocks: any): string {
     if (block.quote) return `> ${extractText(block.quote)}`;
     if (block.code) return `\`\`\`${block.code.lang || ''}\n${block.code.code}\n\`\`\``;
     if (block.header) return `## ${block.header.tag} ${extractText(block.header.content)}`;
+    if (block.cite) {
+      const cite = parseCite(block.cite);
+      if (cite?.type === 'chan' && cite.author) {
+        return `> [quoted: ${cite.author}]`;
+      }
+      if (cite?.type === 'group' && cite.group) {
+        return `> [ref: group ${cite.group}]`;
+      }
+      return '> [quoted message]';
+    }
     if (block.list) {
       const items = Array.isArray(block.list) ? block.list : [block.list];
       return items.map((item: any, i: number) => {
@@ -140,12 +210,26 @@ function getDmChannelId(ship: string): string {
   return `chat/${normalizedShip.slice(1)}/dm`;
 }
 
+// Extract all cites from content for resolution
+function extractCites(content: any[]): ParsedCite[] {
+  const cites: ParsedCite[] = [];
+  if (!Array.isArray(content)) return cites;
+  
+  for (const block of content) {
+    if (block?.block?.cite) {
+      const cite = parseCite(block.block.cite);
+      if (cite) cites.push(cite);
+    }
+  }
+  return cites;
+}
+
 // Fetch messages from a channel
-async function fetchMessages(channel: string, limit: number = 20): Promise<void> {
+async function fetchMessages(channel: string, limit: number = 20, resolveCites: boolean = false): Promise<void> {
   getConfig(); // Validate config
   
   console.log(`Fetching messages from: ${channel}`);
-  console.log(`Limit: ${limit}\n`);
+  console.log(`Limit: ${limit}${resolveCites ? ' (resolving quotes)' : ''}\n`);
   
   try {
     // Use channels v4 API with outline endpoint
@@ -185,10 +269,25 @@ async function fetchMessages(channel: string, limit: number = 20): Promise<void>
       const seal = item.seal;
       const author = essay?.author || "unknown";
       const time = essay?.sent ? formatTime(essay.sent) : 'unknown';
-      const text = extractText(essay?.content || []);
       const replyRef = seal?.meta?.replyCount ? ` (${seal.meta.replyCount} replies)` : '';
       
+      // Resolve cited content if requested
+      let quotedText = '';
+      if (resolveCites && essay?.content) {
+        const cites = extractCites(essay.content);
+        for (const cite of cites) {
+          const citedContent = await fetchCiteContent(cite);
+          if (citedContent) {
+            const citeAuthor = cite.author || 'unknown';
+            quotedText += `> ${citeAuthor} wrote: ${citedContent.substring(0, 200)}${citedContent.length > 200 ? '...' : ''}\n`;
+          }
+        }
+      }
+      
+      const text = extractText(essay?.content || []);
+      
       console.log(`[${author}] ${time}${replyRef}`);
+      if (quotedText) console.log(quotedText);
       console.log(text.substring(0, 500));
       if (text.length > 500) console.log('...');
       console.log('');
@@ -226,6 +325,7 @@ async function main() {
   // Parse flags
   let limit = 20;
   let channel: string | null = null;
+  let resolveCites = false;
   
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--limit' && args[i + 1]) {
@@ -236,37 +336,40 @@ async function main() {
       channel = args[i + 1];
       i++;
     }
+    if (args[i] === '--resolve-cites' || args[i] === '--quotes') {
+      resolveCites = true;
+    }
   }
   
   switch (command) {
     case 'dm': {
       const ship = args[1];
       if (!ship) {
-        console.log('Usage: npx ts-node scripts/messages.ts dm ~ship [--limit N]');
+        console.log('Usage: npx ts-node scripts/messages.ts dm ~ship [--limit N] [--resolve-cites]');
         process.exit(1);
       }
       const dmChannel = getDmChannelId(ship);
-      await fetchMessages(dmChannel, limit);
+      await fetchMessages(dmChannel, limit, resolveCites);
       break;
     }
     
     case 'channel': {
       const channelPath = args[1];
       if (!channelPath) {
-        console.log('Usage: npx ts-node scripts/messages.ts channel chat/~host/slug [--limit N]');
+        console.log('Usage: npx ts-node scripts/messages.ts channel chat/~host/slug [--limit N] [--resolve-cites]');
         process.exit(1);
       }
-      await fetchMessages(channelPath, limit);
+      await fetchMessages(channelPath, limit, resolveCites);
       break;
     }
     
     case 'history': {
       const channelPath = args[1] || channel;
       if (!channelPath) {
-        console.log('Usage: npx ts-node scripts/messages.ts history "chat/~host/slug" [--limit N]');
+        console.log('Usage: npx ts-node scripts/messages.ts history "chat/~host/slug" [--limit N] [--resolve-cites]');
         process.exit(1);
       }
-      await fetchMessages(channelPath, limit);
+      await fetchMessages(channelPath, limit, resolveCites);
       break;
     }
     
@@ -283,10 +386,15 @@ async function main() {
     
     default:
       console.log('Usage:');
-      console.log('  npx ts-node scripts/messages.ts dm ~sampel-palnet [--limit N]');
-      console.log('  npx ts-node scripts/messages.ts channel chat/~host/channel-slug [--limit N]');
-      console.log('  npx ts-node scripts/messages.ts history "chat/~host/channel-slug" [--limit N]');
+      console.log('  npx ts-node scripts/messages.ts dm ~sampel-palnet [--limit N] [--resolve-cites]');
+      console.log('  npx ts-node scripts/messages.ts channel chat/~host/channel-slug [--limit N] [--resolve-cites]');
+      console.log('  npx ts-node scripts/messages.ts history "chat/~host/channel-slug" [--limit N] [--resolve-cites]');
       console.log('  npx ts-node scripts/messages.ts search "query" --channel chat/~host/slug');
+      console.log('');
+      console.log('Options:');
+      console.log('  --limit N         Number of messages to fetch (default: 20)');
+      console.log('  --resolve-cites   Fetch and display quoted message content');
+      console.log('  --quotes          Alias for --resolve-cites');
       process.exit(1);
   }
 }

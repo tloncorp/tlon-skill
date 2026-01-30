@@ -1,6 +1,6 @@
 ---
 name: tlon
-description: Access Tlon/Urbit via the tlon-run tool. Use for checking activity, listing channels/groups, fetching message history, looking up contacts, and performing actions.
+description: Access Tlon/Urbit via the tlon-run tool. Use for checking activity, listing channels/groups, fetching message history, looking up contacts, posting to channels, sending DMs, and performing ship operations. Complements the Tlon channel plugin.
 ---
 
 # Tlon Skill
@@ -140,3 +140,9 @@ If a command fails:
 - Check the ship/group/channel format matches the examples
 - Ensure the resource exists and you have access
 - Limits must be within the allowed range
+
+## Notes
+
+- All ship names should include the `~` prefix (scripts will normalize if missing)
+- Post IDs are Unix timestamps in milliseconds
+- Channel nests follow format: `<kind>/~<host>/<name>` where kind is chat, diary, or heap

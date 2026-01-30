@@ -5,6 +5,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 
 export interface UrbitConfig {
   url: string;
@@ -16,12 +17,47 @@ let config: UrbitConfig | null = null;
 let authCookie: string | null = null;
 
 /**
+ * Try to read Tlon credentials from Moltbot config
+ */
+function getConfigFromMoltbot(): UrbitConfig | null {
+  // Check common Moltbot config locations
+  const configPaths = [
+    process.env.MOLTBOT_CONFIG,
+    path.join(os.homedir(), '.clawdbot', 'moltbot.json'),
+    path.join(os.homedir(), '.moltbot', 'moltbot.json'),
+  ].filter(Boolean) as string[];
+
+  for (const configPath of configPaths) {
+    try {
+      if (!fs.existsSync(configPath)) continue;
+
+      const raw = fs.readFileSync(configPath, 'utf-8');
+      const parsed = JSON.parse(raw);
+
+      const tlon = parsed?.channels?.tlon;
+      if (tlon?.url && tlon?.ship && tlon?.code) {
+        return {
+          url: tlon.url,
+          ship: tlon.ship.replace(/^~/, ''),
+          code: tlon.code,
+        };
+      }
+    } catch {
+      // Continue to next path
+    }
+  }
+
+  return null;
+}
+
+/**
  * Get config from ship file or environment
  *
  * Priority:
  * 1. TLON_CONFIG_FILE env var (direct path to config file)
  * 2. TLON_SHIP + TLON_SKILL_DIR (loads ships/<ship>.json)
- * 3. Legacy URBIT_URL/URBIT_SHIP/URBIT_CODE env vars
+ * 3. URBIT_URL/URBIT_SHIP/URBIT_CODE env vars
+ * 4. Moltbot config (~/.clawdbot/moltbot.json)
  */
 export function getConfig(): UrbitConfig {
   // Option 1: Direct config file path
@@ -47,8 +83,17 @@ export function getConfig(): UrbitConfig {
     return { url, ship: ship.replace(/^~/, ""), code };
   }
 
+  // Option 4: Fall back to Moltbot config
+  const moltbotConfig = getConfigFromMoltbot();
+  if (moltbotConfig) {
+    return moltbotConfig;
+  }
+
   throw new Error(
-    "Missing Urbit config. Set TLON_CONFIG_FILE, or TLON_SHIP + TLON_SKILL_DIR, or URBIT_URL/URBIT_SHIP/URBIT_CODE."
+    "Missing Urbit config. Either:\n" +
+    "  - Set TLON_CONFIG_FILE, or TLON_SHIP + TLON_SKILL_DIR, or\n" +
+    "  - Set URBIT_URL, URBIT_SHIP, and URBIT_CODE environment variables, or\n" +
+    "  - Configure Tlon channel in Moltbot (~/.clawdbot/moltbot.json)"
   );
 }
 
@@ -85,7 +130,7 @@ async function authenticate(): Promise<string> {
   if (authCookie) return authCookie;
 
   config = getConfig();
-  
+
   const resp = await fetch(`${config.url}/~/login`, {
     method: "POST",
     headers: {
@@ -106,7 +151,7 @@ async function authenticate(): Promise<string> {
   // Extract just the urbauth cookie
   const match = cookie.match(/urbauth-[^=]+=([^;]+)/);
   authCookie = match ? cookie.split(";")[0] : cookie.split(";")[0];
-  
+
   return authCookie;
 }
 
@@ -119,9 +164,9 @@ export async function scry<T>(params: {
 }): Promise<T> {
   const cookie = await authenticate();
   const cfg = config!;
-  
+
   const url = `${cfg.url}/~/scry/${params.app}${params.path}.json`;
-  
+
   const resp = await fetch(url, {
     method: "GET",
     headers: {
@@ -147,11 +192,11 @@ export async function poke(params: {
 }): Promise<void> {
   const cookie = await authenticate();
   const cfg = config!;
-  
+
   // Generate a unique channel ID
   const channelId = `skill-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const channelUrl = `${cfg.url}/~/channel/${channelId}`;
-  
+
   // Open channel and send poke
   const pokeReq = {
     id: 1,

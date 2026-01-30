@@ -4,11 +4,14 @@ A [Moltbot](https://github.com/moltbot/moltbot) skill for interacting with Tlon/
 
 ## Features
 
+- **Groups**: Full group administration (create, invite, kick, ban, roles, privacy)
+- **Channels**: List, create, update, delete channels
+- **Posts**: Send messages, reply, react, delete in channels
+- **DMs**: Send direct messages, manage DM requests
+- **Messages**: Fetch message history with quote/cite resolution
 - **Activity**: View mentions, replies, and unread notifications
-- **Channels**: List DMs, group DMs, and subscribed groups
-- **Contacts**: List and lookup contact profiles
-- **Groups**: List groups and view group details
-- **Messages**: Fetch message history from channels
+- **Contacts**: List, get, and update contact profiles
+- **Settings**: Hot-reload Moltbot plugin config via settings-store
 - **Click**: Low-level ship operations (OTA, desk management, group admin, DMs, etc.) via the `click` protocol
 
 ## Deployment (Hosted / K8s)
@@ -126,28 +129,195 @@ export URBIT_SHIP="~your-ship"
 export URBIT_CODE="sampel-ticlyt-migfun-falmel"
 ```
 
-### All Scripts
+The skill also reads credentials from Moltbot's config if environment variables aren't set.
 
-#### Groups
+---
+
+## Groups
+
+Full group administration including membership, roles, and privacy.
 
 ```bash
 npx ts-node scripts/groups.ts list
+
+# Get group info (members, channels, roles, pending requests)
+npx ts-node scripts/groups.ts info ~host/group-name
+
+# Create a new group
 npx ts-node scripts/groups.ts create "My Group" --description "A cool group"
-npx ts-node scripts/groups.ts info ~your-ship/group-slug
-npx ts-node scripts/groups.ts invite ~your-ship/group-slug ~friend1 ~friend2
-npx ts-node scripts/groups.ts leave ~host-ship/group-slug
+
+# Update group metadata
+npx ts-node scripts/groups.ts update ~you/group --title "New Title" --description "..."
+
+# Delete a group (must be host)
+npx ts-node scripts/groups.ts delete ~you/group
+
+# Join/leave groups
+npx ts-node scripts/groups.ts join ~host/group
+npx ts-node scripts/groups.ts leave ~host/group
 ```
 
-#### Activity
+### Membership Management
 
 ```bash
+# Invite members
+npx ts-node scripts/groups.ts invite ~you/group ~friend1 ~friend2
+
+# Kick members
+npx ts-node scripts/groups.ts kick ~you/group ~ship
+
+# Ban/unban ships
+npx ts-node scripts/groups.ts ban ~you/group ~ship
+npx ts-node scripts/groups.ts unban ~you/group ~ship
+
+# Accept/reject join requests (for private groups)
+npx ts-node scripts/groups.ts accept-join ~you/group ~ship
+npx ts-node scripts/groups.ts reject-join ~you/group ~ship
+```
+
+### Roles
+
+```bash
+# Add a new role
+npx ts-node scripts/groups.ts add-role ~you/group my-role --title "Moderator" --description "..."
+
+# Update role metadata
+npx ts-node scripts/groups.ts update-role ~you/group my-role --title "New Title"
+
+# Delete a role
+npx ts-node scripts/groups.ts delete-role ~you/group my-role
+
+# Assign/remove roles from members
+npx ts-node scripts/groups.ts assign-role ~you/group my-role ~member1 ~member2
+npx ts-node scripts/groups.ts remove-role ~you/group my-role ~member
+```
+
+### Privacy
+
+```bash
+# Set group privacy (public, private, secret)
+npx ts-node scripts/groups.ts set-privacy ~you/group private
+```
+
+### Channels in Groups
+
+```bash
+# Add a channel to a group
+npx ts-node scripts/groups.ts add-channel ~you/group chat my-channel --title "General Chat"
+```
+
+---
+
+## Channels
+
+List and manage channels.
+
+```bash
+# List DMs
+npx ts-node scripts/channels.ts dms
+
+# List group DMs (clubs)
+npx ts-node scripts/channels.ts group-dms
+
+# List subscribed groups
+npx ts-node scripts/channels.ts groups
+
+# Get channel info
+npx ts-node scripts/channels.ts info chat/~host/channel-name
+
+# Update channel metadata
+npx ts-node scripts/channels.ts update chat/~host/channel --title "New Title" --description "..."
+
+# Delete a channel (must be group admin)
+npx ts-node scripts/channels.ts delete chat/~host/channel
+```
+
+---
+
+## Posts (Channel Messages)
+
+Send messages to channels (chat, diary, heap).
+
+```bash
+# Send a message to a channel
+npx ts-node scripts/posts.ts send chat/~host/channel "Hello world!"
+
+# Reply to a post
+npx ts-node scripts/posts.ts reply chat/~host/channel 170.141... "My reply"
+
+# React to a post
+npx ts-node scripts/posts.ts react chat/~host/channel 170.141... "👍"
+
+# Remove reaction
+npx ts-node scripts/posts.ts unreact chat/~host/channel 170.141...
+
+# Delete a post
+npx ts-node scripts/posts.ts delete chat/~host/channel 170.141...
+```
+
+---
+
+## DMs (Direct Messages)
+
+Send and manage direct messages.
+
+```bash
+# Send a DM
+npx ts-node scripts/dms.ts send ~sampel-palnet "Hello!"
+
+# Reply to a DM
+npx ts-node scripts/dms.ts reply ~sampel-palnet 170.141... "My reply"
+
+# React to a DM
+npx ts-node scripts/dms.ts react ~sampel-palnet 170.141... "❤️"
+
+# Remove reaction
+npx ts-node scripts/dms.ts unreact ~sampel-palnet 170.141...
+
+# Delete a DM
+npx ts-node scripts/dms.ts delete ~sampel-palnet 170.141...
+
+# Accept/decline DM requests
+npx ts-node scripts/dms.ts accept ~sampel-palnet
+npx ts-node scripts/dms.ts decline ~sampel-palnet
+```
+
+---
+
+## Messages (History)
+
+Fetch message history with optional quote/cite resolution.
+
+```bash
+# Fetch channel messages
+npx ts-node scripts/messages.ts channel chat/~host/channel --limit 20
+
+# Fetch DM history
+npx ts-node scripts/messages.ts dm ~sampel-palnet --limit 20
+
+# Resolve quoted messages (fetches cited content)
+npx ts-node scripts/messages.ts channel chat/~host/channel --limit 10 --resolve-cites
+```
+
+---
+
+## Activity / Notifications
+
+View mentions, replies, and unread counts.
+
+```bash
+# Get recent mentions
 npx ts-node scripts/activity.ts mentions --limit 10
 npx ts-node scripts/activity.ts replies --limit 10
 npx ts-node scripts/activity.ts all --limit 10
 npx ts-node scripts/activity.ts unreads
 ```
 
-#### Contacts
+---
+
+## Contacts
+
+Manage your contact list and profile.
 
 ```bash
 npx ts-node scripts/contacts.ts list
@@ -156,21 +326,64 @@ npx ts-node scripts/contacts.ts get ~sampel-palnet
 npx ts-node scripts/contacts.ts update-profile --nickname "Name" --bio "About me"
 ```
 
-#### Channels
+---
+
+## Settings (Moltbot Plugin Config)
+
+Manage Moltbot's Tlon plugin config via Urbit settings-store. Changes apply immediately without gateway restart.
 
 ```bash
-npx ts-node scripts/channels.ts dms
-npx ts-node scripts/channels.ts group-dms
-npx ts-node scripts/channels.ts groups
-npx ts-node scripts/channels.ts all
+# View current settings
+npx ts-node scripts/settings.ts get
+
+# Set a value
+npx ts-node scripts/settings.ts set showModelSig true
+
+# Delete a setting
+npx ts-node scripts/settings.ts delete showModelSig
 ```
 
-#### Messages
+### DM Allowlist
 
 ```bash
-npx ts-node scripts/messages.ts dm ~sampel-palnet --limit 20
-npx ts-node scripts/messages.ts channel chat/~host/channel-slug --limit 20
+# Add ship to DM allowlist
+npx ts-node scripts/settings.ts allow-dm ~friend
+
+# Remove ship from DM allowlist
+npx ts-node scripts/settings.ts remove-dm ~friend
 ```
+
+### Channel Permissions
+
+```bash
+# Add ship to channel allowlist
+npx ts-node scripts/settings.ts allow-channel chat/~host/channel ~ship
+
+# Remove ship from channel allowlist
+npx ts-node scripts/settings.ts remove-channel chat/~host/channel ~ship
+
+# Set channel to open mode (anyone can trigger bot)
+npx ts-node scripts/settings.ts open-channel chat/~host/channel
+
+# Set channel to restricted mode (allowlist only)
+npx ts-node scripts/settings.ts restrict-channel chat/~host/channel
+```
+
+---
+
+## Notebook Posts
+
+Post to diary/notebook channels.
+
+```bash
+npx ts-node scripts/notebook-post.ts ~host/group diary/~host/channel "Post Title" "Post content here..."
+```
+
+---
+
+## Complements the Tlon Plugin
+
+This skill handles API operations, history retrieval, and administration. For real-time messaging and bot responses, use the [Tlon channel plugin](https://github.com/tloncorp/moltbot-tlon).
 
 ## API Reference
 
