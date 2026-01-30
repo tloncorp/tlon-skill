@@ -13,7 +13,14 @@ A [Moltbot](https://github.com/moltbot/moltbot) skill for interacting with Tlon/
 
 ## Deployment (Hosted / K8s)
 
-For hosted moltbot deployments where the agent should not have exec privileges, use the `tlon-run` wrapper which provides a safe, validated interface to read-only operations.
+For hosted moltbot deployments where the agent should not have exec privileges, use the `tlon-run` wrapper which provides a safe, validated interface.
+
+With multiple ships configured, `--ship` must come **before** the command:
+
+```bash
+tlon-run --ship ~sampel-palnet groups list
+tlon-run --ship ~sampel-palnet click get-code
+```
 
 ### Installation
 
@@ -90,6 +97,8 @@ tlon-run click merge-to-kids                                   # Merge %base int
 tlon-run click get-remote-hash ~datfen base                    # Get desk hash from remote
 tlon-run click dump-agent-eggs chat                            # Dump agent state
 tlon-run click load-agent-eggs chat                            # Load agent state
+tlon-run click force-join ~host-ship/group-name                # Join a group
+tlon-run click force-join-token ~host-ship/group-name 0v1.abc  # Join with invite token
 tlon-run click eval '=/  m  (strand ,vase)  (pure:m !>(~))'   # Run arbitrary Hoon thread
 ```
 

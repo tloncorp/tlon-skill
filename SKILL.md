@@ -13,13 +13,12 @@ Use the `tlon-run` command for all Tlon operations.
 
 Multiple ships can be registered via json files in the config dir. Check `skills/tlon/ships/` to see the list of available ships.
 
-If multiple ships are configured, specify which one to use:
+If only one ship is configured, it is auto-detected. With multiple ships, you must specify which one using `--ship` **before** the command:
 
 ```bash
-tlon-run --ship ~pinser-botter-nisrun-filnul activity mentions
+tlon-run --ship ~sampel-palnet activity mentions
+tlon-run --ship ~sampel-palnet click get-code
 ```
-
-If only one ship is configured (or TLON_SHIP is set), the flag is optional.
 
 ## Commands
 
@@ -108,6 +107,8 @@ tlon-run click moon-key <moon-prefix>                      # Get boot key for a 
 tlon-run click get-remote-hash ~source <desk>              # Get desk hash from remote ship
 tlon-run click dump-agent-eggs <agent>                     # Dump agent state to jam file
 tlon-run click load-agent-eggs <agent>                     # Load agent state from jam file
+tlon-run click force-join ~host/group-name                 # Force join a group
+tlon-run click force-join-token ~host/group-name <token>   # Join with invite token
 tlon-run click eval '<hoon thread>'                        # Run arbitrary Hoon thread
 ```
 
