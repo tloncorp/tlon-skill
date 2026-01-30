@@ -338,9 +338,9 @@ Content format is Tlon's Story structure - an array of verses:
 ]
 ```
 
-### Moltbot Settings (Hot-Reload Config)
+### OpenClaw Settings (Hot-Reload Config)
 
-Manage Moltbot's Tlon plugin settings via Urbit's settings-store. Changes apply immediately without gateway restart.
+Manage OpenClaw's Tlon plugin settings via Urbit's settings-store. Changes apply immediately without gateway restart.
 
 **View current settings:**
 ```bash
@@ -394,5 +394,5 @@ See [references/urbit-api.md](references/urbit-api.md) for Urbit HTTP API detail
 - All ship names should include the `~` prefix (scripts will normalize if missing)
 - Profile updates sync to peers automatically via the contacts agent
 - Post IDs are Unix timestamps in milliseconds
-- For sending messages via the Moltbot message tool, use `channel=tlon`
+- For sending messages via the OpenClaw message tool, use `channel=tlon`
 - Channel nests follow format: `<kind>/~<host>/<name>` where kind is chat, diary, or heap
