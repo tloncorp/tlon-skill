@@ -66,6 +66,13 @@ EOF
     ;;
 esac
 
+# Handle --ship flag (must be first argument, before any command)
+if [ "${1:-}" = "--ship" ]; then
+  TLON_SHIP="${2:-}"
+  [ -n "$TLON_SHIP" ] || { echo "error: --ship requires a ship name"; exit 2; }
+  shift 2
+fi
+
 # Workspace file commands (no ship/dist needed)
 resolve_workspace_file() {
   local name="$1"
@@ -114,13 +121,6 @@ esac
 
 # Export skill dir for scripts
 export TLON_SKILL_DIR="$SKILL_DIR"
-
-# Handle --ship flag (must be first argument)
-if [ "${1:-}" = "--ship" ]; then
-  TLON_SHIP="${2:-}"
-  [ -n "$TLON_SHIP" ] || { echo "error: --ship requires a ship name"; exit 2; }
-  shift 2
-fi
 
 # If no TLON_SHIP specified, try to auto-detect from available configs
 if [ -z "${TLON_SHIP:-}" ]; then
