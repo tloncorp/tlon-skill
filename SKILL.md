@@ -35,50 +35,144 @@ tlon-run activity unreads               # Unread counts per channel
 
 ### Channels
 
-List available channels and groups.
+List and manage channels.
 
 ```bash
-tlon-run channels dms        # List direct message contacts
-tlon-run channels group-dms  # List group DMs (clubs)
-tlon-run channels groups     # List subscribed groups with channels
-tlon-run channels all        # List everything
+tlon-run channels dms                                          # List DM contacts
+tlon-run channels group-dms                                    # List group DMs (clubs)
+tlon-run channels groups                                       # List subscribed groups with channels
+tlon-run channels all                                          # List everything
+tlon-run channels info chat/~host/slug                         # Get channel details
+tlon-run channels update chat/~host/slug --title "New Title"   # Update channel metadata
+tlon-run channels delete chat/~host/slug                       # Delete a channel
 ```
 
 ### Contacts
 
-Look up profiles and contacts.
+Manage contacts and profiles.
 
 ```bash
-tlon-run contacts list           # List all contacts
-tlon-run contacts self           # Get your own profile
-tlon-run contacts get ~sampel    # Get a specific contact's profile
+tlon-run contacts list                                   # List all contacts
+tlon-run contacts self                                   # Get your own profile
+tlon-run contacts get ~sampel                            # Get a contact's profile
+tlon-run contacts sync ~ship1 ~ship2                     # Fetch/sync profiles
+tlon-run contacts add ~sampel                            # Add a contact
+tlon-run contacts remove ~sampel                         # Remove a contact
+tlon-run contacts update-profile --nickname "My Name"    # Update your profile
 ```
 
-Ship name format: `~prefix` or `~prefix-suffix` (e.g., `~zod`, `~sampel-palnet`)
+`update-profile` options: `--nickname`, `--bio`, `--status`, `--avatar`, `--cover`
 
 ### Groups
 
-List and inspect groups.
+Full group management.
 
 ```bash
-tlon-run groups list                                                          # List your groups
-tlon-run groups info ~host-ship/slug                                          # Get group details and members
-tlon-run groups create "Group Name" [--description "..."]                     # Create a new group
-tlon-run groups invite ~host-ship/slug ~invitee1 ~invitee2                    # Invite members
-tlon-run groups leave ~host-ship/slug                                         # Leave a group
-tlon-run groups add-channel ~host-ship/slug "Name" [--kind chat] [--description "..."]  # Add a channel
+# Basics
+tlon-run groups list                                         # List your groups
+tlon-run groups info ~host/slug                              # Get group details
+tlon-run groups create "Name" [--description "..."]          # Create a group
+tlon-run groups join ~host/slug                              # Join a group
+tlon-run groups leave ~host/slug                             # Leave a group
+tlon-run groups delete ~host/slug                            # Delete a group (host only)
+tlon-run groups update ~host/slug --title "..." [--description "..."] [--image "..."]
+
+# Members
+tlon-run groups invite ~host/slug ~ship1 ~ship2              # Invite members
+tlon-run groups kick ~host/slug ~ship1                       # Kick members
+tlon-run groups ban ~host/slug ~ship1                        # Ban members
+tlon-run groups unban ~host/slug ~ship1                      # Unban members
+tlon-run groups accept-join ~host/slug ~ship1                # Accept join request
+tlon-run groups reject-join ~host/slug ~ship1                # Reject join request
+tlon-run groups set-privacy ~host/slug public|private|secret # Set privacy
+
+# Roles
+tlon-run groups add-role ~host/slug role-id --title "..."    # Create a role
+tlon-run groups delete-role ~host/slug role-id               # Delete a role
+tlon-run groups update-role ~host/slug role-id --title "..." # Update a role
+tlon-run groups assign-role ~host/slug role-id ~ship1        # Assign role to members
+tlon-run groups remove-role ~host/slug role-id ~ship1        # Remove role from members
+
+# Channels
+tlon-run groups add-channel ~host/slug "Name" [--kind chat|diary|heap] [--description "..."]
 ```
 
 Group format: `~host-ship/group-slug` (e.g., `~nocsyx-lassul/bongtable`)
 
 ### Messages
 
-Fetch message history from channels.
+Read and search message history.
 
 ```bash
-tlon-run messages dm ~sampel-palnet --limit 20              # DM history (limit <= 50)
-tlon-run messages channel chat/~host/channel --limit 20     # Channel history (limit <= 50)
-tlon-run messages history chat/~host/channel --limit 20     # Same as channel
+tlon-run messages dm ~sampel --limit 20                      # DM history (limit <= 50)
+tlon-run messages channel chat/~host/slug --limit 20         # Channel history (limit <= 50)
+tlon-run messages history chat/~host/slug --limit 20         # Same as channel
+tlon-run messages search "query" --channel chat/~host/slug   # Search messages
+```
+
+Options: `--limit N`, `--resolve-cites` (resolve quoted messages)
+
+### DMs
+
+Send and manage direct messages.
+
+```bash
+tlon-run dms send ~sampel "hello"                # Send a DM
+tlon-run dms send <club-id> "hello"              # Send to group DM (0v... id)
+tlon-run dms reply ~sampel <post-id> "reply"     # Reply to a DM
+tlon-run dms react ~sampel <post-id> <emoji>     # React to a DM
+tlon-run dms unreact ~sampel <post-id>           # Remove reaction
+tlon-run dms delete ~sampel <post-id>            # Delete a DM
+tlon-run dms accept ~sampel                      # Accept DM invite
+tlon-run dms decline ~sampel                     # Decline DM invite
+```
+
+### Posts
+
+Post to channels (chat, diary, heap).
+
+```bash
+tlon-run posts send chat/~host/slug "message"              # Post to channel
+tlon-run posts reply chat/~host/slug <post-id> "reply"     # Reply to a post
+tlon-run posts react chat/~host/slug <post-id> <emoji>     # React to a post
+tlon-run posts unreact chat/~host/slug <post-id>           # Remove reaction
+tlon-run posts delete chat/~host/slug <post-id>            # Delete a post
+```
+
+### Notebook
+
+Post to diary/notebook channels.
+
+```bash
+tlon-run notebook diary/~host/slug "Title"                   # Post with no body
+tlon-run notebook diary/~host/slug "Title" --content file.md  # Post from file
+tlon-run notebook diary/~host/slug "Title" --stdin            # Post from stdin
+tlon-run notebook diary/~host/slug "Title" --image <url>      # Post with image
+```
+
+### Settings
+
+Manage bot settings (settings-store).
+
+```bash
+# General
+tlon-run settings get                                        # Show all settings
+tlon-run settings set <key> <json-value>                     # Set a value
+tlon-run settings delete <key>                               # Delete a setting
+
+# DM allowlist
+tlon-run settings allow-dm ~ship                             # Add to DM allowlist
+tlon-run settings remove-dm ~ship                            # Remove from DM allowlist
+
+# Channel controls
+tlon-run settings allow-channel chat/~host/slug              # Add to watch list
+tlon-run settings remove-channel chat/~host/slug             # Remove from watch list
+tlon-run settings open-channel chat/~host/slug               # Set channel to open
+tlon-run settings restrict-channel chat/~host/slug [~ship1]  # Set restricted
+
+# Authorization
+tlon-run settings authorize-ship ~ship                       # Add to default auth
+tlon-run settings deauthorize-ship ~ship                     # Remove from default auth
 ```
 
 Channel format: `{chat|diary|heap}/~host-ship/channel-slug`
