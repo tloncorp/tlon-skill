@@ -284,371 +284,114 @@ Scripts require these environment variables (from gateway config):
 - `URBIT_SHIP` - Ship name (e.g., `~sampel-palnet`)
 - `URBIT_CODE` - Ship access code
 
-The skill reads these from your Tlon channel config automatically.
-
-### Posting to Channels
-
-**Send a message to a channel:**
-```bash
-npx ts-node scripts/posts.ts send chat/~host/channel-name "Hello everyone!"
-```
-
-**Reply to a post:**
-```bash
-npx ts-node scripts/posts.ts reply chat/~host/channel-name <post-id> "Great point!"
-```
-
-**React to a post:**
-```bash
-npx ts-node scripts/posts.ts react chat/~host/channel-name <post-id> <emoji>
-```
-
-**Remove a reaction:**
-```bash
-npx ts-node scripts/posts.ts unreact chat/~host/channel-name <post-id>
-```
-
-**Delete a post:**
-```bash
-npx ts-node scripts/posts.ts delete chat/~host/channel-name <post-id>
-```
-
-### Direct Messages
-
-**Send a DM:**
-```bash
-npx ts-node scripts/dms.ts send ~sampel-palnet "Hey, how's it going?"
-```
-
-**Reply in a DM thread:**
-```bash
-npx ts-node scripts/dms.ts reply ~sampel-palnet <post-id> "Thanks for the reply!"
-```
-
-**React to a DM:**
-```bash
-npx ts-node scripts/dms.ts react ~sampel-palnet <post-id> <emoji>
-```
-
-**Remove reaction from a DM:**
-```bash
-npx ts-node scripts/dms.ts unreact ~sampel-palnet <post-id>
-```
-
-**Delete a DM:**
-```bash
-npx ts-node scripts/dms.ts delete ~sampel-palnet <post-id>
-```
-
-**Accept a DM invite:**
-```bash
-npx ts-node scripts/dms.ts accept ~sampel-palnet
-```
-
-**Decline a DM invite:**
-```bash
-npx ts-node scripts/dms.ts decline ~sampel-palnet
-```
-
-**Send to a group DM (club):**
-```bash
-npx ts-node scripts/dms.ts send 0v4.club-id "Message to the group"
-```
-
-### Contacts
-
-**Get all contacts:**
-```bash
-npx ts-node scripts/contacts.ts list
-```
-
-**Get a specific contact's profile:**
-```bash
-npx ts-node scripts/contacts.ts get ~sampel-palnet
-```
-
-**Add a contact:**
-```bash
-npx ts-node scripts/contacts.ts add ~sampel-palnet
-```
-
-**Remove a contact:**
-```bash
-npx ts-node scripts/contacts.ts remove ~sampel-palnet
-```
-
-**Sync (fetch) profiles from ships:**
-```bash
-npx ts-node scripts/contacts.ts sync ~sampel-palnet ~zod
-```
-
-**Update your profile:**
-```bash
-npx ts-node scripts/contacts.ts update-profile --nickname "My Name" --bio "About me" --status "Available"
-```
-
-**Update your avatar:**
-```bash
-npx ts-node scripts/contacts.ts update-profile --avatar "https://example.com/avatar.png"
-```
-
-### Channels
-
-**List DMs:**
-```bash
-npx ts-node scripts/channels.ts dms
-```
-
-**List group DMs:**
-```bash
-npx ts-node scripts/channels.ts group-dms
-```
-
-**List subscribed groups:**
-```bash
-npx ts-node scripts/channels.ts groups
-```
-
-**Get channel info:**
-```bash
-npx ts-node scripts/channels.ts info chat/~host/channel-name
-```
-
-**Update channel metadata:**
-```bash
-npx ts-node scripts/channels.ts update chat/~host/channel-name --title "New Title" [--description "..."]
-```
-
-**Delete a channel (must be group admin):**
-```bash
-npx ts-node scripts/channels.ts delete chat/~host/channel-name
-```
-
-### Groups
-
-**List your groups:**
-```bash
-npx ts-node scripts/groups.ts list
-```
-
-**Create a new group:**
-```bash
-npx ts-node scripts/groups.ts create "Group Name" [--description "..."]
-```
-
-**Get group info:**
-```bash
-npx ts-node scripts/groups.ts info ~ship/group-slug
-```
-
-**Invite members:**
-```bash
-npx ts-node scripts/groups.ts invite ~ship/group-slug ~invitee1 ~invitee2
-```
-
-**Leave a group:**
-```bash
-npx ts-node scripts/groups.ts leave ~ship/group-slug
-```
-
-**Join a group:**
-```bash
-npx ts-node scripts/groups.ts join ~ship/group-slug
-```
-
-**Add a channel to a group:**
-```bash
-npx ts-node scripts/groups.ts add-channel ~ship/group-slug "Channel Name" [--kind chat|diary|heap] [--description "..."]
-```
-
-### Group Administration (Host Only)
-
-**Delete a group:**
-```bash
-npx ts-node scripts/groups.ts delete ~ship/group-slug
-```
-
-**Update group metadata:**
-```bash
-npx ts-node scripts/groups.ts update ~ship/group-slug --title "New Title" [--description "..."] [--image "https://..."]
-```
-
-**Kick members:**
-```bash
-npx ts-node scripts/groups.ts kick ~ship/group-slug ~member1 ~member2
-```
-
-**Ban members:**
-```bash
-npx ts-node scripts/groups.ts ban ~ship/group-slug ~member1 ~member2
-```
-
-**Unban members:**
-```bash
-npx ts-node scripts/groups.ts unban ~ship/group-slug ~member1 ~member2
-```
-
-**Set group privacy:**
-```bash
-npx ts-node scripts/groups.ts set-privacy ~ship/group-slug public|private|secret
-```
-
-**Accept join requests (for private groups):**
-```bash
-npx ts-node scripts/groups.ts accept-join ~ship/group-slug ~requester1 ~requester2
-```
-
-**Reject join requests:**
-```bash
-npx ts-node scripts/groups.ts reject-join ~ship/group-slug ~requester1 ~requester2
-```
-
-### Role Management
-
-**Add a role:**
-```bash
-npx ts-node scripts/groups.ts add-role ~ship/group-slug role-id --title "Role Name" [--description "..."]
-```
-
-**Delete a role:**
-```bash
-npx ts-node scripts/groups.ts delete-role ~ship/group-slug role-id
-```
-
-**Assign role to members:**
-```bash
-npx ts-node scripts/groups.ts assign-role ~ship/group-slug role-id ~member1 ~member2
-```
-
-**Remove role from members:**
-```bash
-npx ts-node scripts/groups.ts remove-role ~ship/group-slug role-id ~member1 ~member2
-```
-
-### Activity / Notifications
-
-**Get recent mentions:**
-```bash
-npx ts-node scripts/activity.ts mentions [--limit N]
-```
-
-**Get recent replies:**
-```bash
-npx ts-node scripts/activity.ts replies [--limit N]
-```
-
-**Get all recent activity:**
-```bash
-npx ts-node scripts/activity.ts all [--limit N]
-```
-
-**Get unread counts:**
-```bash
-npx ts-node scripts/activity.ts unreads
-```
-
-### Messages
-
-**Get recent messages from a DM:**
-```bash
-npx ts-node scripts/messages.ts dm ~sampel-palnet --limit 20
-```
-
-**Get recent messages from a channel:**
-```bash
-npx ts-node scripts/messages.ts channel chat/~host/channel-slug --limit 20
-```
-
-**Fetch full message history (same as channel):**
-```bash
-npx ts-node scripts/messages.ts history "chat/~host/channel-slug" --limit 50
-```
-
-**Search messages in a channel:**
-```bash
-npx ts-node scripts/messages.ts search "query" --channel chat/~host/channel-name
-```
-
-Channel format:
-- DMs: `chat/~ship/dm` (auto-converted from `dm ~ship`)
-- Group channels: `chat/~host/channel-slug`
-- Examples: `chat/~nocsyx-lassul/bongtable`, `chat/~host/general`
-
-### Notebooks (Diary Channels)
-
-**Post to a notebook:**
-```bash
-npx ts-node scripts/notebook-post.ts diary/~host/channel-name "Post Title"
-```
-
-**Post with a cover image:**
-```bash
-npx ts-node scripts/notebook-post.ts diary/~host/channel-name "Post Title" --image https://example.com/cover.png
-```
-
-**Post with rich content from a JSON file:**
-```bash
-npx ts-node scripts/notebook-post.ts diary/~host/channel-name "Post Title" --content article.json
-```
-
-**Post with content from stdin:**
-```bash
-echo '[{"inline":["Hello, world!"]}]' | npx ts-node scripts/notebook-post.ts diary/~host/channel-name "Post Title" --stdin
-```
-
-Content format is Tlon's Story structure - an array of verses:
-```json
-[
-  { "inline": ["Plain text or ", { "bold": ["bold"] }, " text"] },
-  { "block": { "header": { "tag": "h2", "content": ["Section Title"] } } },
-  { "block": { "code": { "code": "const x = 1;", "lang": "javascript" } } },
-  { "inline": [{ "blockquote": ["A wise quote"] }] }
-]
-```
-
-### OpenClaw Settings (Hot-Reload Config)
-
-Manage OpenClaw's Tlon plugin settings via Urbit's settings-store. Changes apply immediately without gateway restart.
-
-**View current settings:**
-```bash
-npx ts-node scripts/settings.ts get
-```
-
-**Allow a ship to DM the bot:**
-```bash
-npx ts-node scripts/settings.ts allow-dm ~nocsyx-lassul
-```
-
-**Remove DM access:**
-```bash
-npx ts-node scripts/settings.ts remove-dm ~sampel-palnet
-```
-
-**Add a channel to watch:**
-```bash
-npx ts-node scripts/settings.ts allow-channel chat/~nocsyx-lassul/bongtable
-```
-
-**Open a channel to all (anyone can interact):**
-```bash
-npx ts-node scripts/settings.ts open-channel chat/~nocsyx-lassul/bongtable
-```
-
-**Restrict a channel to specific ships:**
-```bash
-npx ts-node scripts/settings.ts restrict-channel chat/~host/channel ~ship1 ~ship2
-```
-
-**Authorize a ship for commands (default auth):**
-```bash
-npx ts-node scripts/settings.ts authorize-ship ~nocsyx-lassul
-```
-
-**Set arbitrary setting:**
-```bash
-npx ts-node scripts/settings.ts set showModelSig true
-npx ts-node scripts/settings.ts set autoDiscover false
+The skill reads these from your Tlon channel config automatically
+
+> ⚠️ **Legacy / Exec-only reference (do not run in agent environments):**
+> These `npx ts-node scripts/*` commands **require shell/exec access** (`bash`, `exec`, etc.). Most deployments **do not allow this**.
+> **Prefer `tlon-run`** for all operations. This block exists only so you can recognize and map them mentally to the `tlon-run` sections above.
+
+```bash
+# Activity / Notifications
+npx ts-node scripts/activity.ts mentions --limit 10            # Recent mentions (limit <= 25)  -> tlon-run activity mentions
+npx ts-node scripts/activity.ts replies --limit 10             # Recent replies (limit <= 25)   -> tlon-run activity replies
+npx ts-node scripts/activity.ts all --limit 10                 # All recent activity (<= 25)    -> tlon-run activity all
+npx ts-node scripts/activity.ts unreads                        # Unread counts per channel      -> tlon-run activity unreads
+
+# Channels
+npx ts-node scripts/channels.ts dms                            # List DM contacts               -> tlon-run channels dms
+npx ts-node scripts/channels.ts group-dms                      # List group DMs (clubs)         -> tlon-run channels group-dms
+npx ts-node scripts/channels.ts groups                         # List subscribed groups         -> tlon-run channels groups
+npx ts-node scripts/channels.ts info chat/~host/slug           # Get channel details            -> tlon-run channels info
+npx ts-node scripts/channels.ts update chat/~host/slug --title "New Title"   # Update channel metadata -> tlon-run channels update
+npx ts-node scripts/channels.ts delete chat/~host/slug         # Delete channel (admin only)    -> tlon-run channels delete
+
+# Contacts / Profiles
+npx ts-node scripts/contacts.ts list                           # List all contacts              -> tlon-run contacts list
+npx ts-node scripts/contacts.ts self                           # Get your profile               -> tlon-run contacts self
+npx ts-node scripts/contacts.ts get ~sampel                    # Get a contact profile          -> tlon-run contacts get
+npx ts-node scripts/contacts.ts sync ~ship1 ~ship2             # Fetch/sync profiles            -> tlon-run contacts sync
+npx ts-node scripts/contacts.ts add ~sampel                    # Add a contact                  -> tlon-run contacts add
+npx ts-node scripts/contacts.ts remove ~sampel                 # Remove a contact               -> tlon-run contacts remove
+npx ts-node scripts/contacts.ts update-profile --nickname "My Name"          # Update your profile -> tlon-run contacts update-profile
+npx ts-node scripts/contacts.ts update-profile --bio "About me"              # Update bio          -> tlon-run contacts update-profile
+npx ts-node scripts/contacts.ts update-profile --status "Available"          # Update status       -> tlon-run contacts update-profile
+npx ts-node scripts/contacts.ts update-profile --avatar "https://..."        # Update avatar       -> tlon-run contacts update-profile
+npx ts-node scripts/contacts.ts update-profile --cover "https://..."         # Update cover        -> tlon-run contacts update-profile
+
+# Groups (basics)
+npx ts-node scripts/groups.ts list                             # List your groups               -> tlon-run groups list
+npx ts-node scripts/groups.ts info ~host/slug                  # Get group details              -> tlon-run groups info
+npx ts-node scripts/groups.ts create "Name" --description "..."# Create a group                 -> tlon-run groups create
+npx ts-node scripts/groups.ts join ~host/slug                  # Join a group                   -> tlon-run groups join
+npx ts-node scripts/groups.ts leave ~host/slug                 # Leave a group                  -> tlon-run groups leave
+npx ts-node scripts/groups.ts delete ~host/slug                # Delete a group (host only)     -> tlon-run groups delete
+npx ts-node scripts/groups.ts update ~host/slug --title "..." --description "..." --image "https://..."  # Update group -> tlon-run groups update
+
+# Groups (members / moderation)
+npx ts-node scripts/groups.ts invite ~host/slug ~ship1 ~ship2   # Invite members                -> tlon-run groups invite
+npx ts-node scripts/groups.ts kick ~host/slug ~ship1            # Kick member                   -> tlon-run groups kick
+npx ts-node scripts/groups.ts ban ~host/slug ~ship1             # Ban member                    -> tlon-run groups ban
+npx ts-node scripts/groups.ts unban ~host/slug ~ship1           # Unban member                  -> tlon-run groups unban
+npx ts-node scripts/groups.ts accept-join ~host/slug ~ship1     # Accept join request           -> tlon-run groups accept-join
+npx ts-node scripts/groups.ts reject-join ~host/slug ~ship1     # Reject join request           -> tlon-run groups reject-join
+npx ts-node scripts/groups.ts set-privacy ~host/slug public     # Set privacy                   -> tlon-run groups set-privacy
+npx ts-node scripts/groups.ts set-privacy ~host/slug private    # Set privacy                   -> tlon-run groups set-privacy
+npx ts-node scripts/groups.ts set-privacy ~host/slug secret     # Set privacy                   -> tlon-run groups set-privacy
+
+# Groups (roles)
+npx ts-node scripts/groups.ts add-role ~host/slug role-id --title "Role Name"      # Create role      -> tlon-run groups add-role
+npx ts-node scripts/groups.ts delete-role ~host/slug role-id                        # Delete role      -> tlon-run groups delete-role
+npx ts-node scripts/groups.ts update-role ~host/slug role-id --title "New Title"    # Update role      -> tlon-run groups update-role
+npx ts-node scripts/groups.ts assign-role ~host/slug role-id ~ship1 ~ship2          # Assign role      -> tlon-run groups assign-role
+npx ts-node scripts/groups.ts remove-role ~host/slug role-id ~ship1 ~ship2          # Remove role      -> tlon-run groups remove-role
+
+# Groups (channels)
+npx ts-node scripts/groups.ts add-channel ~host/slug "Name" --kind chat  --description "..."   # Add chat channel  -> tlon-run groups add-channel
+npx ts-node scripts/groups.ts add-channel ~host/slug "Name" --kind diary --description "..."   # Add diary channel -> tlon-run groups add-channel
+npx ts-node scripts/groups.ts add-channel ~host/slug "Name" --kind heap  --description "..."   # Add heap channel  -> tlon-run groups add-channel
+
+# Messages (read/search)
+npx ts-node scripts/messages.ts dm ~sampel --limit 20            # DM history (limit <= 50)      -> tlon-run messages dm
+npx ts-node scripts/messages.ts channel chat/~host/slug --limit 20 # Channel history (<= 50)     -> tlon-run messages channel
+npx ts-node scripts/messages.ts history chat/~host/slug --limit 20 # Same as channel/history     -> tlon-run messages history
+npx ts-node scripts/messages.ts search "query" --channel chat/~host/slug  # Search messages       -> tlon-run messages search
+
+# Posts (channel posting)
+npx ts-node scripts/posts.ts send chat/~host/slug "message"       # Post to channel              -> tlon-run posts send
+npx ts-node scripts/posts.ts reply chat/~host/slug 1700000000000 "reply" # Reply to post         -> tlon-run posts reply
+npx ts-node scripts/posts.ts react chat/~host/slug 1700000000000 👍       # React to post         -> tlon-run posts react
+npx ts-node scripts/posts.ts unreact chat/~host/slug 1700000000000        # Remove reaction       -> tlon-run posts unreact
+npx ts-node scripts/posts.ts delete chat/~host/slug 1700000000000         # Delete post           -> tlon-run posts delete
+
+# Direct Messages (send/reply/react/delete + invites)
+npx ts-node scripts/dms.ts send ~sampel "hello"                   # Send a DM                   -> tlon-run dms send
+npx ts-node scripts/dms.ts send 0v4.club-id "hello"               # Send to group DM (club)      -> tlon-run dms send
+npx ts-node scripts/dms.ts reply ~sampel 1700000000000 "reply"    # Reply in DM thread           -> tlon-run dms reply
+npx ts-node scripts/dms.ts react ~sampel 1700000000000 👍         # React to DM                  -> tlon-run dms react
+npx ts-node scripts/dms.ts unreact ~sampel 1700000000000          # Remove DM reaction           -> tlon-run dms unreact
+npx ts-node scripts/dms.ts delete ~sampel 1700000000000           # Delete a DM                  -> tlon-run dms delete
+npx ts-node scripts/dms.ts accept ~sampel                         # Accept DM invite             -> tlon-run dms accept
+npx ts-node scripts/dms.ts decline ~sampel                        # Decline DM invite            -> tlon-run dms decline
+
+# Notebook / Diary posting
+npx ts-node scripts/notebook-post.ts diary/~host/slug "Title"                    # Notebook post            -> tlon-run notebook diary/~host/slug "Title"
+npx ts-node scripts/notebook-post.ts diary/~host/slug "Title" --image https://...# Notebook post w/ image   -> tlon-run notebook ... --image
+npx ts-node scripts/notebook-post.ts diary/~host/slug "Title" --content article.json # Post from file       -> tlon-run notebook ... --content
+echo '[{"inline":["Hello"]}]' | npx ts-node scripts/notebook-post.ts diary/~host/slug "Title" --stdin       # Post from stdin -> tlon-run notebook ... --stdin
+
+# Settings (hot-reload config)
+npx ts-node scripts/settings.ts get                               # Show all settings             -> tlon-run settings get
+npx ts-node scripts/settings.ts allow-dm ~ship                    # Add to DM allowlist           -> tlon-run settings allow-dm
+npx ts-node scripts/settings.ts remove-dm ~ship                   # Remove from DM allowlist      -> tlon-run settings remove-dm
+npx ts-node scripts/settings.ts allow-channel chat/~host/slug     # Add to watch list             -> tlon-run settings allow-channel
+npx ts-node scripts/settings.ts remove-channel chat/~host/slug    # Remove from watch list        -> tlon-run settings remove-channel
+npx ts-node scripts/settings.ts open-channel chat/~host/slug      # Set channel to open           -> tlon-run settings open-channel
+npx ts-node scripts/settings.ts restrict-channel chat/~host/slug ~ship1 ~ship2  # Restrict channel     -> tlon-run settings restrict-channel
+npx ts-node scripts/settings.ts authorize-ship ~ship              # Add to default auth           -> tlon-run settings authorize-ship
+npx ts-node scripts/settings.ts deauthorize-ship ~ship            # Remove from default auth      -> tlon-run settings deauthorize-ship
+npx ts-node scripts/settings.ts set showModelSig true             # Set arbitrary setting         -> tlon-run settings set
+npx ts-node scripts/settings.ts set autoDiscover false            # Set arbitrary setting         -> tlon-run settings set
+npx ts-node scripts/settings.ts delete <key>                      # Delete a setting              -> tlon-run settings delete
 ```
 
 Settings are stored in `%settings-store` under desk `moltbot`, bucket `tlon`. The Tlon plugin subscribes to changes and applies them immediately.
