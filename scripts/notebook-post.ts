@@ -63,12 +63,11 @@ export async function postToNotebook(
     sent,
     kind: "/diary",
     blob: null,
-    meta: null,
-    "kind-data": {
-      diary: {
-        title,
-        ...(image ? { image } : {}),
-      },
+    meta: {
+      title,
+      description: "",
+      image: image || "",
+      cover: "",
     },
   };
 

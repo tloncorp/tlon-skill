@@ -227,6 +227,8 @@ async function unreactToPost(
 }
 
 // Delete a post
+// Note: postId must be in @da format (e.g., "170.141.184.507.800.833.818.237.178.278.053.937.152")
+// NOT the Unix timestamp. Use messages.ts to fetch posts and see their actual IDs.
 async function deletePost(
   nest: string,
   postId: string
@@ -334,7 +336,8 @@ Commands:
   delete <channel> <post-id>            Delete a post
 
 Channel format: chat/~host/channel-name, diary/~host/name, heap/~host/name
-Post IDs are Unix timestamps (milliseconds) or @da format numbers.
+Post IDs for delete must be @da format (e.g., 170.141.184.507....). 
+Use 'messages.ts channel <nest> --limit N' to see actual post IDs.
 
 Examples:
   posts.ts send chat/~sampel/general "Hello everyone!"

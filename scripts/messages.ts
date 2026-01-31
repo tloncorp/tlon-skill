@@ -361,7 +361,11 @@ async function fetchMessages(channel: string, limit: number = 20, resolveCites: 
       
       const text = extractText(essay?.content || []);
       
+      // Show post ID for notebook posts (useful for delete)
+      const title = essay?.meta?.title;
+      const idLine = title ? `📓 ${title}` : `ID: ${id}`;
       console.log(`[${author}] ${time}${replyRef}`);
+      console.log(idLine);
       if (quotedText) console.log(quotedText);
       console.log(text.substring(0, 500));
       if (text.length > 500) console.log('...');
