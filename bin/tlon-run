@@ -152,9 +152,18 @@ if [ -z "${TLON_SHIP:-}" ]; then
   elif [ ${#ship_configs[@]} -eq 1 ]; then
     TLON_SHIP="${ship_configs[0]}"
   else
-    echo "error: multiple ships configured, specify one with --ship"
-    for s in "${ship_configs[@]}"; do echo "  ~$s"; done
-    exit 2
+    # Multiple ships: prefer first moon (4+ hyphens), else alphabetical
+    IFS=$'\n' sorted=($(printf '%s\n' "${ship_configs[@]}" | sort)); unset IFS
+    picked=""
+    for s in "${sorted[@]}"; do
+      # Moons have 4+ hyphen-separated syllables (e.g. doznec-fogdys-sampel-palnet)
+      parts=$(echo "$s" | tr '-' '\n' | wc -l)
+      if [ "$parts" -ge 4 ]; then
+        picked="$s"
+        break
+      fi
+    done
+    TLON_SHIP="${picked:-${sorted[0]}}"
   fi
 fi
 
