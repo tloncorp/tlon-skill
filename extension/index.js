@@ -11,6 +11,34 @@ const WORKSPACE_CMDS = new Set([
   "soul", "user", "tools", "agents", "bootstrap", "heartbeat", "identity", "memory",
 ]);
 
+/**
+ * Shell-like argument splitter: respects double and single quotes so that
+ * `posts reply chat/~host/slug 12345 "Hello, this is my reply"` produces
+ * ["posts", "reply", "chat/~host/slug", "12345", "Hello, this is my reply"]
+ * instead of shattering the quoted string on whitespace.
+ */
+function shellSplit(str) {
+  const args = [];
+  let cur = "";
+  let inDouble = false;
+  let inSingle = false;
+  let escape = false;
+
+  for (const ch of str) {
+    if (escape) { cur += ch; escape = false; continue; }
+    if (ch === "\\" && !inSingle) { escape = true; continue; }
+    if (ch === '"' && !inSingle) { inDouble = !inDouble; continue; }
+    if (ch === "'" && !inDouble) { inSingle = !inSingle; continue; }
+    if (/\s/.test(ch) && !inDouble && !inSingle) {
+      if (cur) { args.push(cur); cur = ""; }
+      continue;
+    }
+    cur += ch;
+  }
+  if (cur) args.push(cur);
+  return args;
+}
+
 function runTlonCommand(args, stdin) {
   return new Promise((resolve, reject) => {
     const tlonRunPath = process.env.TLON_RUN_PATH || "/usr/local/bin/tlon-run";
@@ -54,40 +82,36 @@ function runTlonCommand(args, stdin) {
 /**
  * Parse a tlon-run command string into args + optional stdin.
  *
- * Workspace write commands (e.g. "soul replace <content>") need special
- * handling: the content after the subcommand is a single blob that may
- * contain spaces and newlines, so we pipe it via stdin instead of passing
- * it as a positional arg (which would be shattered by whitespace splitting).
+ * Uses shell-like quote parsing so that quoted strings (messages, content,
+ * group names, etc.) survive as single arguments.
+ *
+ * Workspace write commands (replace/append) additionally pipe content via
+ * stdin to handle large multiline markdown that may not be quoted.
  */
 function parseCommand(raw) {
-  const trimmed = raw.trim();
+  const tokens = shellSplit(raw.trim());
 
   // Detect optional --ship prefix
-  let rest = trimmed;
+  let start = 0;
   const shipArgs = [];
-  if (rest.startsWith("--ship ")) {
-    const parts = rest.split(/\s+/);
-    shipArgs.push(parts[0], parts[1]); // --ship ~name
-    rest = parts.slice(2).join(" ");
+  if (tokens[0] === "--ship" && tokens.length > 1) {
+    shipArgs.push(tokens[0], tokens[1]);
+    start = 2;
   }
 
-  const tokens = rest.split(/\s+/);
-  const cmd = tokens[0] || "";
+  const cmd = tokens[start] || "";
 
   if (WORKSPACE_CMDS.has(cmd)) {
-    const sub = tokens[1] || "";
+    const sub = tokens[start + 1] || "";
     if (sub === "replace" || sub === "append") {
-      // Everything after "cmd sub " is content — pass via stdin
-      const prefixLen = rest.indexOf(sub) + sub.length;
-      const content = rest.slice(prefixLen).replace(/^\s+/, "");
-      return { args: [...shipArgs, cmd, sub, "-"], stdin: content || "" };
+      // Content may be unquoted multiline — pipe via stdin
+      const content = tokens[start + 2] || "";
+      return { args: [...shipArgs, cmd, sub, "-"], stdin: content };
     }
-    // read or unknown sub — no content
-    return { args: [...shipArgs, ...tokens], stdin: null };
+    return { args: [...shipArgs, ...tokens.slice(start)], stdin: null };
   }
 
-  // Non-workspace commands: plain whitespace split
-  return { args: [...shipArgs, ...tokens], stdin: null };
+  return { args: [...shipArgs, ...tokens.slice(start)], stdin: null };
 }
 
 export default {

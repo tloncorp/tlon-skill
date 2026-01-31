@@ -11,9 +11,8 @@ A [OpenClaw](https://github.com/openclaw/openclaw) skill for interacting with Tl
 - **Messages**: Fetch message history with quote/cite resolution
 - **Activity**: View mentions, replies, and unread notifications
 - **Contacts**: List, get, and update contact profiles
-- **Settings**: Hot-reload Moltbot plugin config via settings-store
+- **Settings**: Hot-reload Moltbot/OpenClaw plugin config via settings-store
 - **Click**: Low-level ship operations (OTA, desk management, group admin, DMs, etc.) via the `click` protocol
-- **Settings**: Hot-reload OpenClaw plugin config via settings-store
 
 ## Deployment (Hosted / K8s)
 
@@ -127,7 +126,7 @@ npm install
 ```bash
 export URBIT_URL="https://your-ship.tlon.network"
 export URBIT_SHIP="~your-ship"
-export URBIT_CODE="sampel-ticlyt-migfun-falmel"
+export URBIT_CODE="sampel-ticlyt-migfun-falmel"  # Your +code
 ```
 
 The skill also reads credentials from OpenClaw's config if environment variables aren't set.
@@ -139,6 +138,7 @@ The skill also reads credentials from OpenClaw's config if environment variables
 Full group administration including membership, roles, and privacy.
 
 ```bash
+# List all your groups
 npx ts-node scripts/groups.ts list
 
 # Get group info (members, channels, roles, pending requests)
@@ -309,8 +309,14 @@ View mentions, replies, and unread counts.
 ```bash
 # Get recent mentions
 npx ts-node scripts/activity.ts mentions --limit 10
+
+# Get recent replies to your posts
 npx ts-node scripts/activity.ts replies --limit 10
+
+# Get all recent activity
 npx ts-node scripts/activity.ts all --limit 10
+
+# Get unread counts by channel/group
 npx ts-node scripts/activity.ts unreads
 ```
 
@@ -321,10 +327,20 @@ npx ts-node scripts/activity.ts unreads
 Manage your contact list and profile.
 
 ```bash
+# List all contacts
 npx ts-node scripts/contacts.ts list
+
+# Get your own profile
 npx ts-node scripts/contacts.ts self
+
+# Get a specific contact's profile
 npx ts-node scripts/contacts.ts get ~sampel-palnet
-npx ts-node scripts/contacts.ts update-profile --nickname "Name" --bio "About me"
+
+# Update your profile
+npx ts-node scripts/contacts.ts update-profile --nickname "My Name" --bio "About me"
+
+# Update your avatar
+npx ts-node scripts/contacts.ts update-profile --avatar "https://example.com/avatar.png"
 ```
 
 ---
