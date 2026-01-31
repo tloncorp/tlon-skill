@@ -33,10 +33,10 @@ function getConfigFromOpenClaw(): UrbitConfig | null {
   for (const configPath of configPaths) {
     try {
       if (!fs.existsSync(configPath)) continue;
-      
+
       const raw = fs.readFileSync(configPath, 'utf-8');
       const parsed = JSON.parse(raw);
-      
+
       const tlon = parsed?.channels?.tlon;
       if (tlon?.url && tlon?.ship && tlon?.code) {
         return {
@@ -49,15 +49,35 @@ function getConfigFromOpenClaw(): UrbitConfig | null {
       // Continue to next path
     }
   }
-  
+
   return null;
 }
 
 /**
- * Get config from environment variables, or fall back to OpenClaw config
+ * Get config from ship file or environment
+ *
+ * Priority:
+ * 1. TLON_CONFIG_FILE env var (direct path to config file)
+ * 2. TLON_SHIP + TLON_SKILL_DIR (loads ships/<ship>.json)
+ * 3. URBIT_URL/URBIT_SHIP/URBIT_CODE env vars
+ * 4. Moltbot config (~/.clawdbot/moltbot.json)
  */
 export function getConfig(): UrbitConfig {
-  // 1. Check environment variables first
+  // Option 1: Direct config file path
+  const configFile = process.env.TLON_CONFIG_FILE;
+  if (configFile) {
+    return loadConfigFile(configFile);
+  }
+
+  // Option 2: Ship name + skill dir
+  const shipName = process.env.TLON_SHIP;
+  const skillDir = process.env.TLON_SKILL_DIR;
+  if (shipName && skillDir) {
+    const shipFile = path.join(skillDir, 'ships', `${shipName.replace(/^~/, '')}.json`);
+    return loadConfigFile(shipFile);
+  }
+
+  // Option 3: Legacy env vars
   const url = process.env.URBIT_URL;
   const ship = process.env.URBIT_SHIP;
   const code = process.env.URBIT_CODE;
@@ -74,9 +94,36 @@ export function getConfig(): UrbitConfig {
 
   throw new Error(
     "Missing Urbit config. Either:\n" +
+    "  - Set TLON_CONFIG_FILE, or TLON_SHIP + TLON_SKILL_DIR, or\n" +
     "  - Set URBIT_URL, URBIT_SHIP, and URBIT_CODE environment variables, or\n" +
     "  - Configure Tlon channel in OpenClaw (~/.openclaw/openclaw.yaml)"
   );
+}
+
+function loadConfigFile(filePath: string): UrbitConfig {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`Ship config not found: ${filePath}`);
+  }
+
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const data = JSON.parse(content);
+
+    if (!data.url || !data.ship || !data.code) {
+      throw new Error(`Invalid config: must have url, ship, and code`);
+    }
+
+    return {
+      url: data.url,
+      ship: data.ship.replace(/^~/, ""),
+      code: data.code,
+    };
+  } catch (err: any) {
+    if (err.message.includes('Invalid config') || err.message.includes('not found')) {
+      throw err;
+    }
+    throw new Error(`Failed to parse config ${filePath}: ${err.message}`);
+  }
 }
 
 /**
@@ -86,7 +133,7 @@ async function authenticate(): Promise<string> {
   if (authCookie) return authCookie;
 
   config = getConfig();
-  
+
   const resp = await fetch(`${config.url}/~/login`, {
     method: "POST",
     headers: {
@@ -107,7 +154,7 @@ async function authenticate(): Promise<string> {
   // Extract just the urbauth cookie
   const match = cookie.match(/urbauth-[^=]+=([^;]+)/);
   authCookie = match ? cookie.split(";")[0] : cookie.split(";")[0];
-  
+
   return authCookie;
 }
 
@@ -120,9 +167,9 @@ export async function scry<T>(params: {
 }): Promise<T> {
   const cookie = await authenticate();
   const cfg = config!;
-  
+
   const url = `${cfg.url}/~/scry/${params.app}${params.path}.json`;
-  
+
   const resp = await fetch(url, {
     method: "GET",
     headers: {
@@ -148,11 +195,11 @@ export async function poke(params: {
 }): Promise<void> {
   const cookie = await authenticate();
   const cfg = config!;
-  
+
   // Generate a unique channel ID
   const channelId = `skill-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const channelUrl = `${cfg.url}/~/channel/${channelId}`;
-  
+
   // Open channel and send poke
   const pokeReq = {
     id: 1,

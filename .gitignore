@@ -1,3 +1,7 @@
 node_modules/
 *.log
 .DS_Store
+dist
+# Ship configs contain secrets - only keep example
+ships/*
+!ships/example.json
