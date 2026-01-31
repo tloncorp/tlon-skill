@@ -289,6 +289,44 @@ Output is returned raw from click. Urbit loobeans: `0` = true, `1` = false.
 
 ---
 
+### Workspace Files
+
+Read and edit persistent workspace files (SOUL.md, MEMORY.md, USER.md, etc.). Content persists across sessions.
+```bash
+# Read files
+tlon-run soul read                    # Read SOUL.md (bot personality/instructions)
+tlon-run memory read                  # Read MEMORY.md (persistent notes/context)
+tlon-run user read                    # Read USER.md (user-specific info)
+tlon-run tools read                   # Read TOOLS.md
+tlon-run agents read                  # Read AGENTS.md
+tlon-run heartbeat read               # Read HEARTBEAT.md
+tlon-run identity read                # Read IDENTITY.md
+
+# Replace entire file content
+tlon-run soul replace "New content"
+tlon-run memory replace "Fresh start"
+# etc
+
+# Append to file
+tlon-run soul append "Additional note"
+tlon-run memory append "Remember: user prefers formal tone"
+# etc
+
+# For multiline / markdown content, use stdin (**only works if you have shell privileges**)
+cat <<'EOF' | tlon-run soul replace -
+# Bot Personality
+
+You are a helpful assistant who speaks like a pirate.
+EOF
+
+echo "User timezone: PST" | tlon-run memory append -
+```
+
+- Pass `-` as the content argument to read from stdin
+- Files are stored on FS and persist across bot restarts
+
+---
+
 ## Notes
 
 - All ship names should include the `~` prefix (scripts will normalize if missing)
