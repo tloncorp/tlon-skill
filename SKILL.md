@@ -1,6 +1,6 @@
 ---
 name: tlon
-description: Access Tlon/Urbit via the tlon-run tool. Use for checking activity, listing channels/groups, fetching message history, looking up contacts, posting to channels, sending DMs, and performing ship operations. Complements the Tlon channel plugin.
+description: Interact with Tlon/Urbit beyond the channel plugin. Use for contacts (get/update profiles, nicknames, avatars), listing channels/groups, fetching message history, posting to channels, sending DMs, and ship lookups. Complements the Tlon channel - use this skill for read operations, profile management, and direct API access.
 ---
 
 # Tlon Skill
