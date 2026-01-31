@@ -226,6 +226,63 @@ async function unreactToPost(
   }
 }
 
+// Edit a post (channels only, not DMs)
+// Note: postId must be in @da format
+async function editPost(
+  nest: string,
+  postId: string,
+  newContent: string,
+  metadata?: { title?: string; image?: string; description?: string; cover?: string }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const config = getConfig();
+    const author = `~${config.ship}`;
+    const sent = Date.now();
+    const content = parseContent(newContent);
+    
+    // Determine kind from nest
+    const kind = nest.startsWith("diary/") ? "/diary" 
+               : nest.startsWith("heap/") ? "/heap" 
+               : "/chat";
+    
+    const essay: Record<string, any> = {
+      content,
+      author,
+      sent,
+      kind,
+      blob: null,
+      meta: metadata ? {
+        title: metadata.title || "",
+        description: metadata.description || "",
+        image: metadata.image || "",
+        cover: metadata.cover || "",
+      } : null,
+    };
+
+    await poke({
+      app: "channels",
+      mark: "channel-action-1",
+      json: {
+        channel: {
+          nest,
+          action: {
+            post: {
+              edit: {
+                id: postId,
+                essay,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
 // Delete a post
 // Note: postId must be in @da format (e.g., "170.141.184.507.800.833.818.237.178.278.053.937.152")
 // NOT the Unix timestamp. Use messages.ts to fetch posts and see their actual IDs.
@@ -313,6 +370,35 @@ async function main() {
         break;
       }
 
+      case "edit": {
+        const nest = args[1];
+        const postId = args[2];
+        // Check for --title flag for notebook posts
+        const titleIdx = args.indexOf("--title");
+        let title: string | undefined;
+        let messageStart = 3;
+        if (titleIdx !== -1 && args[titleIdx + 1]) {
+          title = args[titleIdx + 1];
+          // Remove --title and its value from message construction
+          const beforeTitle = args.slice(3, titleIdx);
+          const afterTitle = args.slice(titleIdx + 2);
+          const message = [...beforeTitle, ...afterTitle].join(" ");
+          if (!nest || !postId || !message) {
+            console.error("Usage: posts.ts edit <channel> <post-id> <new-message> [--title <title>]");
+            process.exit(1);
+          }
+          result = await editPost(nest, postId, message, { title });
+        } else {
+          const message = args.slice(3).join(" ");
+          if (!nest || !postId || !message) {
+            console.error("Usage: posts.ts edit <channel> <post-id> <new-message> [--title <title>]");
+            process.exit(1);
+          }
+          result = await editPost(nest, postId, message);
+        }
+        break;
+      }
+
       case "delete": {
         const nest = args[1];
         const postId = args[2];
@@ -333,6 +419,7 @@ Commands:
   reply <channel> <post-id> <message>   Reply to a post
   react <channel> <post-id> <emoji>     React to a post with an emoji
   unreact <channel> <post-id>           Remove your reaction from a post
+  edit <channel> <post-id> <message>    Edit a post [--title <t> for notebooks]
   delete <channel> <post-id>            Delete a post
 
 Channel format: chat/~host/channel-name, diary/~host/name, heap/~host/name
