@@ -17,12 +17,15 @@ let config: UrbitConfig | null = null;
 let authCookie: string | null = null;
 
 /**
- * Try to read Tlon credentials from Moltbot config
+ * Try to read Tlon credentials from OpenClaw config
  */
-function getConfigFromMoltbot(): UrbitConfig | null {
-  // Check common Moltbot config locations
+function getConfigFromOpenClaw(): UrbitConfig | null {
+  // Check common OpenClaw config locations (with moltbot fallback)
   const configPaths = [
-    process.env.MOLTBOT_CONFIG,
+    process.env.OPENCLAW_CONFIG,
+    path.join(os.homedir(), '.openclaw', 'openclaw.yaml'),
+    path.join(os.homedir(), '.openclaw', 'openclaw.json'),
+    // Legacy paths for backwards compatibility
     path.join(os.homedir(), '.clawdbot', 'moltbot.json'),
     path.join(os.homedir(), '.moltbot', 'moltbot.json'),
   ].filter(Boolean) as string[];
@@ -83,17 +86,17 @@ export function getConfig(): UrbitConfig {
     return { url, ship: ship.replace(/^~/, ""), code };
   }
 
-  // Option 4: Fall back to Moltbot config
-  const moltbotConfig = getConfigFromMoltbot();
-  if (moltbotConfig) {
-    return moltbotConfig;
+  // 2. Fall back to OpenClaw config
+  const openclawConfig = getConfigFromOpenClaw();
+  if (openclawConfig) {
+    return openclawConfig;
   }
 
   throw new Error(
     "Missing Urbit config. Either:\n" +
     "  - Set TLON_CONFIG_FILE, or TLON_SHIP + TLON_SKILL_DIR, or\n" +
     "  - Set URBIT_URL, URBIT_SHIP, and URBIT_CODE environment variables, or\n" +
-    "  - Configure Tlon channel in Moltbot (~/.clawdbot/moltbot.json)"
+    "  - Configure Tlon channel in OpenClaw (~/.openclaw/openclaw.yaml)"
   );
 }
 

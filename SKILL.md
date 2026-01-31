@@ -244,6 +244,10 @@ Pass a Hoon thread string directly to click, exactly as you would with `click -k
 
 Note: Click output uses Urbit loobeans where `0` = true/yes and `1` = false/no.
 
+### OpenClaw Settings (Hot-Reload Config)
+
+Manage OpenClaw's Tlon plugin settings via Urbit's settings-store. Changes apply immediately without gateway restart.
+
 ## Limits
 
 - Activity commands: max 25 items
@@ -267,4 +271,5 @@ If a command fails:
 
 - All ship names should include the `~` prefix (scripts will normalize if missing)
 - Post IDs are Unix timestamps in milliseconds
+- For sending messages via the OpenClaw message tool, use `channel=tlon`
 - Channel nests follow format: `<kind>/~<host>/<name>` where kind is chat, diary, or heap

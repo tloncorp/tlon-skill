@@ -1,6 +1,6 @@
 # Tlon Skill
 
-A [Moltbot](https://github.com/moltbot/moltbot) skill for interacting with Tlon/Urbit beyond the channel plugin.
+A [OpenClaw](https://github.com/openclaw/openclaw) skill for interacting with Tlon/Urbit beyond the channel plugin.
 
 ## Features
 
@@ -13,6 +13,7 @@ A [Moltbot](https://github.com/moltbot/moltbot) skill for interacting with Tlon/
 - **Contacts**: List, get, and update contact profiles
 - **Settings**: Hot-reload Moltbot plugin config via settings-store
 - **Click**: Low-level ship operations (OTA, desk management, group admin, DMs, etc.) via the `click` protocol
+- **Settings**: Hot-reload OpenClaw plugin config via settings-store
 
 ## Deployment (Hosted / K8s)
 
@@ -129,7 +130,7 @@ export URBIT_SHIP="~your-ship"
 export URBIT_CODE="sampel-ticlyt-migfun-falmel"
 ```
 
-The skill also reads credentials from Moltbot's config if environment variables aren't set.
+The skill also reads credentials from OpenClaw's config if environment variables aren't set.
 
 ---
 
@@ -328,9 +329,9 @@ npx ts-node scripts/contacts.ts update-profile --nickname "Name" --bio "About me
 
 ---
 
-## Settings (Moltbot Plugin Config)
+## Settings (OpenClaw Plugin Config)
 
-Manage Moltbot's Tlon plugin config via Urbit settings-store. Changes apply immediately without gateway restart.
+Manage OpenClaw's Tlon plugin config via Urbit settings-store. Changes apply immediately without gateway restart.
 
 ```bash
 # View current settings
@@ -383,7 +384,7 @@ npx ts-node scripts/notebook-post.ts ~host/group diary/~host/channel "Post Title
 
 ## Complements the Tlon Plugin
 
-This skill handles API operations, history retrieval, and administration. For real-time messaging and bot responses, use the [Tlon channel plugin](https://github.com/tloncorp/moltbot-tlon).
+This skill handles API operations, history retrieval, and administration. For real-time messaging and bot responses, use the [Tlon channel plugin](https://github.com/tloncorp/openclaw-tlon).
 
 ## API Reference
 

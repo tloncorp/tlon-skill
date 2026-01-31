@@ -1,6 +1,6 @@
 #!/usr/bin/env npx ts-node
 /**
- * Manage Moltbot settings in Urbit settings-store.
+ * Manage OpenClaw settings in Urbit settings-store.
  * 
  * Usage:
  *   npx ts-node scripts/settings.ts get
@@ -256,7 +256,7 @@ async function main() {
       }
       
       default:
-        console.log(`Moltbot Settings Manager
+        console.log(`OpenClaw Settings Manager
 
 Commands:
   get                              Show all settings
