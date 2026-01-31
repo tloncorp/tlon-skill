@@ -15,33 +15,11 @@
  */
 
 import { getConfig, poke, getCurrentShip, normalizeShip } from "./urbit-client";
+import { markdownToStory, type Story } from "./story";
 
-// Parse content into Story format
-function parseContent(message: string): any[] {
-  const inlines: any[] = [];
-  
-  // Split by ship mentions
-  const parts = message.split(/(~[a-z]+-[a-z]+(?:-[a-z]+)*)/g);
-  
-  for (const part of parts) {
-    if (!part) continue;
-    
-    if (part.match(/^~[a-z]+-[a-z]+(?:-[a-z]+)*$/)) {
-      inlines.push({ ship: part });
-    } else {
-      const lines = part.split('\n');
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i]) {
-          inlines.push(lines[i]);
-        }
-        if (i < lines.length - 1) {
-          inlines.push({ break: null });
-        }
-      }
-    }
-  }
-  
-  return [{ inline: inlines }];
+// Parse content into Story format with rich markdown support
+function parseContent(message: string): Story {
+  return markdownToStory(message);
 }
 
 // Check if the target is a group DM (club)
