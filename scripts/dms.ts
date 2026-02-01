@@ -230,7 +230,7 @@ async function reactToDM(
   try {
     await poke({
       app: "chat",
-      mark: "chat-dm-action",
+      mark: "chat-dm-action-1",
       json: {
         ship: normalizedShip,
         diff: {
@@ -262,7 +262,7 @@ async function unreactToDM(
   try {
     await poke({
       app: "chat",
-      mark: "chat-dm-action",
+      mark: "chat-dm-action-1",
       json: {
         ship: normalizedShip,
         diff: {
