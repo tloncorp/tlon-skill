@@ -15,6 +15,12 @@
 import { getConfig, poke, getCurrentShip, normalizeShip } from "./urbit-client";
 import { scot, da } from "@urbit/aura";
 
+// Strip optional ~ship/ prefix from a post ID, returning just the numeric part
+function extractNumericId(id: string): string {
+  const slash = id.indexOf('/');
+  return slash >= 0 ? id.slice(slash + 1) : id;
+}
+
 // Format a post ID as @ud (with dots every 3 digits)
 // This is required for reactions to work properly
 function formatUd(id: string): string {
@@ -137,7 +143,7 @@ async function replyToPost(
           action: {
             post: {
               reply: {
-                id: postId,
+                id: formatUd(extractNumericId(postId)),
                 action: {
                   add: memo,
                 },
@@ -162,7 +168,7 @@ async function reactToPost(
   react: string
 ): Promise<{ success: boolean; error?: string }> {
   const ship = getCurrentShip();
-  const formattedId = formatUd(postId);
+  const formattedId = formatUd(extractNumericId(postId));
 
   try {
     await poke({
@@ -196,7 +202,7 @@ async function unreactToPost(
   postId: string
 ): Promise<{ success: boolean; error?: string }> {
   const ship = getCurrentShip();
-  const formattedId = formatUd(postId);
+  const formattedId = formatUd(extractNumericId(postId));
 
   try {
     await poke({
@@ -265,7 +271,7 @@ async function editPost(
           action: {
             post: {
               edit: {
-                id: postId,
+                id: formatUd(extractNumericId(postId)),
                 essay,
               },
             },
@@ -296,7 +302,7 @@ async function deletePost(
           nest,
           action: {
             post: {
-              del: postId,
+              del: formatUd(extractNumericId(postId)),
             },
           },
         },
