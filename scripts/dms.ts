@@ -395,7 +395,7 @@ async function main() {
         const emoji = args[3];
         if (!whom || !postId || !emoji) {
           console.error("Usage: dms.ts react <ship> <post-id> <emoji>");
-          console.error("Example: dms.ts react ~sampel-palnet 1706123456789 👍");
+          console.error("Example: dms.ts react ~sampel-palnet ~zod/170.141.184.507... 👍");
           process.exit(1);
         }
         // Note: Club reactions would need different handling
@@ -460,10 +460,11 @@ Commands:
 
 Ship format: ~sampel-palnet (with or without ~)
 Club ID format: 0v... (for group DMs)
+Post ID format: ~author/170.141.184.507... (returned by send/reply)
 
 Examples:
   dms.ts send ~sampel-palnet "Hey, how's it going?"
-  dms.ts react ~sampel-palnet 1706123456789 ❤️
+  dms.ts react ~sampel-palnet ~zod/170.141.184.507... ❤️
   dms.ts accept ~sampel-palnet
 `);
         process.exit(1);

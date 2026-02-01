@@ -13,12 +13,7 @@
  */
 
 import { getConfig, poke, getCurrentShip, normalizeShip } from "./urbit-client";
-
-// Generate a post ID in @da format from Unix timestamp
-function generatePostId(): string {
-  // Return Unix timestamp in milliseconds - the backend handles conversion
-  return Date.now().toString();
-}
+import { scot, da } from "@urbit/aura";
 
 // Format a post ID as @ud (with dots every 3 digits)
 // This is required for reactions to work properly
@@ -108,7 +103,8 @@ async function sendPost(nest: string, message: string): Promise<{ success: boole
       },
     });
 
-    return { success: true, postId: `${author}/${sent}` };
+    const idUd = scot("ud", da.fromUnix(sent));
+    return { success: true, postId: `${author}/${idUd}` };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
@@ -152,7 +148,8 @@ async function replyToPost(
       },
     });
 
-    return { success: true, replyId: `${author}/${sent}` };
+    const idUd = scot("ud", da.fromUnix(sent));
+    return { success: true, replyId: `${author}/${idUd}` };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
@@ -339,7 +336,7 @@ async function main() {
         const message = args.slice(3).join(" ");
         if (!nest || !postId || !message) {
           console.error("Usage: posts.ts reply <channel> <post-id> <message>");
-          console.error("Example: posts.ts reply chat/~sampel/general 170141184505123456789 Nice post!");
+          console.error("Example: posts.ts reply chat/~sampel/general 170.141.184.507... Nice post!");
           process.exit(1);
         }
         result = await replyToPost(nest, postId, message);
@@ -352,7 +349,7 @@ async function main() {
         const emoji = args[3];
         if (!nest || !postId || !emoji) {
           console.error("Usage: posts.ts react <channel> <post-id> <emoji>");
-          console.error("Example: posts.ts react chat/~sampel/general 170141184505123456789 👍");
+          console.error("Example: posts.ts react chat/~sampel/general 170.141.184.507... 👍");
           process.exit(1);
         }
         result = await reactToPost(nest, postId, emoji);
@@ -428,7 +425,7 @@ Use 'messages.ts channel <nest> --limit N' to see actual post IDs.
 
 Examples:
   posts.ts send chat/~sampel/general "Hello everyone!"
-  posts.ts react chat/~sampel/general 1706123456789 👍
+  posts.ts react chat/~sampel/general 170.141.184.507... 👍
 `);
         process.exit(1);
     }

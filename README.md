@@ -191,11 +191,13 @@ Send messages to channels (chat, diary, heap).
 
 ```bash
 tlon-run posts send chat/~host/channel "Hello world!"
-tlon-run posts reply chat/~host/channel 170.141... "My reply"
-tlon-run posts react chat/~host/channel 170.141... "👍"
-tlon-run posts unreact chat/~host/channel 170.141...
-tlon-run posts delete chat/~host/channel 170.141...
+tlon-run posts reply chat/~host/channel 170.141.184.507... "My reply"
+tlon-run posts react chat/~host/channel 170.141.184.507... "👍"
+tlon-run posts unreact chat/~host/channel 170.141.184.507...
+tlon-run posts delete chat/~host/channel 170.141.184.507...
 ```
+
+Post IDs are @ud numbers with dots (e.g. `170.141.184.507.802.259...`). Get them from `messages channel` output.
 
 ---
 
@@ -205,14 +207,16 @@ Send and manage direct messages.
 
 ```bash
 tlon-run dms send ~sampel-palnet "Hello!"
-tlon-run dms send <club-id> "Hello!"                         # Group DM (0v... id)
-tlon-run dms reply ~sampel-palnet 170.141... "My reply"
-tlon-run dms react ~sampel-palnet 170.141... "❤️"
-tlon-run dms unreact ~sampel-palnet 170.141...
-tlon-run dms delete ~sampel-palnet 170.141...
+tlon-run dms send <club-id> "Hello!"                                      # Group DM (0v... id)
+tlon-run dms reply ~sampel-palnet ~author/170.141.184.507... "My reply"
+tlon-run dms react ~sampel-palnet ~author/170.141.184.507... "❤️"
+tlon-run dms unreact ~sampel-palnet ~author/170.141.184.507...
+tlon-run dms delete ~sampel-palnet ~author/170.141.184.507...
 tlon-run dms accept ~sampel-palnet
 tlon-run dms decline ~sampel-palnet
 ```
+
+DM post IDs include the author ship prefix (e.g. `~zod/170.141.184.507.802...`). Returned by `send`/`reply`.
 
 ---
 
@@ -330,7 +334,7 @@ echo "User timezone: PST" | tlon-run memory append -
 ## Notes
 
 - All ship names should include the `~` prefix (scripts will normalize if missing)
-- Post IDs are Unix timestamps in milliseconds
+- Post IDs are @ud format with dots (e.g. `170.141.184.507...`). DM post IDs include author prefix (`~ship/170.141...`)
 - Channel nests follow format: `<kind>/~<host>/<name>` where kind is chat, diary, or heap
 - Profile updates sync to peers automatically via the contacts agent
 
@@ -442,18 +446,18 @@ npx ts-node scripts/messages.ts search "query" --channel chat/~host/slug
 
 # Posts (channel posting)
 npx ts-node scripts/posts.ts send chat/~host/slug "message"    # -> tlon-run posts send
-npx ts-node scripts/posts.ts reply chat/~host/slug <id> "reply" # -> tlon-run posts reply
-npx ts-node scripts/posts.ts react chat/~host/slug <id> 👍      # -> tlon-run posts react
-npx ts-node scripts/posts.ts unreact chat/~host/slug <id>       # -> tlon-run posts unreact
-npx ts-node scripts/posts.ts delete chat/~host/slug <id>        # -> tlon-run posts delete
+npx ts-node scripts/posts.ts reply chat/~host/slug 170.141... "reply" # -> tlon-run posts reply
+npx ts-node scripts/posts.ts react chat/~host/slug 170.141... 👍      # -> tlon-run posts react
+npx ts-node scripts/posts.ts unreact chat/~host/slug 170.141...       # -> tlon-run posts unreact
+npx ts-node scripts/posts.ts delete chat/~host/slug 170.141...        # -> tlon-run posts delete
 
 # Direct Messages
 npx ts-node scripts/dms.ts send ~sampel "hello"                # -> tlon-run dms send
 npx ts-node scripts/dms.ts send 0v4.club-id "hello"            # -> tlon-run dms send (group DM)
-npx ts-node scripts/dms.ts reply ~sampel <id> "reply"          # -> tlon-run dms reply
-npx ts-node scripts/dms.ts react ~sampel <id> 👍                # -> tlon-run dms react
-npx ts-node scripts/dms.ts unreact ~sampel <id>                 # -> tlon-run dms unreact
-npx ts-node scripts/dms.ts delete ~sampel <id>                  # -> tlon-run dms delete
+npx ts-node scripts/dms.ts reply ~sampel ~author/170.141... "reply"  # -> tlon-run dms reply
+npx ts-node scripts/dms.ts react ~sampel ~author/170.141... 👍        # -> tlon-run dms react
+npx ts-node scripts/dms.ts unreact ~sampel ~author/170.141...         # -> tlon-run dms unreact
+npx ts-node scripts/dms.ts delete ~sampel ~author/170.141...          # -> tlon-run dms delete
 npx ts-node scripts/dms.ts accept ~sampel                      # -> tlon-run dms accept
 npx ts-node scripts/dms.ts decline ~sampel                     # -> tlon-run dms decline
 
