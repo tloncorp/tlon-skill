@@ -31,9 +31,11 @@ Commands:
   groups add-channel ~host/slug "Name" [opts]  - Add channel to group
   messages {dm|channel|history} [--limit N]    - Read messages
   messages search "query" --channel <nest>     - Search messages
-  dms {send|reply|react|unreact|delete}        - DM operations
+  dms send <club-id> "msg"                      - Send to group DM (clubs only)
+  dms reply <club-id> <id> "msg"               - Reply in group DM (clubs only)
+  dms {react|unreact|delete}                   - DM management
   dms {accept|decline}                         - DM invites
-  posts {send|reply|react|unreact|delete}      - Channel posts
+  posts {react|unreact|delete}                 - Channel post management
   notebook <nest> "Title" [--content file]     - Post to notebook/diary
   settings {get|set|delete}                    - Bot settings
   settings {allow-dm|remove-dm}               - DM allowlist
@@ -550,18 +552,26 @@ case "$cmd" in
       send)
         target="${1:-}"
         msg="${2:-}"
-        [ -n "$target" ] || { echo "error: missing target"; echo "usage: tlon-run dms send ~ship|<club-id> \"message\""; exit 2; }
+        [ -n "$target" ] || { echo "error: missing target"; echo "usage: tlon-run dms send <club-id> \"message\""; exit 2; }
         [ -n "$msg" ] || { echo "error: missing message"; exit 2; }
-        exec node "$DIST_DIR/dms.js" send "$target" "$msg"
+        # 1:1 DM send is handled by the Tlon channel plugin; only club (group DM) send goes through here
+        case "$target" in
+          0v*) exec node "$DIST_DIR/dms.js" send "$target" "$msg" ;;
+          *) echo "error: 1:1 DM send is handled by the Tlon channel plugin."; echo "Use the channel message tool with channel=tlon instead."; exit 2 ;;
+        esac
         ;;
       reply)
         target="${1:-}"
         post_id="${2:-}"
         msg="${3:-}"
-        [ -n "$target" ] || { echo "error: missing target"; echo "usage: tlon-run dms reply ~ship <post-id> \"message\""; exit 2; }
+        [ -n "$target" ] || { echo "error: missing target"; echo "usage: tlon-run dms reply <club-id> <post-id> \"message\""; exit 2; }
         [ -n "$post_id" ] || { echo "error: missing post id"; exit 2; }
         [ -n "$msg" ] || { echo "error: missing message"; exit 2; }
-        exec node "$DIST_DIR/dms.js" reply "$target" "$post_id" "$msg"
+        # 1:1 DM reply is handled by the Tlon channel plugin; only club (group DM) reply goes through here
+        case "$target" in
+          0v*) exec node "$DIST_DIR/dms.js" reply "$target" "$post_id" "$msg" ;;
+          *) echo "error: 1:1 DM reply is handled by the Tlon channel plugin."; echo "Use the channel message tool with channel=tlon and replyTo instead."; exit 2 ;;
+        esac
         ;;
       react)
         target="${1:-}"
@@ -611,22 +621,16 @@ case "$cmd" in
     shift || true
     case "$sub" in
       send)
-        chan="${1:-}"
-        msg="${2:-}"
-        [ -n "$chan" ] || { echo "error: missing channel"; echo "usage: tlon-run posts send chat/~host/slug \"message\""; exit 2; }
-        [ -n "$msg" ] || { echo "error: missing message"; exit 2; }
-        validate_channel "$chan"
-        exec node "$DIST_DIR/posts.js" send "$chan" "$msg"
+        # Channel post send is handled by the Tlon channel plugin
+        echo "error: Channel post send is handled by the Tlon channel plugin."
+        echo "Use the channel message tool with channel=tlon instead."
+        exit 2
         ;;
       reply)
-        chan="${1:-}"
-        post_id="${2:-}"
-        msg="${3:-}"
-        [ -n "$chan" ] || { echo "error: missing channel"; echo "usage: tlon-run posts reply chat/~host/slug <post-id> \"message\""; exit 2; }
-        [ -n "$post_id" ] || { echo "error: missing post id"; exit 2; }
-        [ -n "$msg" ] || { echo "error: missing message"; exit 2; }
-        validate_channel "$chan"
-        exec node "$DIST_DIR/posts.js" reply "$chan" "$post_id" "$msg"
+        # Channel post reply is handled by the Tlon channel plugin
+        echo "error: Channel post reply is handled by the Tlon channel plugin."
+        echo "Use the channel message tool with channel=tlon and replyTo instead."
+        exit 2
         ;;
       react)
         chan="${1:-}"

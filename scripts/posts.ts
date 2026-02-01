@@ -1,12 +1,14 @@
 #!/usr/bin/env npx ts-node
 /**
- * Post to Tlon channels (chat, diary, heap)
+ * Channel post management for Tlon
+ *
+ * Note: Sending and replying to channel posts is handled by the openclaw-tlon
+ * channel plugin. This script handles reactions, edits, and deletes only.
  *
  * Usage:
- *   npx ts-node scripts/posts.ts send <channel> <message>
- *   npx ts-node scripts/posts.ts reply <channel> <post-id> <message>
  *   npx ts-node scripts/posts.ts react <channel> <post-id> <emoji>
  *   npx ts-node scripts/posts.ts unreact <channel> <post-id>
+ *   npx ts-node scripts/posts.ts edit <channel> <post-id> <message>
  *   npx ts-node scripts/posts.ts delete <channel> <post-id>
  *
  * Channel format: chat/~host/channel-name, diary/~host/channel-name, heap/~host/channel-name
@@ -76,90 +78,11 @@ function getChannelKind(nest: string): string {
   }
 }
 
-// Send a post to a channel
-async function sendPost(nest: string, message: string): Promise<{ success: boolean; postId?: string; error?: string }> {
-  const config = getConfig();
-  const author = getCurrentShip();
-  const sent = Date.now();
-  const content = parseContent(message);
-  const kind = getChannelKind(nest);
+// sendPost: Handled by the openclaw-tlon channel plugin (sendText).
+// Use the Tlon channel's message tool instead of tlon-run for posting to channels.
 
-  const essay = {
-    content,
-    author,
-    sent,
-    kind,
-    blob: null,
-    meta: null,
-  };
-
-  try {
-    await poke({
-      app: "channels",
-      mark: "channel-action-1",
-      json: {
-        channel: {
-          nest,
-          action: {
-            post: {
-              add: essay,
-            },
-          },
-        },
-      },
-    });
-
-    const idUd = scot("ud", da.fromUnix(sent));
-    return { success: true, postId: `${author}/${idUd}` };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-}
-
-// Reply to a post in a channel
-async function replyToPost(
-  nest: string,
-  postId: string,
-  message: string
-): Promise<{ success: boolean; replyId?: string; error?: string }> {
-  const config = getConfig();
-  const author = getCurrentShip();
-  const sent = Date.now();
-  const content = parseContent(message);
-
-  const memo = {
-    content,
-    author,
-    sent,
-  };
-
-  try {
-    await poke({
-      app: "channels",
-      mark: "channel-action-1",
-      json: {
-        channel: {
-          nest,
-          action: {
-            post: {
-              reply: {
-                id: formatUd(extractNumericId(postId)),
-                action: {
-                  add: memo,
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-
-    const idUd = scot("ud", da.fromUnix(sent));
-    return { success: true, replyId: `${author}/${idUd}` };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-}
+// replyToPost: Handled by the openclaw-tlon channel plugin (sendText with replyToId).
+// Use the Tlon channel's message tool with replyTo instead of tlon-run for replies.
 
 // React to a post
 async function reactToPost(
@@ -325,27 +248,16 @@ async function main() {
 
     switch (command) {
       case "send": {
-        const nest = args[1];
-        const message = args.slice(2).join(" ");
-        if (!nest || !message) {
-          console.error("Usage: posts.ts send <channel> <message>");
-          console.error("Example: posts.ts send chat/~sampel/general Hello world!");
-          process.exit(1);
-        }
-        result = await sendPost(nest, message);
+        console.error("error: Channel post send is handled by the Tlon channel plugin.");
+        console.error("Use the channel message tool with channel=tlon instead.");
+        process.exit(1);
         break;
       }
 
       case "reply": {
-        const nest = args[1];
-        const postId = args[2];
-        const message = args.slice(3).join(" ");
-        if (!nest || !postId || !message) {
-          console.error("Usage: posts.ts reply <channel> <post-id> <message>");
-          console.error("Example: posts.ts reply chat/~sampel/general 170.141.184.507... Nice post!");
-          process.exit(1);
-        }
-        result = await replyToPost(nest, postId, message);
+        console.error("error: Channel post reply is handled by the Tlon channel plugin.");
+        console.error("Use the channel message tool with channel=tlon and replyTo instead.");
+        process.exit(1);
         break;
       }
 
@@ -417,21 +329,22 @@ async function main() {
         console.error(`
 Usage: posts.ts <command> [args]
 
+Note: Sending and replying to posts is handled by the Tlon channel plugin.
+Use tlon-run only for reactions, edits, and deletes.
+
 Commands:
-  send <channel> <message>              Post a message to a channel
-  reply <channel> <post-id> <message>   Reply to a post
   react <channel> <post-id> <emoji>     React to a post with an emoji
   unreact <channel> <post-id>           Remove your reaction from a post
   edit <channel> <post-id> <message>    Edit a post [--title <t> for notebooks]
   delete <channel> <post-id>            Delete a post
 
 Channel format: chat/~host/channel-name, diary/~host/name, heap/~host/name
-Post IDs for delete must be @da format (e.g., 170.141.184.507....). 
-Use 'messages.ts channel <nest> --limit N' to see actual post IDs.
+Post IDs are @ud format with dots (e.g., 170.141.184.507...).
+Use 'tlon-run messages channel <nest> --limit N' to see post IDs.
 
 Examples:
-  posts.ts send chat/~sampel/general "Hello everyone!"
   posts.ts react chat/~sampel/general 170.141.184.507... 👍
+  posts.ts delete chat/~sampel/general 170.141.184.507...
 `);
         process.exit(1);
     }
