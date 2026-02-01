@@ -15,6 +15,7 @@
  */
 
 import { getConfig, poke, getCurrentShip, normalizeShip } from "./urbit-client";
+import { scot, da } from "@urbit/aura";
 
 // Parse content into Story format
 function parseContent(message: string): any[] {
@@ -58,27 +59,21 @@ async function sendDM(
   const author = getCurrentShip();
   const sent = Date.now();
   const content = parseContent(message);
-
-  const essay = {
-    content,
-    author,
-    sent,
-    kind: "/chat",
-    blob: null,
-    meta: null,
-  };
+  const idUd = scot("ud", da.fromUnix(sent));
+  const id = `${author}/${idUd}`;
 
   try {
     await poke({
       app: "chat",
-      mark: "chat-dm-action-1",
+      mark: "chat-dm-action",
       json: {
         ship: normalizedShip,
         diff: {
-          id: `${author}/${sent}`,
+          id,
           delta: {
             add: {
-              essay,
+              memo: { content, author, sent },
+              kind: null,
               time: null,
             },
           },
@@ -86,7 +81,7 @@ async function sendDM(
       },
     });
 
-    return { success: true, postId: `${author}/${sent}` };
+    return { success: true, postId: id };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
@@ -100,12 +95,8 @@ async function sendClubMessage(
   const author = getCurrentShip();
   const sent = Date.now();
   const content = parseContent(message);
-
-  const memo = {
-    content,
-    author,
-    sent,
-  };
+  const idUd = scot("ud", da.fromUnix(sent));
+  const id = `${author}/${idUd}`;
 
   try {
     await poke({
@@ -117,17 +108,11 @@ async function sendClubMessage(
           uid: "0v3",
           delta: {
             writ: {
-              id: `${author}/${sent}`,
+              id,
               delta: {
                 add: {
-                  essay: {
-                    content,
-                    author,
-                    sent,
-                    kind: "/chat",
-                    blob: null,
-                    meta: null,
-                  },
+                  memo: { content, author, sent },
+                  kind: null,
                   time: null,
                 },
               },
@@ -137,7 +122,7 @@ async function sendClubMessage(
       },
     });
 
-    return { success: true, postId: `${author}/${sent}` };
+    return { success: true, postId: id };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
@@ -153,28 +138,24 @@ async function replyToDM(
   const author = getCurrentShip();
   const sent = Date.now();
   const content = parseContent(message);
-
-  const memo = {
-    content,
-    author,
-    sent,
-  };
+  const idUd = scot("ud", da.fromUnix(sent));
+  const replyId = `${author}/${idUd}`;
 
   try {
     await poke({
       app: "chat",
-      mark: "chat-dm-action-1",
+      mark: "chat-dm-action",
       json: {
         ship: normalizedShip,
         diff: {
           id: postId,
           delta: {
             reply: {
-              id: `${author}/${sent}`,
+              id: replyId,
               meta: null,
               delta: {
                 add: {
-                  memo,
+                  memo: { content, author, sent },
                   time: null,
                 },
               },
@@ -184,7 +165,7 @@ async function replyToDM(
       },
     });
 
-    return { success: true, replyId: `${author}/${sent}` };
+    return { success: true, replyId };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
@@ -199,12 +180,8 @@ async function replyToClub(
   const author = getCurrentShip();
   const sent = Date.now();
   const content = parseContent(message);
-
-  const memo = {
-    content,
-    author,
-    sent,
-  };
+  const idUd = scot("ud", da.fromUnix(sent));
+  const replyId = `${author}/${idUd}`;
 
   try {
     await poke({
@@ -219,11 +196,11 @@ async function replyToClub(
               id: postId,
               delta: {
                 reply: {
-                  id: `${author}/${sent}`,
+                  id: replyId,
                   meta: null,
                   delta: {
                     add: {
-                      memo,
+                      memo: { content, author, sent },
                       time: null,
                     },
                   },
@@ -235,7 +212,7 @@ async function replyToClub(
       },
     });
 
-    return { success: true, replyId: `${author}/${sent}` };
+    return { success: true, replyId };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
@@ -253,7 +230,7 @@ async function reactToDM(
   try {
     await poke({
       app: "chat",
-      mark: "chat-dm-action-1",
+      mark: "chat-dm-action",
       json: {
         ship: normalizedShip,
         diff: {
@@ -285,7 +262,7 @@ async function unreactToDM(
   try {
     await poke({
       app: "chat",
-      mark: "chat-dm-action-1",
+      mark: "chat-dm-action",
       json: {
         ship: normalizedShip,
         diff: {
@@ -313,7 +290,7 @@ async function deleteDM(
   try {
     await poke({
       app: "chat",
-      mark: "chat-dm-action-1",
+      mark: "chat-dm-action",
       json: {
         ship: normalizedShip,
         diff: {
