@@ -1,7 +1,7 @@
 {
   "id": "tlon-run",
   "name": "Tlon Run",
-  "description": "tlon_run tool for read-only Tlon API access",
+  "description": "tlon_run tool for Tlon API access not covered by the plugin",
   "version": "1.0.0",
   "configSchema": {
     "type": "object",
