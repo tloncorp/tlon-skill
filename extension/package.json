@@ -5,5 +5,8 @@
   "main": "index.js",
   "clawdbot": {
     "extensions": ["./index.js"]
+  },
+  "openclaw": {
+    "extensions": ["./index.js"]
   }
 }
