@@ -13,6 +13,7 @@
  */
 
 import { getConfig, poke, getCurrentShip, normalizeShip } from "./urbit-client";
+import { markdownToStory, type Story } from "./story";
 
 // Generate a post ID in @da format from Unix timestamp
 function generatePostId(): string {
@@ -33,35 +34,9 @@ function formatUd(id: string): string {
   return parts.join('.');
 }
 
-// Parse content into Story format (array of verses)
-function parseContent(message: string): any[] {
-  // Simple implementation: treat as inline text with @mentions and linebreaks
-  const inlines: any[] = [];
-  
-  // Split by ship mentions
-  const parts = message.split(/(~[a-z]+-[a-z]+(?:-[a-z]+)*)/g);
-  
-  for (const part of parts) {
-    if (!part) continue;
-    
-    if (part.match(/^~[a-z]+-[a-z]+(?:-[a-z]+)*$/)) {
-      // Ship mention
-      inlines.push({ ship: part });
-    } else {
-      // Handle newlines
-      const lines = part.split('\n');
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i]) {
-          inlines.push(lines[i]);
-        }
-        if (i < lines.length - 1) {
-          inlines.push({ break: null });
-        }
-      }
-    }
-  }
-  
-  return [{ inline: inlines }];
+// Parse content into Story format with rich markdown support
+function parseContent(message: string): Story {
+  return markdownToStory(message);
 }
 
 // Determine channel kind from nest
