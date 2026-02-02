@@ -16,6 +16,7 @@
 
 import * as fs from "fs";
 import { getConfig, getCurrentShip } from "./urbit-client";
+import { scot, da } from "@urbit/aura";
 
 interface PostResult {
   success: boolean;
@@ -149,7 +150,8 @@ export async function postToNotebook(
 
               if (event.response === "poke") {
                 if (event.ok === "ok") {
-                  result = { success: true, messageId: `${author}/${sent}` };
+                  const idUd = scot("ud", da.fromUnix(sent));
+                  result = { success: true, messageId: `${author}/${idUd}` };
                 } else if (event.err) {
                   result = { success: false, error: event.err };
                 }

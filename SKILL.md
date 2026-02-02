@@ -114,30 +114,34 @@ Options: `--limit N`, `--resolve-cites` (resolve quoted messages)
 
 ### DMs
 
-Send and manage direct messages.
+Manage direct messages. Sending and replying to 1:1 DMs is handled by the Tlon channel plugin — use `tlon-run` only for group DM (club) messaging and DM management operations.
 
 ```bash
-tlon-run dms send ~sampel "hello"                # Send a DM
-tlon-run dms send <club-id> "hello"              # Send to group DM (0v... id)
-tlon-run dms reply ~sampel <post-id> "reply"     # Reply to a DM
-tlon-run dms react ~sampel <post-id> <emoji>     # React to a DM
-tlon-run dms unreact ~sampel <post-id>           # Remove reaction
-tlon-run dms delete ~sampel <post-id>            # Delete a DM
-tlon-run dms accept ~sampel                      # Accept DM invite
-tlon-run dms decline ~sampel                     # Decline DM invite
+# Group DMs (clubs) only — 1:1 DM send/reply uses the channel plugin
+tlon-run dms send <club-id> "hello"                                      # Send to group DM (0v... id)
+tlon-run dms reply <club-id> ~author/170.141.184.507... "reply"          # Reply in group DM
+
+# Management (works for all DMs)
+tlon-run dms react ~sampel ~author/170.141.184.507... "👍"               # React to a DM
+tlon-run dms unreact ~sampel ~author/170.141.184.507...                  # Remove reaction
+tlon-run dms delete ~sampel ~author/170.141.184.507...                   # Delete a DM
+tlon-run dms accept ~sampel                                              # Accept DM invite
+tlon-run dms decline ~sampel                                             # Decline DM invite
 ```
+
+Post IDs are in `~ship/170.141.184...` format (@ud with dots).
 
 ### Posts
 
-Post to channels (chat, diary, heap).
+Manage channel posts. Sending and replying is handled by the Tlon channel plugin — use `tlon-run` for reactions, edits, and deletes.
 
 ```bash
-tlon-run posts send chat/~host/slug "message"              # Post to channel
-tlon-run posts reply chat/~host/slug <post-id> "reply"     # Reply to a post
-tlon-run posts react chat/~host/slug <post-id> <emoji>     # React to a post
-tlon-run posts unreact chat/~host/slug <post-id>           # Remove reaction
-tlon-run posts delete chat/~host/slug <post-id>            # Delete a post
+tlon-run posts react chat/~host/slug 170.141.184.507... "👍"         # React to a post
+tlon-run posts unreact chat/~host/slug 170.141.184.507...            # Remove reaction
+tlon-run posts delete chat/~host/slug 170.141.184.507...             # Delete a post
 ```
+
+Post IDs are @ud numbers with dots (e.g. `170.141.184.507.802.259...`). Get them from `messages channel` output.
 
 ### Notebook
 
@@ -270,7 +274,7 @@ If a command fails:
 ## Notes
 
 - All ship names should include the `~` prefix (scripts will normalize if missing)
-- Post IDs are Unix timestamps in milliseconds
+- Post IDs are @ud format numbers with dots (e.g. `170.141.184.507...`). For DMs, they include the author ship prefix (`~ship/170.141...`)
 - For sending messages via the OpenClaw message tool, use `channel=tlon`
 - Channel nests follow format: `<kind>/~<host>/<name>` where kind is chat, diary, or heap
 - Profile updates sync to peers automatically via the contacts agent
@@ -356,20 +360,16 @@ npx ts-node scripts/messages.ts channel chat/~host/slug --limit 20 # Channel his
 npx ts-node scripts/messages.ts history chat/~host/slug --limit 20 # Same as channel/history     -> tlon-run messages history
 npx ts-node scripts/messages.ts search "query" --channel chat/~host/slug  # Search messages       -> tlon-run messages search
 
-# Posts (channel posting)
-npx ts-node scripts/posts.ts send chat/~host/slug "message"       # Post to channel              -> tlon-run posts send
-npx ts-node scripts/posts.ts reply chat/~host/slug 1700000000000 "reply" # Reply to post         -> tlon-run posts reply
-npx ts-node scripts/posts.ts react chat/~host/slug 1700000000000 👍       # React to post         -> tlon-run posts react
-npx ts-node scripts/posts.ts unreact chat/~host/slug 1700000000000        # Remove reaction       -> tlon-run posts unreact
-npx ts-node scripts/posts.ts delete chat/~host/slug 1700000000000         # Delete post           -> tlon-run posts delete
+# Posts (management only — send/reply handled by channel plugin)
+npx ts-node scripts/posts.ts react chat/~host/slug 170.141.184.507... 👍     # React to post      -> tlon-run posts react
+npx ts-node scripts/posts.ts unreact chat/~host/slug 170.141.184.507...      # Remove reaction    -> tlon-run posts unreact
+npx ts-node scripts/posts.ts delete chat/~host/slug 170.141.184.507...       # Delete post        -> tlon-run posts delete
 
-# Direct Messages (send/reply/react/delete + invites)
-npx ts-node scripts/dms.ts send ~sampel "hello"                   # Send a DM                   -> tlon-run dms send
+# Direct Messages (management — 1:1 send/reply handled by channel plugin)
 npx ts-node scripts/dms.ts send 0v4.club-id "hello"               # Send to group DM (club)      -> tlon-run dms send
-npx ts-node scripts/dms.ts reply ~sampel 1700000000000 "reply"    # Reply in DM thread           -> tlon-run dms reply
-npx ts-node scripts/dms.ts react ~sampel 1700000000000 👍         # React to DM                  -> tlon-run dms react
-npx ts-node scripts/dms.ts unreact ~sampel 1700000000000          # Remove DM reaction           -> tlon-run dms unreact
-npx ts-node scripts/dms.ts delete ~sampel 1700000000000           # Delete a DM                  -> tlon-run dms delete
+npx ts-node scripts/dms.ts react ~sampel ~author/170.141... 👍      # React to DM                -> tlon-run dms react
+npx ts-node scripts/dms.ts unreact ~sampel ~author/170.141...       # Remove DM reaction         -> tlon-run dms unreact
+npx ts-node scripts/dms.ts delete ~sampel ~author/170.141...        # Delete a DM                -> tlon-run dms delete
 npx ts-node scripts/dms.ts accept ~sampel                         # Accept DM invite             -> tlon-run dms accept
 npx ts-node scripts/dms.ts decline ~sampel                        # Decline DM invite            -> tlon-run dms decline
 
