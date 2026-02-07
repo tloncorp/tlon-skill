@@ -114,7 +114,7 @@ Options: `--limit N`, `--resolve-cites` (resolve quoted messages)
 
 ### DMs
 
-Manage direct messages. Sending and replying to 1:1 DMs is handled by the Tlon channel plugin — use `tlon-run` only for group DM (club) messaging and DM management operations.
+Manage direct messages. Sending and replying to 1:1 DMs is handled by the Tlon channel plugin — use `tlon-run` only for group DM (club) messaging and DM management operations if possible.
 
 ```bash
 # Group DMs (clubs) only — 1:1 DM send/reply uses the channel plugin

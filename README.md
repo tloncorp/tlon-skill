@@ -187,7 +187,7 @@ Options: `--limit N`, `--resolve-cites` (resolve quoted messages)
 
 ### Posts (Channel Management)
 
-Manage channel posts. Sending and replying is handled by the Tlon channel plugin.
+Post to channels (chat, diary, heap).
 
 ```bash
 tlon-run posts react chat/~host/channel 170.141.184.507... "👍"
@@ -201,7 +201,7 @@ Post IDs are @ud numbers with dots (e.g. `170.141.184.507.802.259...`). Get them
 
 ### DMs (Direct Messages)
 
-Manage direct messages. 1:1 DM send/reply is handled by the Tlon channel plugin — use `tlon-run` for group DMs (clubs) and management ops.
+Manage direct messages. 1:1 DM send/reply are also handled by the Tlon channel plugin — use `tlon-run` for group DMs (clubs) and management ops.
 
 ```bash
 # Group DMs (clubs) only
@@ -443,13 +443,17 @@ npx ts-node scripts/messages.ts channel chat/~host/slug --limit 20 # -> tlon-run
 npx ts-node scripts/messages.ts history chat/~host/slug --limit 20 # -> tlon-run messages history
 npx ts-node scripts/messages.ts search "query" --channel chat/~host/slug
 
-# Posts (management — send/reply handled by channel plugin)
+# Posts (channel posting)
+npx ts-node scripts/posts.ts send chat/~host/slug "message"       # Post to channel              -> tlon-run posts send
+npx ts-node scripts/posts.ts reply chat/~host/slug 170.141.184.507... "reply" # Reply to post    -> tlon-run posts reply
 npx ts-node scripts/posts.ts react chat/~host/slug 170.141... 👍      # -> tlon-run posts react
 npx ts-node scripts/posts.ts unreact chat/~host/slug 170.141...       # -> tlon-run posts unreact
 npx ts-node scripts/posts.ts delete chat/~host/slug 170.141...        # -> tlon-run posts delete
 
-# Direct Messages (management — 1:1 send/reply handled by channel plugin)
-npx ts-node scripts/dms.ts send 0v4.club-id "hello"            # -> tlon-run dms send (group DM)
+# Direct Messages (send/reply/react/delete + invites)
+npx ts-node scripts/dms.ts send ~sampel "hello"                   # Send a DM                   -> tlon-run dms send
+npx ts-node scripts/dms.ts send 0v4.club-id "hello"               # Send to group DM (club)      -> tlon-run dms send
+npx ts-node scripts/dms.ts reply ~sampel ~author/170.141... "reply"  # Reply in DM thread         -> tlon-run dms reply
 npx ts-node scripts/dms.ts react ~sampel ~author/170.141... 👍        # -> tlon-run dms react
 npx ts-node scripts/dms.ts unreact ~sampel ~author/170.141...         # -> tlon-run dms unreact
 npx ts-node scripts/dms.ts delete ~sampel ~author/170.141...          # -> tlon-run dms delete

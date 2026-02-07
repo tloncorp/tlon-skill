@@ -1,27 +1,48 @@
 #!/usr/bin/env npx ts-node
 /**
- * Direct Message management for Tlon
- *
- * Note: 1:1 DM send/reply is handled by the openclaw-tlon channel plugin.
- * This script handles club (group DM) messaging and DM management ops only.
+ * Direct Message operations for Tlon
  *
  * Usage:
- *   npx ts-node scripts/dms.ts send <club-id> <message>        (group DMs only)
- *   npx ts-node scripts/dms.ts reply <club-id> <post-id> <msg> (group DMs only)
+ *   npx ts-node scripts/dms.ts send <ship> <message>
+ *   npx ts-node scripts/dms.ts reply <ship> <post-id> <message>
  *   npx ts-node scripts/dms.ts react <ship> <post-id> <emoji>
  *   npx ts-node scripts/dms.ts unreact <ship> <post-id>
  *   npx ts-node scripts/dms.ts delete <ship> <post-id>
  *   npx ts-node scripts/dms.ts accept <ship>
  *   npx ts-node scripts/dms.ts decline <ship>
+ *
+ * For group DMs, use the club ID (0v format) instead of ship
  */
 
 import { getConfig, poke, getCurrentShip, normalizeShip } from "./urbit-client";
 import { scot, da } from "@urbit/aura";
-import { markdownToStory, type Story } from "./story";
 
-// Parse content into Story format with rich markdown support
-function parseContent(message: string): Story {
-  return markdownToStory(message);
+// Parse content into Story format
+function parseContent(message: string): any[] {
+  const inlines: any[] = [];
+  
+  // Split by ship mentions
+  const parts = message.split(/(~[a-z]+-[a-z]+(?:-[a-z]+)*)/g);
+  
+  for (const part of parts) {
+    if (!part) continue;
+    
+    if (part.match(/^~[a-z]+-[a-z]+(?:-[a-z]+)*$/)) {
+      inlines.push({ ship: part });
+    } else {
+      const lines = part.split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i]) {
+          inlines.push(lines[i]);
+        }
+        if (i < lines.length - 1) {
+          inlines.push({ break: null });
+        }
+      }
+    }
+  }
+  
+  return [{ inline: inlines }];
 }
 
 // Check if the target is a group DM (club)
@@ -29,8 +50,42 @@ function isClub(whom: string): boolean {
   return whom.startsWith("0v");
 }
 
-// sendDM: Handled by the openclaw-tlon channel plugin (sendText).
-// Use the Tlon channel's message tool instead of tlon-run for 1:1 DMs.
+// Send a DM to a ship
+async function sendDM(
+  ship: string,
+  message: string
+): Promise<{ success: boolean; postId?: string; error?: string }> {
+  const normalizedShip = normalizeShip(ship);
+  const author = getCurrentShip();
+  const sent = Date.now();
+  const content = parseContent(message);
+  const idUd = scot("ud", da.fromUnix(sent));
+  const id = `${author}/${idUd}`;
+
+  try {
+    await poke({
+      app: "chat",
+      mark: "chat-dm-action",
+      json: {
+        ship: normalizedShip,
+        diff: {
+          id,
+          delta: {
+            add: {
+              memo: { content, author, sent },
+              kind: null,
+              time: null,
+            },
+          },
+        },
+      },
+    });
+
+    return { success: true, postId: id };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
 
 // Send a message to a group DM (club)
 async function sendClubMessage(
@@ -73,8 +128,48 @@ async function sendClubMessage(
   }
 }
 
-// replyToDM: Handled by the openclaw-tlon channel plugin (sendText with replyToId).
-// Use the Tlon channel's message tool instead of tlon-run for 1:1 DM replies.
+// Reply to a DM
+async function replyToDM(
+  ship: string,
+  postId: string,
+  message: string
+): Promise<{ success: boolean; replyId?: string; error?: string }> {
+  const normalizedShip = normalizeShip(ship);
+  const author = getCurrentShip();
+  const sent = Date.now();
+  const content = parseContent(message);
+  const idUd = scot("ud", da.fromUnix(sent));
+  const replyId = `${author}/${idUd}`;
+
+  try {
+    await poke({
+      app: "chat",
+      mark: "chat-dm-action",
+      json: {
+        ship: normalizedShip,
+        diff: {
+          id: postId,
+          delta: {
+            reply: {
+              id: replyId,
+              meta: null,
+              delta: {
+                add: {
+                  memo: { content, author, sent },
+                  time: null,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return { success: true, replyId };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
 
 // Reply in a club (group DM)
 async function replyToClub(
@@ -266,15 +361,14 @@ async function main() {
         const whom = args[1];
         const message = args.slice(2).join(" ");
         if (!whom || !message) {
-          console.error("Usage: dms.ts send <club-id> <message>");
+          console.error("Usage: dms.ts send <ship|club-id> <message>");
+          console.error("Example: dms.ts send ~sampel-palnet Hello!");
           process.exit(1);
         }
         if (isClub(whom)) {
           result = await sendClubMessage(whom, message);
         } else {
-          console.error("error: 1:1 DM send is handled by the Tlon channel plugin.");
-          console.error("Use the channel message tool with channel=tlon instead.");
-          process.exit(1);
+          result = await sendDM(whom, message);
         }
         break;
       }
@@ -284,15 +378,13 @@ async function main() {
         const postId = args[2];
         const message = args.slice(3).join(" ");
         if (!whom || !postId || !message) {
-          console.error("Usage: dms.ts reply <club-id> <post-id> <message>");
+          console.error("Usage: dms.ts reply <ship|club-id> <post-id> <message>");
           process.exit(1);
         }
         if (isClub(whom)) {
           result = await replyToClub(whom, postId, message);
         } else {
-          console.error("error: 1:1 DM reply is handled by the Tlon channel plugin.");
-          console.error("Use the channel message tool with channel=tlon and replyTo instead.");
-          process.exit(1);
+          result = await replyToDM(whom, postId, message);
         }
         break;
       }
@@ -357,23 +449,21 @@ async function main() {
         console.error(`
 Usage: dms.ts <command> [args]
 
-Note: 1:1 DM send/reply is handled by the Tlon channel plugin.
-Use tlon-run only for club (group DM) send/reply and DM management ops.
-
 Commands:
-  send <club-id> <message>                   Send to group DM (club only)
-  reply <club-id> <post-id> <message>        Reply in group DM (club only)
+  send <ship|club-id> <message>              Send a DM
+  reply <ship|club-id> <post-id> <message>   Reply to a DM
   react <ship> <post-id> <emoji>             React to a DM with an emoji
   unreact <ship> <post-id>                   Remove your reaction from a DM
   delete <ship> <post-id>                    Delete a DM
   accept <ship>                              Accept a DM invite
   decline <ship>                             Decline a DM invite
 
+Ship format: ~sampel-palnet (with or without ~)
 Club ID format: 0v... (for group DMs)
-Post ID format: ~author/170.141.184.507...
+Post ID format: ~author/170.141.184.507... (returned by send/reply)
 
 Examples:
-  dms.ts send 0v4.club-id "Hello group"
+  dms.ts send ~sampel-palnet "Hey, how's it going?"
   dms.ts react ~sampel-palnet ~zod/170.141.184.507... ❤️
   dms.ts accept ~sampel-palnet
 `);

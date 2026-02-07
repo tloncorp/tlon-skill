@@ -1,14 +1,12 @@
 #!/usr/bin/env npx ts-node
 /**
- * Channel post management for Tlon
- *
- * Note: Sending and replying to channel posts is handled by the openclaw-tlon
- * channel plugin. This script handles reactions, edits, and deletes only.
+ * Post to Tlon channels (chat, diary, heap)
  *
  * Usage:
+ *   npx ts-node scripts/posts.ts send <channel> <message>
+ *   npx ts-node scripts/posts.ts reply <channel> <post-id> <message>
  *   npx ts-node scripts/posts.ts react <channel> <post-id> <emoji>
  *   npx ts-node scripts/posts.ts unreact <channel> <post-id>
- *   npx ts-node scripts/posts.ts edit <channel> <post-id> <message>
  *   npx ts-node scripts/posts.ts delete <channel> <post-id>
  *
  * Channel format: chat/~host/channel-name, diary/~host/channel-name, heap/~host/channel-name
@@ -16,13 +14,6 @@
 
 import { getConfig, poke, getCurrentShip, normalizeShip } from "./urbit-client";
 import { scot, da } from "@urbit/aura";
-import { markdownToStory, type Story } from "./story";
-
-// Strip optional ~ship/ prefix from a post ID, returning just the numeric part
-function extractNumericId(id: string): string {
-  const slash = id.indexOf('/');
-  return slash >= 0 ? id.slice(slash + 1) : id;
-}
 
 // Format a post ID as @ud (with dots every 3 digits)
 // This is required for reactions to work properly
@@ -37,9 +28,35 @@ function formatUd(id: string): string {
   return parts.join('.');
 }
 
-// Parse content into Story format with rich markdown support
-function parseContent(message: string): Story {
-  return markdownToStory(message);
+// Parse content into Story format (array of verses)
+function parseContent(message: string): any[] {
+  // Simple implementation: treat as inline text with @mentions and linebreaks
+  const inlines: any[] = [];
+  
+  // Split by ship mentions
+  const parts = message.split(/(~[a-z]+-[a-z]+(?:-[a-z]+)*)/g);
+  
+  for (const part of parts) {
+    if (!part) continue;
+    
+    if (part.match(/^~[a-z]+-[a-z]+(?:-[a-z]+)*$/)) {
+      // Ship mention
+      inlines.push({ ship: part });
+    } else {
+      // Handle newlines
+      const lines = part.split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i]) {
+          inlines.push(lines[i]);
+        }
+        if (i < lines.length - 1) {
+          inlines.push({ break: null });
+        }
+      }
+    }
+  }
+  
+  return [{ inline: inlines }];
 }
 
 // Determine channel kind from nest
@@ -53,11 +70,90 @@ function getChannelKind(nest: string): string {
   }
 }
 
-// sendPost: Handled by the openclaw-tlon channel plugin (sendText).
-// Use the Tlon channel's message tool instead of tlon-run for posting to channels.
+// Send a post to a channel
+async function sendPost(nest: string, message: string): Promise<{ success: boolean; postId?: string; error?: string }> {
+  const config = getConfig();
+  const author = getCurrentShip();
+  const sent = Date.now();
+  const content = parseContent(message);
+  const kind = getChannelKind(nest);
 
-// replyToPost: Handled by the openclaw-tlon channel plugin (sendText with replyToId).
-// Use the Tlon channel's message tool with replyTo instead of tlon-run for replies.
+  const essay = {
+    content,
+    author,
+    sent,
+    kind,
+    blob: null,
+    meta: null,
+  };
+
+  try {
+    await poke({
+      app: "channels",
+      mark: "channel-action-1",
+      json: {
+        channel: {
+          nest,
+          action: {
+            post: {
+              add: essay,
+            },
+          },
+        },
+      },
+    });
+
+    const idUd = scot("ud", da.fromUnix(sent));
+    return { success: true, postId: `${author}/${idUd}` };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// Reply to a post in a channel
+async function replyToPost(
+  nest: string,
+  postId: string,
+  message: string
+): Promise<{ success: boolean; replyId?: string; error?: string }> {
+  const config = getConfig();
+  const author = getCurrentShip();
+  const sent = Date.now();
+  const content = parseContent(message);
+
+  const memo = {
+    content,
+    author,
+    sent,
+  };
+
+  try {
+    await poke({
+      app: "channels",
+      mark: "channel-action-1",
+      json: {
+        channel: {
+          nest,
+          action: {
+            post: {
+              reply: {
+                id: postId,
+                action: {
+                  add: memo,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const idUd = scot("ud", da.fromUnix(sent));
+    return { success: true, replyId: `${author}/${idUd}` };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
 
 // React to a post
 async function reactToPost(
@@ -66,7 +162,7 @@ async function reactToPost(
   react: string
 ): Promise<{ success: boolean; error?: string }> {
   const ship = getCurrentShip();
-  const formattedId = formatUd(extractNumericId(postId));
+  const formattedId = formatUd(postId);
 
   try {
     await poke({
@@ -100,7 +196,7 @@ async function unreactToPost(
   postId: string
 ): Promise<{ success: boolean; error?: string }> {
   const ship = getCurrentShip();
-  const formattedId = formatUd(extractNumericId(postId));
+  const formattedId = formatUd(postId);
 
   try {
     await poke({
@@ -169,7 +265,7 @@ async function editPost(
           action: {
             post: {
               edit: {
-                id: formatUd(extractNumericId(postId)),
+                id: postId,
                 essay,
               },
             },
@@ -200,7 +296,7 @@ async function deletePost(
           nest,
           action: {
             post: {
-              del: formatUd(extractNumericId(postId)),
+              del: postId,
             },
           },
         },
@@ -223,16 +319,27 @@ async function main() {
 
     switch (command) {
       case "send": {
-        console.error("error: Channel post send is handled by the Tlon channel plugin.");
-        console.error("Use the channel message tool with channel=tlon instead.");
-        process.exit(1);
+        const nest = args[1];
+        const message = args.slice(2).join(" ");
+        if (!nest || !message) {
+          console.error("Usage: posts.ts send <channel> <message>");
+          console.error("Example: posts.ts send chat/~sampel/general Hello world!");
+          process.exit(1);
+        }
+        result = await sendPost(nest, message);
         break;
       }
 
       case "reply": {
-        console.error("error: Channel post reply is handled by the Tlon channel plugin.");
-        console.error("Use the channel message tool with channel=tlon and replyTo instead.");
-        process.exit(1);
+        const nest = args[1];
+        const postId = args[2];
+        const message = args.slice(3).join(" ");
+        if (!nest || !postId || !message) {
+          console.error("Usage: posts.ts reply <channel> <post-id> <message>");
+          console.error("Example: posts.ts reply chat/~sampel/general 170.141.184.507... Nice post!");
+          process.exit(1);
+        }
+        result = await replyToPost(nest, postId, message);
         break;
       }
 
@@ -304,22 +411,21 @@ async function main() {
         console.error(`
 Usage: posts.ts <command> [args]
 
-Note: Sending and replying to posts is handled by the Tlon channel plugin.
-Use tlon-run only for reactions, edits, and deletes.
-
 Commands:
+  send <channel> <message>              Post a message to a channel
+  reply <channel> <post-id> <message>   Reply to a post
   react <channel> <post-id> <emoji>     React to a post with an emoji
   unreact <channel> <post-id>           Remove your reaction from a post
   edit <channel> <post-id> <message>    Edit a post [--title <t> for notebooks]
   delete <channel> <post-id>            Delete a post
 
 Channel format: chat/~host/channel-name, diary/~host/name, heap/~host/name
-Post IDs are @ud format with dots (e.g., 170.141.184.507...).
-Use 'tlon-run messages channel <nest> --limit N' to see post IDs.
+Post IDs for delete must be @da format (e.g., 170.141.184.507....). 
+Use 'messages.ts channel <nest> --limit N' to see actual post IDs.
 
 Examples:
+  posts.ts send chat/~sampel/general "Hello everyone!"
   posts.ts react chat/~sampel/general 170.141.184.507... 👍
-  posts.ts delete chat/~sampel/general 170.141.184.507...
 `);
         process.exit(1);
     }
