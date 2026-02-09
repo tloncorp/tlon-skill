@@ -154,6 +154,14 @@ tlon-run notebook diary/~host/slug "Title" --stdin            # Post from stdin
 tlon-run notebook diary/~host/slug "Title" --image <url>      # Post with image
 ```
 
+### Upload
+
+Upload an image from a URL to Tlon storage. Returns the hosted URL.
+
+```bash
+tlon-run upload <image-url>
+```
+
 ### Settings
 
 Manage bot settings (settings-store).

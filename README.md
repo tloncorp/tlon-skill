@@ -232,6 +232,16 @@ tlon-run notebook diary/~host/channel "Post Title" --image <url>
 
 ---
 
+### Upload
+
+Upload an image from a URL to Tlon storage. Returns the hosted URL.
+
+```bash
+tlon-run upload https://example.com/image.png
+```
+
+---
+
 ### Settings (OpenClaw Plugin Config)
 
 Manage OpenClaw's Tlon plugin config via Urbit settings-store. Changes apply immediately without gateway restart.

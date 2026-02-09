@@ -121,7 +121,7 @@ export default {
   register(api) {
     api.registerTool({
       name: "tlon_run",
-      description: "Tlon/Urbit API access and workspace editing. Commands: activity {mentions|replies|all|unreads} [--limit N], channels {dms|group-dms|groups|all}, contacts {list|self|get ~ship}, groups {list|info ~host/slug}, messages {dm ~ship|channel chat/~host/slug} [--limit N], dms {send|reply|react|delete}, posts {send|reply|react|delete}, settings {get|set|delete}, click <op>. Workspace: soul|user|tools|agents|bootstrap|heartbeat|identity|memory {read|replace|append} [content]. Multiline content with markdown is fine for replace/append.",
+      description: "Tlon/Urbit API access and workspace editing. Commands: activity {mentions|replies|all|unreads} [--limit N], channels {dms|group-dms|groups|all}, contacts {list|self|get ~ship}, groups {list|info ~host/slug}, messages {dm ~ship|channel chat/~host/slug} [--limit N], dms {send|reply|react|delete}, posts {send|reply|react|delete}, upload <image-url>, settings {get|set|delete}, click <op>. Workspace: soul|user|tools|agents|bootstrap|heartbeat|identity|memory {read|replace|append} [content]. Multiline content with markdown is fine for replace/append.",
       parameters: {
         type: "object",
         properties: {
