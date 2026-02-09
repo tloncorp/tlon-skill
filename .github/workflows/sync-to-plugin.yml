@@ -56,6 +56,6 @@ jobs:
           **Source commit:** \`${{ github.sha }}\`
           **Original message:** $COMMIT_MSG
           
-          Note: The binary is now distributed via npm as \`@tloncorp/tlon-skill\`." \
+          Note: The binary is distributed via npm as \`@tloncorp/tlon-skill\`." \
             --base master \
             --head "$BRANCH"

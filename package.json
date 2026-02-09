@@ -19,8 +19,11 @@
     "@tloncorp/tlon-skill-darwin-x64": "0.1.0",
     "@tloncorp/tlon-skill-linux-x64": "0.1.0"
   },
-  "devDependencies": {
+  "dependencies": {
     "@tloncorp/api": "github:tloncorp/api-beta#main",
+    "@urbit/aura": "^3.0.0"
+  },
+  "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.9.3"
   },
