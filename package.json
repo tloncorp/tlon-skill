@@ -1,14 +1,15 @@
 {
   "name": "tlon-skill",
-  "version": "1.0.0",
-  "description": "Tlon/Urbit skill scripts for Clawdbot",
+  "version": "2.0.0",
+  "description": "Tlon/Urbit skill scripts for OpenClaw",
   "type": "commonjs",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "build:binary": "bun build scripts/main.ts --compile --outfile bin/tlon-run"
   },
   "dependencies": {
-    "@urbit/aura": "^3.0.0",
-    "@urbit/http-api": "^3.0.0"
+    "@tloncorp/api": "file:../api-beta",
+    "@urbit/aura": "^3.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.19.30",
