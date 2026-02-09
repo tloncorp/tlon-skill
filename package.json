@@ -7,7 +7,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@tloncorp/api": "github:tloncorp/api-beta#b7603e08dc8081e50f1dc5fff9b4005825189fdd",
+    "@tloncorp/api": "github:tloncorp/api-beta#ab3fad71eadb4930a497433499fc65e9fa9a0b35",
     "@urbit/aura": "^3.0.0",
     "@urbit/http-api": "^3.0.0"
   },
