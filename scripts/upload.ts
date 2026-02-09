@@ -10,34 +10,64 @@
  *   npx ts-node scripts/upload.ts https://example.com/image.png
  */
 
-import { getConfig } from "./urbit-client.js";
+import { getConfig, type UrbitConfig } from "./urbit-client";
+import type {
+  ClientParams,
+  ConfigureClientFn,
+  UploadFileFn,
+} from "@tloncorp/api/api" with { "resolution-mode": "import" };
 
-// @tloncorp/api is ESM-only; dynamic import preserves as real import() with module=Node16
-async function loadApi(): Promise<{
-  configureClient: (params: {
-    shipUrl: string;
-    shipName: string;
-    verbose: boolean;
-    getCode: () => Promise<string>;
-  }) => void;
-  uploadFile: (params: { blob: Blob; contentType: string }) => Promise<{ url: string }>;
-}> {
-  return await import("@tloncorp/api") as any;
+type TlonApiModule = {
+  configureClient: ConfigureClientFn;
+  uploadFile: UploadFileFn;
+};
+
+const DEFAULT_CONTENT_TYPE = "application/octet-stream";
+
+// @tloncorp/api is ESM-only, so it must be loaded lazily from this CommonJS package.
+async function loadApi(): Promise<TlonApiModule> {
+  const api = await import("@tloncorp/api/api");
+  const maybeApi = api as {
+    configureClient?: unknown;
+    uploadFile?: unknown;
+  };
+
+  if (typeof maybeApi.configureClient !== "function" || typeof maybeApi.uploadFile !== "function") {
+    throw new Error("Invalid @tloncorp/api module shape");
+  }
+
+  return {
+    configureClient: maybeApi.configureClient as TlonApiModule["configureClient"],
+    uploadFile: maybeApi.uploadFile as UploadFileFn,
+  };
 }
 
-export async function uploadImageFromUrl(
-  uploadFile: (opts: { blob: Blob; contentType: string }) => Promise<{ url: string }>,
-  imageUrl: string,
-): Promise<string> {
+function getClientParams(config: UrbitConfig): ClientParams {
+  return {
+    shipUrl: config.url,
+    shipName: config.ship.replace(/^~/, ""),
+    verbose: false,
+    getCode: async () => config.code,
+  };
+}
+
+async function fetchImageBlob(imageUrl: string): Promise<Blob> {
   const response = await fetch(imageUrl);
   if (!response.ok) {
     throw new Error(`Failed to fetch image: ${response.status}`);
   }
 
-  const blob = await response.blob();
+  return response.blob();
+}
+
+export async function uploadImageFromUrl(
+  imageUrl: string,
+  uploadFile: UploadFileFn,
+): Promise<string> {
+  const blob = await fetchImageBlob(imageUrl);
   const result = await uploadFile({
     blob,
-    contentType: blob.type || "application/octet-stream",
+    contentType: blob.type || DEFAULT_CONTENT_TYPE,
   });
 
   return result.url;
@@ -61,14 +91,9 @@ Examples:
   const config = getConfig();
   const { configureClient, uploadFile } = await loadApi();
 
-  configureClient({
-    shipUrl: config.url,
-    shipName: config.ship.replace(/^~/, ""),
-    verbose: false,
-    getCode: async () => config.code,
-  });
+  configureClient(getClientParams(config));
 
-  const uploadedUrl = await uploadImageFromUrl(uploadFile, url);
+  const uploadedUrl = await uploadImageFromUrl(url, uploadFile);
   console.log(uploadedUrl);
 }
 
