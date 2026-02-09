@@ -12,7 +12,8 @@
  *   npx ts-node scripts/settings.ts set-rule chat/~host/channel restricted ~ship1 ~ship2
  */
 
-import { scry, poke, closeClient, normalizeShip } from './urbit-client';
+import { poke, scry } from "@tloncorp/api";
+import { ensureClient, normalizeShip } from "./api-client";
 
 const SETTINGS_DESK = 'moltbot';
 const SETTINGS_BUCKET = 'tlon';
@@ -130,6 +131,7 @@ async function main() {
   const [,, command, ...args] = process.argv;
   
   try {
+    ensureClient();
     switch (command) {
       case 'get': {
         const settings = await getSettings();
@@ -282,7 +284,7 @@ Examples:
 `);
     }
   } finally {
-    await closeClient();
+    // no-op: @tloncorp/api client is process-scoped
   }
 }
 
