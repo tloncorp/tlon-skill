@@ -37,6 +37,7 @@ Commands:
   dms {accept|decline}                         - DM invites
   posts {react|unreact|delete}                 - Channel post management
   notebook <nest> "Title" [--content file]     - Post to notebook/diary
+  upload <image-url>                           - Upload image to Tlon storage
   settings {get|set|delete}                    - Bot settings
   settings {allow-dm|remove-dm}               - DM allowlist
   settings {allow-channel|remove-channel}      - Channel watch list
@@ -676,6 +677,12 @@ case "$cmd" in
     exec node "$DIST_DIR/notebook-post.js" "$nest" "$title" "$@"
     ;;
 
+  upload)
+    url="${1:-}"
+    [ -n "$url" ] || { echo "error: missing image URL"; echo "usage: tlon-run upload <image-url>"; exit 2; }
+    exec node "$DIST_DIR/upload.js" "$url"
+    ;;
+
   settings)
     sub="${1:-}"
     shift || true
@@ -916,13 +923,13 @@ case "$cmd" in
 
   "")
     echo "error: no command specified"
-    echo "usage: tlon-run {activity|channels|contacts|groups|messages|dms|posts|notebook|settings|soul|user|tools|agents|bootstrap|heartbeat|identity|memory|click|help}"
+    echo "usage: tlon-run {activity|channels|contacts|groups|messages|dms|posts|notebook|upload|settings|soul|user|tools|agents|bootstrap|heartbeat|identity|memory|click|help}"
     exit 2
     ;;
 
   *)
     echo "error: unknown command '$cmd'"
-    echo "usage: tlon-run {activity|channels|contacts|groups|messages|dms|posts|notebook|settings|soul|user|tools|agents|bootstrap|heartbeat|identity|memory|click|help}"
+    echo "usage: tlon-run {activity|channels|contacts|groups|messages|dms|posts|notebook|upload|settings|soul|user|tools|agents|bootstrap|heartbeat|identity|memory|click|help}"
     exit 2
     ;;
 esac
