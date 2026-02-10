@@ -3,6 +3,7 @@ node_modules/
 .DS_Store
 dist
 npm
+bin
 # Ship configs contain secrets - only keep example
 ships/*
 !ships/example.json
