@@ -22,7 +22,7 @@
     "@tloncorp/tlon-skill-linux-x64": "0.1.0"
   },
   "dependencies": {
-    "@tloncorp/api": "github:tloncorp/api-beta#main",
+    "@tloncorp/api": "git+https://github.com/tloncorp/api-beta.git#main",
     "@urbit/aura": "^3.0.0"
   },
   "devDependencies": {
