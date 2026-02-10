@@ -16,9 +16,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-14        # ARM64
+          - os: macos-14
             target: darwin-arm64
-          - os: macos-12        # x64 (Intel)
+          - os: macos-14        # Cross-compile x64 from ARM64
             target: darwin-x64
           - os: ubuntu-latest
             target: linux-x64
@@ -40,7 +40,7 @@ jobs:
         run: npm install
 
       - name: Build binary
-        run: node scripts/build-all.js
+        run: node scripts/build-all.js --target=${{ matrix.target }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
