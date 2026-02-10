@@ -37,7 +37,7 @@ function getBinaryPath() {
   try {
     // Try to resolve the platform-specific package
     const packagePath = require.resolve(`${packageName}/package.json`);
-    const binaryPath = join(dirname(packagePath), "tlon-run");
+    const binaryPath = join(dirname(packagePath), "tlon");
     
     if (!existsSync(binaryPath)) {
       throw new Error(`Binary not found at ${binaryPath}`);

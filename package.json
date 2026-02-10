@@ -1,6 +1,6 @@
 {
   "name": "@tloncorp/tlon-skill",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Tlon/Urbit skill for OpenClaw agents",
   "type": "module",
   "bin": {
@@ -17,9 +17,9 @@
     "test": "bun test"
   },
   "optionalDependencies": {
-    "@tloncorp/tlon-skill-darwin-arm64": "0.1.1",
-    "@tloncorp/tlon-skill-darwin-x64": "0.1.1",
-    "@tloncorp/tlon-skill-linux-x64": "0.1.1"
+    "@tloncorp/tlon-skill-darwin-arm64": "0.1.2",
+    "@tloncorp/tlon-skill-darwin-x64": "0.1.2",
+    "@tloncorp/tlon-skill-linux-x64": "0.1.2"
   },
   "devDependencies": {
     "@tloncorp/api": "git+https://github.com/tloncorp/api-beta.git#main",
