@@ -21,6 +21,12 @@ function getBinaryPath() {
   const arch = process.arch;
   const key = `${platform}-${arch}`;
 
+  // Check for local binary (dev mode)
+  const localBinary = join(__dirname, "tlon-run");
+  if (existsSync(localBinary)) {
+    return localBinary;
+  }
+
   const packageName = PLATFORMS[key];
   if (!packageName) {
     console.error(`Unsupported platform: ${platform}-${arch}`);
