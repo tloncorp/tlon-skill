@@ -9,6 +9,22 @@ Use the `tlon-run` command for all Tlon operations.
 
 **Do NOT use `npx`, `ts-node`, `npm`, `bash`, `sh`, or any other shell commands.**
 
+## Installation
+
+**Node.js environments:**
+```bash
+npm install @tloncorp/tlon-skill
+tlon-run channels groups
+```
+
+**Non-Node environments (containers, cron, scripts):**
+```bash
+npm install @tloncorp/tlon-skill-darwin-arm64
+./node_modules/@tloncorp/tlon-skill-darwin-arm64/tlon-run channels groups
+```
+
+The platform packages (`@tloncorp/tlon-skill-darwin-arm64`, etc.) contain the raw binary with no Node.js dependency.
+
 ## Ship Selection
 
 Multiple ships can be registered via json files in the config dir. Check `skills/tlon/ships/` to see the list of available ships.
