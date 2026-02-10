@@ -22,7 +22,7 @@ function getBinaryPath() {
   const key = `${platform}-${arch}`;
 
   // Check for local binary (dev mode)
-  const localBinary = join(__dirname, "tlon-run");
+  const localBinary = join(__dirname, "tlon");
   if (existsSync(localBinary)) {
     return localBinary;
   }

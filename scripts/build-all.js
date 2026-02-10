@@ -24,7 +24,7 @@ console.log(`Building for ${target}...`);
 const distDir = join(rootDir, "dist");
 mkdirSync(distDir, { recursive: true });
 
-const binaryName = platform === "win32" ? "tlon-run.exe" : "tlon-run";
+const binaryName = platform === "win32" ? "tlon.exe" : "tlon";
 const binaryPath = join(distDir, binaryName);
 
 execSync(`bun build scripts/main.ts --compile --outfile ${binaryPath}`, {
