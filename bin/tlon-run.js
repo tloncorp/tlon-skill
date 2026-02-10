@@ -11,9 +11,9 @@ const require = createRequire(import.meta.url);
 
 // Map of platform+arch to package name
 const PLATFORMS = {
-  "darwin-arm64": "@tlon/tlon-skill-darwin-arm64",
-  "darwin-x64": "@tlon/tlon-skill-darwin-x64",
-  "linux-x64": "@tlon/tlon-skill-linux-x64",
+  "darwin-arm64": "@tloncorp/tlon-skill-darwin-arm64",
+  "darwin-x64": "@tloncorp/tlon-skill-darwin-x64",
+  "linux-x64": "@tloncorp/tlon-skill-linux-x64",
 };
 
 function getBinaryPath() {
