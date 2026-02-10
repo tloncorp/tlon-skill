@@ -15,8 +15,17 @@
  *   npx ts-node scripts/dms.ts decline <ship>
  */
 
-import { getConfig, poke, getCurrentShip, normalizeShip } from "./urbit-client";
-import { scot, da } from "@urbit/aura";
+import {
+  addReaction,
+  deletePost,
+  getCurrentUserId,
+  removeReaction,
+  respondToDMInvite,
+  sendPost,
+  sendReply,
+} from "@tloncorp/api";
+import type { Channel } from "@tloncorp/api";
+import { ensureClient, normalizeShip } from "./api-client";
 import { markdownToStory, type Story } from "./story";
 
 // Parse content into Story format with rich markdown support
@@ -29,52 +38,36 @@ function isClub(whom: string): boolean {
   return whom.startsWith("0v");
 }
 
-// sendDM: Handled by the openclaw-tlon channel plugin (sendText).
-// Use the Tlon channel's message tool instead of tlon-run for 1:1 DMs.
+function parsePostId(postId: string): { id: string; authorId?: string } {
+  if (postId.includes("/")) {
+    const [author, id] = postId.split("/");
+    return { id, authorId: normalizeShip(author) };
+  }
+  return { id: postId };
+}
 
 // Send a message to a group DM (club)
 async function sendClubMessage(
   clubId: string,
   message: string
 ): Promise<{ success: boolean; postId?: string; error?: string }> {
-  const author = getCurrentShip();
-  const sent = Date.now();
+  const authorId = getCurrentUserId();
+  const sentAt = Date.now();
   const content = parseContent(message);
-  const idUd = scot("ud", da.fromUnix(sent));
-  const id = `${author}/${idUd}`;
 
   try {
-    await poke({
-      app: "chat",
-      mark: "chat-club-action-0",
-      json: {
-        id: clubId,
-        diff: {
-          uid: "0v3",
-          delta: {
-            writ: {
-              id,
-              delta: {
-                add: {
-                  memo: { content, author, sent },
-                  kind: null,
-                  time: null,
-                },
-              },
-            },
-          },
-        },
-      },
+    await sendPost({
+      channelId: clubId,
+      authorId,
+      sentAt,
+      content,
     });
 
-    return { success: true, postId: id };
+    return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
 }
-
-// replyToDM: Handled by the openclaw-tlon channel plugin (sendText with replyToId).
-// Use the Tlon channel's message tool instead of tlon-run for 1:1 DM replies.
 
 // Reply in a club (group DM)
 async function replyToClub(
@@ -82,42 +75,26 @@ async function replyToClub(
   postId: string,
   message: string
 ): Promise<{ success: boolean; replyId?: string; error?: string }> {
-  const author = getCurrentShip();
-  const sent = Date.now();
+  const authorId = getCurrentUserId();
+  const sentAt = Date.now();
   const content = parseContent(message);
-  const idUd = scot("ud", da.fromUnix(sent));
-  const replyId = `${author}/${idUd}`;
+  const parsed = parsePostId(postId);
+
+  if (!parsed.authorId) {
+    return { success: false, error: "Post ID must include author (e.g., ~ship/123.456)" };
+  }
 
   try {
-    await poke({
-      app: "chat",
-      mark: "chat-club-action-0",
-      json: {
-        id: clubId,
-        diff: {
-          uid: "0v3",
-          delta: {
-            writ: {
-              id: postId,
-              delta: {
-                reply: {
-                  id: replyId,
-                  meta: null,
-                  delta: {
-                    add: {
-                      memo: { content, author, sent },
-                      time: null,
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+    await sendReply({
+      channelId: clubId,
+      parentId: parsed.id,
+      parentAuthor: parsed.authorId,
+      content,
+      sentAt,
+      authorId,
     });
 
-    return { success: true, replyId };
+    return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
@@ -130,24 +107,20 @@ async function reactToDM(
   react: string
 ): Promise<{ success: boolean; error?: string }> {
   const normalizedShip = normalizeShip(ship);
-  const author = getCurrentShip();
+  const our = getCurrentUserId();
+  const parsed = parsePostId(postId);
+
+  if (!parsed.authorId) {
+    return { success: false, error: "Post ID must include author (e.g., ~ship/123.456)" };
+  }
 
   try {
-    await poke({
-      app: "chat",
-      mark: "chat-dm-action-1",
-      json: {
-        ship: normalizedShip,
-        diff: {
-          id: postId,
-          delta: {
-            "add-react": {
-              react,
-              author,
-            },
-          },
-        },
-      },
+    await addReaction({
+      channelId: normalizedShip,
+      postId: parsed.id,
+      emoji: react,
+      our,
+      postAuthor: parsed.authorId,
     });
 
     return { success: true };
@@ -162,21 +135,19 @@ async function unreactToDM(
   postId: string
 ): Promise<{ success: boolean; error?: string }> {
   const normalizedShip = normalizeShip(ship);
-  const author = getCurrentShip();
+  const our = getCurrentUserId();
+  const parsed = parsePostId(postId);
+
+  if (!parsed.authorId) {
+    return { success: false, error: "Post ID must include author (e.g., ~ship/123.456)" };
+  }
 
   try {
-    await poke({
-      app: "chat",
-      mark: "chat-dm-action-1",
-      json: {
-        ship: normalizedShip,
-        diff: {
-          id: postId,
-          delta: {
-            "del-react": author,
-          },
-        },
-      },
+    await removeReaction({
+      channelId: normalizedShip,
+      postId: parsed.id,
+      our,
+      postAuthor: parsed.authorId,
     });
 
     return { success: true };
@@ -191,22 +162,11 @@ async function deleteDM(
   postId: string
 ): Promise<{ success: boolean; error?: string }> {
   const normalizedShip = normalizeShip(ship);
+  const authorId = getCurrentUserId();
+  const parsed = parsePostId(postId);
 
   try {
-    await poke({
-      app: "chat",
-      mark: "chat-dm-action",
-      json: {
-        ship: normalizedShip,
-        diff: {
-          id: postId,
-          delta: {
-            del: null,
-          },
-        },
-      },
-    });
-
+    await deletePost(normalizedShip, parsed.id, parsed.authorId ?? authorId);
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -216,17 +176,16 @@ async function deleteDM(
 // Accept a DM invite
 async function acceptDM(ship: string): Promise<{ success: boolean; error?: string }> {
   const normalizedShip = normalizeShip(ship);
+  const channel: Channel = {
+    id: normalizedShip,
+    type: "dm",
+    currentUserIsMember: false,
+    currentUserIsHost: false,
+    contactId: normalizedShip,
+  };
 
   try {
-    await poke({
-      app: "chat",
-      mark: "chat-dm-rsvp",
-      json: {
-        ship: normalizedShip,
-        ok: true,
-      },
-    });
-
+    await respondToDMInvite({ channel, accept: true });
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -236,17 +195,16 @@ async function acceptDM(ship: string): Promise<{ success: boolean; error?: strin
 // Decline a DM invite
 async function declineDM(ship: string): Promise<{ success: boolean; error?: string }> {
   const normalizedShip = normalizeShip(ship);
+  const channel: Channel = {
+    id: normalizedShip,
+    type: "dm",
+    currentUserIsMember: false,
+    currentUserIsHost: false,
+    contactId: normalizedShip,
+  };
 
   try {
-    await poke({
-      app: "chat",
-      mark: "chat-dm-rsvp",
-      json: {
-        ship: normalizedShip,
-        ok: false,
-      },
-    });
-
+    await respondToDMInvite({ channel, accept: false });
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -258,133 +216,153 @@ async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
 
-  try {
-    let result: any;
+  ensureClient();
 
-    switch (command) {
-      case "send": {
-        const whom = args[1];
-        const message = args.slice(2).join(" ");
-        if (!whom || !message) {
-          console.error("Usage: dms.ts send <club-id> <message>");
-          process.exit(1);
-        }
-        if (isClub(whom)) {
-          result = await sendClubMessage(whom, message);
-        } else {
-          console.error("error: 1:1 DM send is handled by the Tlon channel plugin.");
-          console.error("Use the channel message tool with channel=tlon instead.");
-          process.exit(1);
-        }
-        break;
-      }
-
-      case "reply": {
-        const whom = args[1];
-        const postId = args[2];
-        const message = args.slice(3).join(" ");
-        if (!whom || !postId || !message) {
-          console.error("Usage: dms.ts reply <club-id> <post-id> <message>");
-          process.exit(1);
-        }
-        if (isClub(whom)) {
-          result = await replyToClub(whom, postId, message);
-        } else {
-          console.error("error: 1:1 DM reply is handled by the Tlon channel plugin.");
-          console.error("Use the channel message tool with channel=tlon and replyTo instead.");
-          process.exit(1);
-        }
-        break;
-      }
-
-      case "react": {
-        const whom = args[1];
-        const postId = args[2];
-        const emoji = args[3];
-        if (!whom || !postId || !emoji) {
-          console.error("Usage: dms.ts react <ship> <post-id> <emoji>");
-          console.error("Example: dms.ts react ~sampel-palnet ~zod/170.141.184.507... 👍");
-          process.exit(1);
-        }
-        // Note: Club reactions would need different handling
-        result = await reactToDM(whom, postId, emoji);
-        break;
-      }
-
-      case "unreact": {
-        const whom = args[1];
-        const postId = args[2];
-        if (!whom || !postId) {
-          console.error("Usage: dms.ts unreact <ship> <post-id>");
-          process.exit(1);
-        }
-        result = await unreactToDM(whom, postId);
-        break;
-      }
-
-      case "delete": {
-        const whom = args[1];
-        const postId = args[2];
-        if (!whom || !postId) {
-          console.error("Usage: dms.ts delete <ship> <post-id>");
-          process.exit(1);
-        }
-        result = await deleteDM(whom, postId);
-        break;
-      }
-
-      case "accept": {
-        const ship = args[1];
-        if (!ship) {
-          console.error("Usage: dms.ts accept <ship>");
-          process.exit(1);
-        }
-        result = await acceptDM(ship);
-        break;
-      }
-
-      case "decline": {
-        const ship = args[1];
-        if (!ship) {
-          console.error("Usage: dms.ts decline <ship>");
-          process.exit(1);
-        }
-        result = await declineDM(ship);
-        break;
-      }
-
-      default:
-        console.error(`
-Usage: dms.ts <command> [args]
-
-Note: 1:1 DM send/reply is handled by the Tlon channel plugin.
-Use tlon-run only for club (group DM) send/reply and DM management ops.
-
-Commands:
-  send <club-id> <message>                   Send to group DM (club only)
-  reply <club-id> <post-id> <message>        Reply in group DM (club only)
-  react <ship> <post-id> <emoji>             React to a DM with an emoji
-  unreact <ship> <post-id>                   Remove your reaction from a DM
-  delete <ship> <post-id>                    Delete a DM
-  accept <ship>                              Accept a DM invite
-  decline <ship>                             Decline a DM invite
-
-Club ID format: 0v... (for group DMs)
-Post ID format: ~author/170.141.184.507...
-
-Examples:
-  dms.ts send 0v4.club-id "Hello group"
-  dms.ts react ~sampel-palnet ~zod/170.141.184.507... ❤️
-  dms.ts accept ~sampel-palnet
-`);
+  switch (command) {
+    case "send": {
+      const clubId = args[1];
+      const message = args.slice(2).join(" ");
+      if (!clubId || !message) {
+        console.error("Usage: dms.ts send <club-id> <message>");
         process.exit(1);
+      }
+      if (!isClub(clubId)) {
+        console.error("Error: send only supports group DMs (club IDs starting with 0v)");
+        process.exit(1);
+      }
+      const result = await sendClubMessage(clubId, message);
+      if (result.success) {
+        console.log("✓ Message sent!");
+      } else {
+        console.error(`✗ Failed: ${result.error}`);
+        process.exit(1);
+      }
+      break;
     }
 
-    console.log(JSON.stringify(result, null, 2));
-  } catch (error: any) {
-    console.error("Error:", error.message);
-    process.exit(1);
+    case "reply": {
+      const clubId = args[1];
+      const postId = args[2];
+      const message = args.slice(3).join(" ");
+      if (!clubId || !postId || !message) {
+        console.error("Usage: dms.ts reply <club-id> <post-id> <message>");
+        process.exit(1);
+      }
+      if (!isClub(clubId)) {
+        console.error("Error: reply only supports group DMs (club IDs starting with 0v)");
+        process.exit(1);
+      }
+      const result = await replyToClub(clubId, postId, message);
+      if (result.success) {
+        console.log("✓ Reply sent!");
+      } else {
+        console.error(`✗ Failed: ${result.error}`);
+        process.exit(1);
+      }
+      break;
+    }
+
+    case "react": {
+      const ship = args[1];
+      const postId = args[2];
+      const react = args[3];
+      if (!ship || !postId || !react) {
+        console.error("Usage: dms.ts react <ship> <post-id> <emoji>");
+        process.exit(1);
+      }
+      const result = await reactToDM(ship, postId, react);
+      if (result.success) {
+        console.log("✓ Reaction added!");
+      } else {
+        console.error(`✗ Failed: ${result.error}`);
+        process.exit(1);
+      }
+      break;
+    }
+
+    case "unreact": {
+      const ship = args[1];
+      const postId = args[2];
+      if (!ship || !postId) {
+        console.error("Usage: dms.ts unreact <ship> <post-id>");
+        process.exit(1);
+      }
+      const result = await unreactToDM(ship, postId);
+      if (result.success) {
+        console.log("✓ Reaction removed!");
+      } else {
+        console.error(`✗ Failed: ${result.error}`);
+        process.exit(1);
+      }
+      break;
+    }
+
+    case "delete": {
+      const ship = args[1];
+      const postId = args[2];
+      if (!ship || !postId) {
+        console.error("Usage: dms.ts delete <ship> <post-id>");
+        process.exit(1);
+      }
+      const result = await deleteDM(ship, postId);
+      if (result.success) {
+        console.log("✓ DM deleted!");
+      } else {
+        console.error(`✗ Failed: ${result.error}`);
+        process.exit(1);
+      }
+      break;
+    }
+
+    case "accept": {
+      const ship = args[1];
+      if (!ship) {
+        console.error("Usage: dms.ts accept <ship>");
+        process.exit(1);
+      }
+      const result = await acceptDM(ship);
+      if (result.success) {
+        console.log("✓ DM invite accepted!");
+      } else {
+        console.error(`✗ Failed: ${result.error}`);
+        process.exit(1);
+      }
+      break;
+    }
+
+    case "decline": {
+      const ship = args[1];
+      if (!ship) {
+        console.error("Usage: dms.ts decline <ship>");
+        process.exit(1);
+      }
+      const result = await declineDM(ship);
+      if (result.success) {
+        console.log("✓ DM invite declined!");
+      } else {
+        console.error(`✗ Failed: ${result.error}`);
+        process.exit(1);
+      }
+      break;
+    }
+
+    default:
+      console.log(`Usage: dms.ts <command>
+
+Commands:
+  send <club-id> <message>        Send a message to a group DM
+  reply <club-id> <post-id> <msg> Reply in a group DM (post-id must include author)
+  react <ship> <post-id> <emoji>  React to a DM (post-id must include author)
+  unreact <ship> <post-id>        Remove reaction from a DM (post-id must include author)
+  delete <ship> <post-id>         Delete a DM (post-id may include author)
+  accept <ship>                   Accept a DM invite
+  decline <ship>                  Decline a DM invite
+`);
+      process.exit(1);
   }
 }
 
-main();
+main().catch((err) => {
+  console.error("Error:", err);
+  process.exit(1);
+});

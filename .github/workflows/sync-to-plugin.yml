@@ -1,0 +1,73 @@
+name: Sync to Plugin
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tlon-skill
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build binary
+        run: |
+          mkdir -p bin
+          bun build scripts/main.ts --compile --outfile bin/tlon-run
+
+      - name: Checkout openclaw-tlon
+        uses: actions/checkout@v4
+        with:
+          repository: tloncorp/openclaw-tlon
+          token: ${{ secrets.PLUGIN_REPO_TOKEN }}
+          path: openclaw-tlon
+
+      - name: Copy skill files
+        run: |
+          mkdir -p openclaw-tlon/skills/tlon
+          cp SKILL.md openclaw-tlon/skills/tlon/
+          cp bin/tlon-run openclaw-tlon/skills/tlon/
+
+      - name: Create PR
+        working-directory: openclaw-tlon
+        env:
+          GH_TOKEN: ${{ secrets.PLUGIN_REPO_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          BRANCH="skill-sync/${{ github.sha }}"
+          git checkout -b "$BRANCH"
+          git add skills/tlon/
+          
+          # Check if there are changes
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          
+          COMMIT_MSG=$(git -C ${{ github.workspace }} log -1 --pretty=format:"%s")
+          git commit -m "chore: sync tlon-skill from tloncorp/tlon-skill
+
+          Source commit: ${{ github.sha }}
+          Original message: $COMMIT_MSG"
+          
+          git push origin "$BRANCH"
+          
+          gh pr create \
+            --title "chore: sync tlon-skill" \
+            --body "Automated sync from [tloncorp/tlon-skill](https://github.com/tloncorp/tlon-skill/commit/${{ github.sha }}).
+
+          **Source commit:** \`${{ github.sha }}\`
+          **Original message:** $COMMIT_MSG" \
+            --base master \
+            --head "$BRANCH"
