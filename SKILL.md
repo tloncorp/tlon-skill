@@ -18,12 +18,16 @@ tlon-run channels groups
 ```
 
 **Non-Node environments (containers, cron, scripts):**
+
+Download the binary tarball and extract it:
+
 ```bash
-npm install @tloncorp/tlon-skill-darwin-arm64
-./node_modules/@tloncorp/tlon-skill-darwin-arm64/tlon-run channels groups
+# Darwin ARM64
+curl -L https://registry.npmjs.org/@tloncorp/tlon-skill-darwin-arm64/-/tlon-skill-darwin-arm64-0.1.0.tgz | tar -xz -C /usr/local/bin
+tlon-run channels groups
 ```
 
-The platform packages (`@tloncorp/tlon-skill-darwin-arm64`, etc.) contain the raw binary with no Node.js dependency.
+Replace `darwin-arm64` with `darwin-x64` or `linux-x64` as needed.
 
 ## Ship Selection
 
