@@ -170,12 +170,13 @@ async function main() {
       case "edit": {
         const channel = args[1];
         const postId = args[2];
-        const message = args[3];
+        const titleIdx = args.indexOf("--title");
+        const messageEndIdx = titleIdx !== -1 ? titleIdx : args.length;
+        const message = args.slice(3, messageEndIdx).join(" ");
         if (!channel || !postId || !message) {
           console.error("Usage: posts.ts edit <channel> <post-id> <new-message> [--title <title>]");
           process.exit(1);
         }
-        const titleIdx = args.indexOf("--title");
         const title = titleIdx !== -1 ? args[titleIdx + 1] : undefined;
 
         const result = await editChannelPost(channel, postId, message, title ? { title } : undefined);

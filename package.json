@@ -8,7 +8,7 @@
     "build:binary": "bun build scripts/main.ts --compile --outfile bin/tlon-run"
   },
   "dependencies": {
-    "@tloncorp/api": "file:../api-beta",
+    "@tloncorp/api": "github:tloncorp/api-beta#main",
     "@urbit/aura": "^3.0.0"
   },
   "devDependencies": {
