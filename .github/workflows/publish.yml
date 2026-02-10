@@ -42,11 +42,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: binary-${{ matrix.target }}
-          path: npm/${{ matrix.target }}/tlon-run
+          path: npm/${{ matrix.target }}/tlon
 
   publish:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.dry_run == 'false'
 
     steps:
@@ -65,22 +68,18 @@ jobs:
       - name: Copy binaries to npm packages
         run: |
           for target in darwin-arm64 darwin-x64 linux-x64; do
-            cp artifacts/binary-$target/tlon-run npm/$target/
-            chmod +x npm/$target/tlon-run
+            cp artifacts/binary-$target/tlon npm/$target/
+            chmod +x npm/$target/tlon
           done
 
       - name: Publish platform packages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           for target in darwin-arm64 darwin-x64 linux-x64; do
             echo "Publishing @tloncorp/tlon-skill-$target..."
             cd npm/$target
-            npm publish --access public
+            npm publish --access public --provenance
             cd ../..
           done
 
       - name: Publish main package
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public
+        run: npm publish --access public --provenance

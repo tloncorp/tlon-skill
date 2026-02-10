@@ -4,6 +4,3 @@ node_modules/
 dist
 npm
 bin/tlon
-# Ship configs contain secrets - only keep example
-ships/*
-!ships/example.json
