@@ -35,6 +35,7 @@ Commands:
   notebook     Post to diary/notebook channels
   posts        Post reactions, edits, deletes (react, unreact, edit, delete)
   settings     OpenClaw settings management (get, set, delete, allow-dm, ...)
+  upload       Upload an image from URL to Tlon storage
 
 Options:
   --ship ~name   Select which ship to use (sets TLON_SHIP env var)
@@ -127,6 +128,11 @@ async function main() {
       }
       case "settings": {
         const mod = await import("./settings");
+        break;
+      }
+      case "upload": {
+        const mod = await import("./upload");
+        await mod.main(scriptArgs);
         break;
       }
       default:
