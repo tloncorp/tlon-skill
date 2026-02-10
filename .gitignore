@@ -2,5 +2,6 @@ node_modules/
 *.log
 .DS_Store
 dist
-npm
+# Ignore binaries, keep package.json
+npm/*/tlon
 bin/tlon
