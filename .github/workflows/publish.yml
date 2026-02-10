@@ -72,6 +72,7 @@ jobs:
       - name: Copy binaries to npm packages
         run: |
           for target in darwin-arm64 darwin-x64 linux-x64; do
+            mkdir -p npm/$target
             cp artifacts/binary-$target/tlon npm/$target/
             chmod +x npm/$target/tlon
           done
