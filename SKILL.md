@@ -160,6 +160,16 @@ tlon notebook diary/~host/slug "Title" --content file.md # Post from file
 tlon notebook diary/~host/slug "Title" --image <url>     # Post with image
 ```
 
+### Upload
+
+Upload images to Tlon storage.
+
+```bash
+tlon upload https://example.com/image.png    # Upload image from URL
+```
+
+Returns the uploaded image URL for use in posts, profiles, etc.
+
 ### Settings (OpenClaw)
 
 Manage OpenClaw's Tlon plugin config via Urbit settings-store. Changes apply immediately without gateway restart.
