@@ -25,11 +25,46 @@ Replace `darwin-arm64` with `darwin-x64` or `linux-x64` as needed.
 
 ## Configuration
 
-Set environment variables:
+**CLI Flags (highest priority):**
+```bash
+# Pass all three credentials directly
+tlon --url https://your-ship.tlon.network --ship ~your-ship --code sampel-ticlyt-migfun-falmel <command>
+
+# Or load from a JSON config file
+tlon --config ~/ships/my-ship.json <command>
+```
+
+Config file format: `{"url": "...", "ship": "~...", "code": "..."}`
+
+**Environment Variables:**
 ```bash
 export URBIT_URL="https://your-ship.tlon.network"
 export URBIT_SHIP="~your-ship"
 export URBIT_CODE="sampel-ticlyt-migfun-falmel"
+```
+
+**OpenClaw:** If configured with a Tlon channel, credentials load automatically.
+
+**Resolution order:** CLI flags → `TLON_CONFIG_FILE` → `TLON_SHIP`+`TLON_SKILL_DIR` → `URBIT_*` env vars → OpenClaw config
+
+## Multi-Ship Usage
+
+If you have credentials for multiple ships, you can use this skill to operate on behalf of any of them. This is useful for:
+
+- **Managing multiple identities** — switch between ships without changing environment variables
+- **Bot operations** — act as a bot ship while authenticated as yourself
+- **Moon management** — operate moons from their parent planet
+
+Simply pass the target ship's credentials via CLI flags:
+
+```bash
+# Post to a channel as ~other-ship
+tlon --url https://other-ship.tlon.network --ship ~other-ship --code their-access-code \
+  posts send chat/~host/channel "Hello from other-ship"
+
+# Or keep credentials in config files
+tlon --config ~/ships/bot.json channels groups
+tlon --config ~/ships/moon.json contacts self
 ```
 
 ## Commands
