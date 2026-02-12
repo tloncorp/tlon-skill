@@ -53,7 +53,7 @@ Config Resolution (first match wins):
   1. CLI flags (--url, --ship, --code or --config)
   2. TLON_CONFIG_FILE env var
   3. TLON_SHIP + TLON_SKILL_DIR (loads ships/<ship>.json)
-  4. URBIT_URL, URBIT_SHIP, URBIT_CODE env vars
+  4. URBIT_URL/TLON_URL, URBIT_SHIP/TLON_SHIP, URBIT_CODE/TLON_CODE env vars
   5. OpenClaw config (~/.openclaw/openclaw.yaml)
 
 Examples:
