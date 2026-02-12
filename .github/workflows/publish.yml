@@ -1,0 +1,109 @@
+name: Build and Publish
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (skip publish)"
+        type: boolean
+        default: true
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            target: darwin-arm64
+          - os: macos-14        # Cross-compile x64 from ARM64
+            target: darwin-x64
+          - os: ubuntu-latest
+            target: linux-x64
+          - os: ubuntu-latest   # Cross-compile arm64 from x64
+            target: linux-arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build binary
+        run: node scripts/build-all.js --target=${{ matrix.target }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.target }}
+          path: npm/${{ matrix.target }}/tlon
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.dry_run == 'false'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Copy binaries to npm packages
+        run: |
+          for target in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
+            mkdir -p npm/$target
+            cp artifacts/binary-$target/tlon npm/$target/
+            chmod +x npm/$target/tlon
+          done
+
+      # Use token if provided (for bootstrapping), otherwise OIDC
+      - name: Publish platform packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          PROVENANCE=""
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "No NPM_TOKEN, using OIDC with provenance"
+            PROVENANCE="--provenance"
+          else
+            echo "Using NPM_TOKEN"
+          fi
+          for target in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
+            echo "Publishing @tloncorp/tlon-skill-$target..."
+            cd npm/$target
+            npm publish --access public $PROVENANCE
+            cd ../..
+          done
+
+      - name: Publish main package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          PROVENANCE=""
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            PROVENANCE="--provenance"
+          fi
+          npm publish --access public $PROVENANCE

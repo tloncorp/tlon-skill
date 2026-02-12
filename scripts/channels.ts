@@ -12,124 +12,65 @@
  *   npx ts-node channels.ts delete <nest> # Delete a channel (must be group admin)
  */
 
-import { scry, poke, closeClient, getCurrentShip, getConfig } from "./urbit-client";
-
-// Types
-interface Club {
-  team: string[];
-  hive: string[];
-  meta: {
-    title?: string;
-    description?: string;
-    image?: string;
-    cover?: string;
-  };
-}
-
-type Clubs = Record<string, Club>;
-
-interface GroupChannel {
-  meta: {
-    title: string;
-    description: string;
-    image: string;
-    cover: string;
-  };
-  added: number;
-  readers: string[];
-  zone: string;
-  join: boolean;
-}
-
-interface GroupZone {
-  meta: {
-    title: string;
-    description: string;
-    image: string;
-    cover: string;
-  };
-  idx: string[];
-}
-
-interface Group {
-  meta: {
-    title: string;
-    description: string;
-    image: string;
-    cover: string;
-  };
-  fleet: Record<string, { sects: string[]; joined: number }>;
-  cabals: Record<string, { meta: any }>;
-  zones: Record<string, GroupZone>;
-  "zone-ord": string[];
-  channels: Record<string, GroupChannel>;
-  bloc: string[];
-  secret: boolean;
-  cordon: any;
-  flagged: any;
-}
-
-type Groups = Record<string, Group>;
+import { deleteChannel, getGroups, getInitData, updateChannel } from "@tloncorp/api";
+import type { Channel as ApiChannel, Group as ApiGroup } from "@tloncorp/api";
+import { ensureClient, getCurrentShip } from "./api-client";
 
 // Get DMs
 async function getDms() {
-  const dms = await scry<string[]>({
-    app: "chat",
-    path: "/dm",
-  });
-  return dms.map((ship) => ({
+  const init = await getInitData();
+  const dms = init.channels.filter((channel) => channel.type === "dm");
+  return dms.map((dm) => ({
     type: "dm",
-    id: ship,
-    contact: ship,
+    id: dm.id,
+    contact: dm.contactId || dm.id,
   }));
 }
 
 // Get group DMs (clubs)
 async function getGroupDms() {
   const currentShip = getCurrentShip();
-  const clubs = await scry<Clubs>({
-    app: "chat",
-    path: "/clubs",
-  });
+  const init = await getInitData();
+  const groupDms = init.channels.filter((channel) => channel.type === "groupDm");
 
-  return Object.entries(clubs).map(([id, club]) => {
-    const isJoined = club.team.includes(currentShip);
-    const isInvited = club.hive.includes(currentShip);
+  return groupDms.map((dm) => {
+    const members = dm.members || [];
+    const joined = members.filter((member) => member.status === "joined");
+    const invited = members.filter((member) => member.status === "invited");
+    const isJoined = joined.some((member) => member.contactId === currentShip);
+    const isInvited = invited.some((member) => member.contactId === currentShip);
 
     return {
       type: "groupDm",
-      id,
-      title: club.meta.title || "Untitled",
-      description: club.meta.description || "",
-      members: club.team,
-      invited: club.hive,
+      id: dm.id,
+      title: dm.title || "Untitled",
+      description: dm.description || "",
+      members: joined.map((member) => member.contactId),
+      invited: invited.map((member) => member.contactId),
       status: isJoined ? "joined" : isInvited ? "invited" : "unknown",
     };
   });
 }
 
 // Get subscribed groups
-async function getGroups() {
-  const groups = await scry<Groups>({
-    app: "groups",
-    path: "/groups",
-  });
+async function getGroupsList() {
+  const groups = await getGroupsApi();
 
-  return Object.entries(groups).map(([flag, group]) => {
-    const channelList = Object.entries(group.channels).map(([nest, channel]) => ({
-      nest,
-      title: channel.meta.title,
-      zone: channel.zone,
+  return groups.map((group) => {
+    const channelList = (group.channels || []).map((channel) => ({
+      nest: channel.id,
+      title: channel.title || channel.id,
+      zone: findChannelSectionId(group, channel.id),
     }));
 
     return {
       type: "group",
-      id: flag,
-      title: group.meta.title,
-      description: group.meta.description,
-      image: group.meta.image,
-      secret: group.secret,
-      memberCount: Object.keys(group.fleet).length,
+      id: group.id,
+      title: group.title,
+      description: group.description,
+      image: group.iconImage,
+      secret: group.privacy === "secret",
+      memberCount: group.memberCount ?? (group.members || []).length,
       channels: channelList,
     };
   });
@@ -140,7 +81,7 @@ async function getAll() {
   const [dms, groupDms, groups] = await Promise.all([
     getDms(),
     getGroupDms(),
-    getGroups(),
+    getGroupsList(),
   ]);
 
   return {
@@ -152,27 +93,26 @@ async function getAll() {
 
 // Parse nest into components: kind/~host/name -> { kind, host, name, group }
 function parseNest(nest: string): { kind: string; host: string; name: string } {
-  const parts = nest.split('/');
+  const parts = nest.split("/");
   if (parts.length !== 3) {
     throw new Error(`Invalid nest format: ${nest}. Expected: kind/~host/name`);
   }
   return {
     kind: parts[0],
-    host: parts[1].startsWith('~') ? parts[1] : `~${parts[1]}`,
+    host: parts[1].startsWith("~") ? parts[1] : `~${parts[1]}`,
     name: parts[2],
   };
 }
 
 // Find which group a channel belongs to
-async function findChannelGroup(nest: string): Promise<string | null> {
-  const groups = await scry<Groups>({
-    app: "groups",
-    path: "/groups",
-  });
-  
-  for (const [flag, group] of Object.entries(groups)) {
-    if (group.channels && group.channels[nest]) {
-      return flag;
+async function findChannelGroup(
+  nest: string
+): Promise<{ group: ApiGroup; channel: ApiChannel } | null> {
+  const groups = await getGroupsApi();
+  for (const group of groups) {
+    const channel = (group.channels || []).find((c) => c.id === nest);
+    if (channel) {
+      return { group, channel };
     }
   }
   return null;
@@ -180,145 +120,115 @@ async function findChannelGroup(nest: string): Promise<string | null> {
 
 // Get channel info
 async function getChannelInfo(nest: string) {
-  const { kind, host, name } = parseNest(nest);
-  
+  const { kind, name } = parseNest(nest);
+
   // Find the group this channel belongs to
-  const groupFlag = await findChannelGroup(nest);
-  if (!groupFlag) {
+  const match = await findChannelGroup(nest);
+  if (!match) {
     throw new Error(`Channel ${nest} not found in any group`);
   }
-  
-  const groups = await scry<Groups>({
-    app: "groups",
-    path: "/groups",
-  });
-  
-  const group = groups[groupFlag];
-  const channel = group.channels[nest];
-  
-  console.log(`\n=== ${channel.meta.title || name} ===\n`);
+
+  const { group, channel } = match;
+
+  console.log(`\n=== ${channel.title || name} ===\n`);
   console.log(`Nest: ${nest}`);
   console.log(`Kind: ${kind}`);
-  console.log(`Group: ${group.meta.title} (${groupFlag})`);
-  console.log(`Zone: ${channel.zone}`);
-  console.log(`Description: ${channel.meta.description || '(none)'}`);
-  console.log(`Readers: ${channel.readers.length > 0 ? channel.readers.join(', ') : '(all members)'}`);
-  
+  console.log(`Group: ${group.title} (${group.id})`);
+  console.log(`Zone: ${findChannelSectionId(group, channel.id)}`);
+  console.log(`Description: ${channel.description || "(none)"}`);
+  const readerRoles = (channel.readerRoles || []).map((r) => r.roleId);
+  console.log(
+    `Readers: ${readerRoles.length > 0 ? readerRoles.join(", ") : "(all members)"}`
+  );
+
   return {
     nest,
     kind,
-    group: groupFlag,
-    groupTitle: group.meta.title,
-    title: channel.meta.title,
-    description: channel.meta.description,
-    zone: channel.zone,
-    readers: channel.readers,
+    group: group.id,
+    groupTitle: group.title,
+    title: channel.title,
+    description: channel.description,
+    zone: findChannelSectionId(group, channel.id),
+    readers: readerRoles,
   };
 }
 
 // Update channel metadata
-async function updateChannel(nest: string, options: { title?: string; description?: string }) {
-  getConfig();
-  
-  const { kind, host, name } = parseNest(nest);
-  
-  // Find the group this channel belongs to
-  const groupFlag = await findChannelGroup(nest);
-  if (!groupFlag) {
+async function updateChannelMeta(
+  nest: string,
+  options: { title?: string; description?: string }
+) {
+  ensureClient();
+
+  const match = await findChannelGroup(nest);
+  if (!match) {
     throw new Error(`Channel ${nest} not found in any group`);
   }
-  
-  // Get current channel info to preserve existing values
-  const groups = await scry<Groups>({
-    app: "groups",
-    path: "/groups",
+
+  const { group, channel } = match;
+  const sectionId = findChannelSectionId(group, channel.id) || "default";
+  const description = options.description ?? channel.description ?? "";
+  const channelContentConfiguration = channel.contentConfiguration ?? undefined;
+  const encodedDescription = JSON.stringify({
+    description,
+    channelContentConfiguration,
   });
-  
-  const group = groups[groupFlag];
-  const channel = group.channels[nest];
-  
-  // Build the full GroupChannelV7 structure for edit
+
   const channelUpdate = {
-    added: channel.added,
+    added: channel.addedToGroupAt ?? Date.now(),
     meta: {
-      title: options.title ?? channel.meta.title,
-      description: options.description ?? channel.meta.description,
-      image: channel.meta.image || '',
-      cover: channel.meta.cover || '',
+      title: options.title ?? channel.title ?? "",
+      description: encodedDescription,
+      image: channel.iconImage || "",
+      cover: channel.coverImage || "",
     },
-    section: channel.zone || 'default',
-    readers: channel.readers || [],
-    join: channel.join ?? true,
+    section: sectionId,
+    readers: (channel.readerRoles || []).map((r) => r.roleId),
+    join: channel.currentUserIsMember ?? true,
   };
-  
+
   console.log(`Updating channel ${nest}...`);
-  
-  // Update via groups agent (channel meta edit)
-  await poke({
-    app: 'groups',
-    mark: 'group-action-4',
-    json: {
-      group: {
-        flag: groupFlag,
-        'a-group': {
-          channel: {
-            nest,
-            'a-channel': {
-              edit: channelUpdate,
-            },
-          },
-        },
-      },
-    },
+
+  await updateChannel({
+    groupId: group.id,
+    channelId: nest,
+    channel: channelUpdate,
   });
-  
+
   console.log(`✅ Channel updated.`);
   console.log(`   Title: ${channelUpdate.meta.title}`);
-  console.log(`   Description: ${channelUpdate.meta.description || '(none)'}`);
+  console.log(`   Description: ${description || "(none)"}`);
 }
 
 // Delete a channel
-async function deleteChannel(nest: string) {
-  getConfig();
-  
-  const { kind, host, name } = parseNest(nest);
-  
-  // Find the group this channel belongs to
-  const groupFlag = await findChannelGroup(nest);
-  if (!groupFlag) {
+async function deleteChannelByNest(nest: string) {
+  ensureClient();
+
+  const match = await findChannelGroup(nest);
+  if (!match) {
     throw new Error(`Channel ${nest} not found in any group`);
   }
-  
-  console.log(`Deleting channel ${nest} from group ${groupFlag}...`);
-  
-  await poke({
-    app: 'groups',
-    mark: 'group-action-4',
-    json: {
-      group: {
-        flag: groupFlag,
-        'a-group': {
-          channel: {
-            nest,
-            'a-channel': {
-              del: null,
-            },
-          },
-        },
-      },
-    },
+
+  console.log(`Deleting channel ${nest} from group ${match.group.id}...`);
+
+  await deleteChannel({
+    groupId: match.group.id,
+    channelId: nest,
   });
-  
+
   console.log(`✅ Channel deleted.`);
 }
 
-// Parse command line argument for named options
-function getOption(args: string[], name: string): string | undefined {
-  const idx = args.indexOf(`--${name}`);
-  if (idx !== -1 && args[idx + 1]) {
-    return args[idx + 1];
-  }
-  return undefined;
+async function getGroupsApi(): Promise<ApiGroup[]> {
+  ensureClient();
+  return getGroups();
+}
+
+function findChannelSectionId(group: ApiGroup, channelId: string): string {
+  const section = (group.navSections || []).find((nav) =>
+    (nav.channels || []).some((channel) => channel.channelId === channelId)
+  );
+  return section?.sectionId || "default";
 }
 
 // CLI
@@ -327,34 +237,37 @@ async function main() {
   const command = args[0];
 
   try {
-    let result: any;
-
+    ensureClient();
     switch (command) {
-      case "dms":
-        result = await getDms();
-        console.log(JSON.stringify(result, null, 2));
+      case "dms": {
+        const dms = await getDms();
+        console.log(JSON.stringify(dms, null, 2));
         break;
+      }
 
-      case "group-dms":
-        result = await getGroupDms();
-        console.log(JSON.stringify(result, null, 2));
+      case "group-dms": {
+        const dms = await getGroupDms();
+        console.log(JSON.stringify(dms, null, 2));
         break;
+      }
 
-      case "groups":
-        result = await getGroups();
-        console.log(JSON.stringify(result, null, 2));
+      case "groups": {
+        const groups = await getGroupsList();
+        console.log(JSON.stringify(groups, null, 2));
         break;
+      }
 
-      case "all":
-        result = await getAll();
-        console.log(JSON.stringify(result, null, 2));
+      case "all": {
+        const all = await getAll();
+        console.log(JSON.stringify(all, null, 2));
         break;
+      }
 
       case "info": {
         const nest = args[1];
         if (!nest) {
-          console.error('Usage: channels.ts info <nest>');
-          console.error('Example: channels.ts info chat/~ship/channel-name');
+          console.error("Usage: channels.ts info <nest>");
+          console.error("Example: channels.ts info chat/~ship/channel-name");
           process.exit(1);
         }
         await getChannelInfo(nest);
@@ -364,53 +277,54 @@ async function main() {
       case "update": {
         const nest = args[1];
         if (!nest) {
-          console.error('Usage: channels.ts update <nest> --title "..." [--description "..."]');
-          console.error('Example: channels.ts update chat/~ship/channel-name --title "New Title"');
+          console.error("Usage: channels.ts update <nest> --title \"...\" [--description \"...\"]");
+          console.error("Example: channels.ts update chat/~ship/channel-name --title \"New Title\"");
           process.exit(1);
         }
-        const title = getOption(args, 'title');
-        const description = getOption(args, 'description');
+
+        // Parse options
+        const titleIdx = args.indexOf("--title");
+        const descriptionIdx = args.indexOf("--description");
+        const title = titleIdx !== -1 ? args[titleIdx + 1] : undefined;
+        const description = descriptionIdx !== -1 ? args[descriptionIdx + 1] : undefined;
+
         if (!title && !description) {
-          console.error('At least one option required: --title or --description');
+          console.error("Error: At least one of --title or --description is required");
           process.exit(1);
         }
-        await updateChannel(nest, { title, description });
+
+        await updateChannelMeta(nest, { title, description });
         break;
       }
 
       case "delete": {
         const nest = args[1];
         if (!nest) {
-          console.error('Usage: channels.ts delete <nest>');
-          console.error('Example: channels.ts delete chat/~ship/channel-name');
+          console.error("Usage: channels.ts delete <nest>");
+          console.error("Example: channels.ts delete chat/~ship/channel-name");
           process.exit(1);
         }
-        await deleteChannel(nest);
+        await deleteChannelByNest(nest);
         break;
       }
 
       default:
-        console.error(`
-Usage: channels.ts <command>
+        console.log(`Usage: channels.ts <command>
 
 Commands:
-  dms                List direct messages
+  dms                List DMs
   group-dms          List group DMs (clubs)
   groups             List subscribed groups with their channels
   all                List all channels
   info <nest>        Get channel info
   update <nest>      Update channel --title "..." [--description "..."]
   delete <nest>      Delete a channel (must be group admin)
-
-Nest format: kind/~host/name (e.g., chat/~zod/general)
 `);
         process.exit(1);
     }
   } catch (error: any) {
-    console.error("Error:", error.message);
+    console.error(`Error: ${error.message}`);
     process.exit(1);
-  } finally {
-    await closeClient();
   }
 }
 

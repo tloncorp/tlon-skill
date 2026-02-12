@@ -8,35 +8,15 @@
  *   npx ts-node contacts.ts update-profile [options]  # Update your profile
  */
 
-import { scry, poke, closeClient, normalizeShip, getCurrentShip } from "./urbit-client";
-
-// Types from homestead shared/src/urbit/contact.ts
-interface ContactFieldText {
-  type: "text";
-  value: string;
-}
-
-interface ContactImageField {
-  type: "look";
-  value: string;
-}
-
-interface ContactFieldColor {
-  type: "tint";
-  value: string;
-}
-
-interface ContactBookProfile {
-  nickname?: ContactFieldText;
-  bio?: ContactFieldText;
-  avatar?: ContactImageField;
-  cover?: ContactImageField;
-  color?: ContactFieldColor;
-  status?: ContactFieldText;
-}
-
-type ContactRolodex = Record<string, ContactBookProfile | null>;
-type ContactBookScryResult = Record<string, [ContactBookProfile, ContactBookProfile | null]>;
+import {
+  getContacts,
+  syncUserProfiles,
+  updateContactMetadata,
+  getCurrentUserId,
+  poke,
+} from "@tloncorp/api";
+import type { Contact } from "@tloncorp/api";
+import { ensureClient, normalizeShip } from "./api-client";
 
 interface ContactEditField {
   nickname?: string;
@@ -47,97 +27,44 @@ interface ContactEditField {
 }
 
 // Helper to extract profile values
-function extractProfile(profile: ContactBookProfile | null) {
-  if (!profile) return null;
+// Contact has both direct fields (nickname, avatarImage) and peer fields (peerNickname, peerAvatarImage)
+function extractProfile(contact: Contact | null) {
+  if (!contact) return null;
   return {
-    nickname: profile.nickname?.value || null,
-    bio: profile.bio?.value || null,
-    status: profile.status?.value || null,
-    avatar: profile.avatar?.value || null,
-    cover: profile.cover?.value || null,
-    color: profile.color?.value || null,
+    nickname: contact.nickname ?? contact.peerNickname ?? null,
+    bio: contact.bio ?? null,
+    status: contact.status ?? null,
+    avatar: contact.avatarImage ?? contact.peerAvatarImage ?? null,
+    cover: contact.coverImage ?? null,
+    color: contact.color ?? null,
   };
 }
 
 // List all contacts and peers
 async function listContacts() {
-  // Get all peers (merged profile data)
-  const peers = await scry<ContactRolodex>({
-    app: "contacts",
-    path: "/all",
-  });
+  const contacts = await getContacts();
 
-  // Get contacts (with user overrides)
-  const contacts = await scry<ContactBookScryResult>({
-    app: "contacts",
-    path: "/v1/book",
-  });
-
-  const result: any[] = [];
-
-  // Add contacts first (they have override info)
-  for (const [ship, entry] of Object.entries(contacts)) {
-    if (!entry) continue;
-    const [base, overrides] = entry;
-    result.push({
-      ship,
-      isContact: true,
-      profile: extractProfile(base),
-      overrides: extractProfile(overrides),
-    });
-  }
-
-  // Add peers that aren't contacts
-  const contactShips = new Set(Object.keys(contacts));
-  for (const [ship, profile] of Object.entries(peers)) {
-    if (contactShips.has(ship)) continue;
-    if (!profile) continue;
-    result.push({
-      ship,
-      isContact: false,
-      profile: extractProfile(profile as ContactBookProfile),
-    });
-  }
-
-  return result;
+  return contacts.map((contact) => ({
+    ship: contact.id,
+    isContact: !!contact.isContact,
+    profile: extractProfile(contact),
+  }));
 }
 
 // Get a specific contact's profile
 async function getContact(ship: string) {
   const normalizedShip = normalizeShip(ship);
+  const contacts = await getContacts();
+  const contact = contacts.find((c) => c.id === normalizedShip) || null;
 
-  // Try contacts book first
-  const contacts = await scry<ContactBookScryResult>({
-    app: "contacts",
-    path: "/v1/book",
-  });
-
-  if (contacts[normalizedShip]) {
-    const [base, overrides] = contacts[normalizedShip];
+  if (contact) {
     return {
       ship: normalizedShip,
-      isContact: true,
-      profile: extractProfile(base),
-      overrides: extractProfile(overrides),
+      isContact: !!contact.isContact,
+      profile: extractProfile(contact),
     };
   }
 
-  // Fall back to peers
-  const peers = await scry<ContactRolodex>({
-    app: "contacts",
-    path: "/all",
-  });
-
-  const peerProfile = peers[normalizedShip];
-  if (peerProfile) {
-    return {
-      ship: normalizedShip,
-      isContact: false,
-      profile: extractProfile(peerProfile as ContactBookProfile),
-    };
-  }
-
-  // Ship not found in local data - try to sync
   return {
     ship: normalizedShip,
     isContact: false,
@@ -149,11 +76,7 @@ async function getContact(ship: string) {
 // Sync (fetch) profiles for ships
 async function syncProfiles(ships: string[]) {
   const normalizedShips = ships.map(normalizeShip);
-  await poke({
-    app: "contacts",
-    mark: "contact-action-1",
-    json: { meet: normalizedShips },
-  });
+  await syncUserProfiles(normalizedShips);
   return { synced: normalizedShips };
 }
 
@@ -193,19 +116,18 @@ async function updateProfile(updates: {
     json: { edit: editFields },
   });
 
-  return { updated: Object.keys(updates), ship: getCurrentShip() };
+  return { updated: Object.keys(updates), ship: getCurrentUserId() };
 }
 
 // Get own profile
 async function getSelf() {
-  const profile = await scry<ContactBookProfile>({
-    app: "contacts",
-    path: "/v1/self",
-  });
+  const currentUserId = getCurrentUserId();
+  const contacts = await getContacts();
+  const contact = contacts.find((c) => c.id === currentUserId) || null;
 
   return {
-    ship: getCurrentShip(),
-    profile: extractProfile(profile),
+    ship: currentUserId,
+    profile: extractProfile(contact),
   };
 }
 
@@ -231,12 +153,26 @@ async function removeContact(ship: string) {
   return { removed: normalizedShip };
 }
 
+// Update a contact's metadata (nickname/avatar)
+async function updateContact(
+  ship: string,
+  updates: { nickname?: string; avatar?: string }
+) {
+  const normalizedShip = normalizeShip(ship);
+  await updateContactMetadata(normalizedShip, {
+    nickname: updates.nickname,
+    avatarImage: updates.avatar,
+  });
+  return { updated: normalizedShip };
+}
+
 // CLI
 async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
 
   try {
+    ensureClient();
     let result: any;
 
     switch (command) {
@@ -258,7 +194,7 @@ async function main() {
 
       case "sync":
         if (!args[1]) {
-          console.error("Usage: contacts.ts sync ~ship1 ~ship2 ...");
+          console.error("Usage: contacts.ts sync ~ship [~ship2 ...]");
           process.exit(1);
         }
         result = await syncProfiles(args.slice(1));
@@ -273,6 +209,7 @@ async function main() {
         break;
 
       case "remove":
+      case "del":
         if (!args[1]) {
           console.error("Usage: contacts.ts remove ~ship");
           process.exit(1);
@@ -280,63 +217,67 @@ async function main() {
         result = await removeContact(args[1]);
         break;
 
-      case "update-profile": {
-        const updates: any = {};
-        for (let i = 1; i < args.length; i += 2) {
-          const flag = args[i];
-          const value = args[i + 1];
-          switch (flag) {
-            case "--nickname":
-              updates.nickname = value === "null" ? null : value;
-              break;
-            case "--bio":
-              updates.bio = value;
-              break;
-            case "--status":
-              updates.status = value;
-              break;
-            case "--avatar":
-              updates.avatar = value === "null" ? null : value;
-              break;
-            case "--cover":
-              updates.cover = value;
-              break;
-            default:
-              console.error(`Unknown flag: ${flag}`);
-              process.exit(1);
-          }
+      case "update": {
+        const ship = args[1];
+        if (!ship) {
+          console.error("Usage: contacts.ts update ~ship [--nickname <name>] [--avatar <url>]");
+          process.exit(1);
         }
+        const nicknameIdx = args.indexOf("--nickname");
+        const avatarIdx = args.indexOf("--avatar");
+        const nickname = nicknameIdx !== -1 ? args[nicknameIdx + 1] : undefined;
+        const avatar = avatarIdx !== -1 ? args[avatarIdx + 1] : undefined;
+        result = await updateContact(ship, { nickname, avatar });
+        break;
+      }
+
+      case "update-profile": {
+        const nicknameIdx = args.indexOf("--nickname");
+        const bioIdx = args.indexOf("--bio");
+        const statusIdx = args.indexOf("--status");
+        const avatarIdx = args.indexOf("--avatar");
+        const coverIdx = args.indexOf("--cover");
+
+        const updates = {
+          nickname: nicknameIdx !== -1 ? args[nicknameIdx + 1] : undefined,
+          bio: bioIdx !== -1 ? args[bioIdx + 1] : undefined,
+          status: statusIdx !== -1 ? args[statusIdx + 1] : undefined,
+          avatar: avatarIdx !== -1 ? args[avatarIdx + 1] : undefined,
+          cover: coverIdx !== -1 ? args[coverIdx + 1] : undefined,
+        };
+
         result = await updateProfile(updates);
         break;
       }
 
       default:
-        console.error(`
-Usage: contacts.ts <command> [args]
+        console.log(`Usage: contacts.ts <command>
 
 Commands:
-  list                          List all contacts and peers
-  self                          Get your own profile
-  get <~ship>                   Get a contact's profile
-  sync <~ship> [~ship...]       Fetch/sync profiles from ships
-  add <~ship>                   Add a ship as a contact
-  remove <~ship>                Remove a contact
-  update-profile [options]      Update your profile
-    --nickname <name|null>
-    --bio <text>
-    --status <text>
-    --avatar <url|null>
-    --cover <url>
+  list                     List all contacts
+  self                     Show your profile
+  get ~ship                Get a contact's profile
+  sync ~ship [~ship2 ...]   Sync profiles
+  add ~ship                Add a contact
+  remove ~ship             Remove a contact
+  update ~ship --nickname <name> --avatar <url>
+                           Update a contact's metadata
+  update-profile [options] Update your profile
+
+Examples:
+  npx ts-node scripts/contacts.ts list
+  npx ts-node scripts/contacts.ts get ~sampel-palnet
+  npx ts-node scripts/contacts.ts update-profile --nickname "New Name"
 `);
         process.exit(1);
     }
 
-    console.log(JSON.stringify(result, null, 2));
+    if (result) {
+      console.log(JSON.stringify(result, null, 2));
+    }
   } catch (error: any) {
-    console.error("Error:", error.message);
+    console.error(`Error: ${error.message}`);
     process.exit(1);
-  } finally {
-    await closeClient();
   }
 }
 

@@ -1,480 +1,299 @@
 #!/usr/bin/env npx ts-node
 /**
  * Messages API for Tlon
- * 
+ *
  * Usage:
  *   npx ts-node scripts/messages.ts dm ~sampel-palnet [--limit N] [--resolve-cites]
  *   npx ts-node scripts/messages.ts channel chat/~host/channel-slug [--limit N] [--resolve-cites]
  *   npx ts-node scripts/messages.ts history "chat/~host/channel-slug" [--limit N] [--resolve-cites]
  *   npx ts-node scripts/messages.ts search "query" --channel chat/~host/channel-slug
- * 
+ *
  * Options:
  *   --resolve-cites, --quotes   Fetch and display quoted/cited message content
  */
 
-import { scry, getConfig, normalizeShip } from './urbit-client';
-
-interface MessageKey {
-  id: string;
-  time: string;
-}
-
-interface Story {
-  inline?: any[];
-  block?: any[];
-}
-
-interface Message {
-  key: MessageKey;
-  author: string;
-  content: Story;
-  replied?: MessageKey;
-  repliedBy?: string;
-}
-
-interface ChatInfo {
-  id: string;
-  nick?: string;
-  dial?: string;
-  enactor: string;
-  createdAt: string;
-}
-
-interface ChatMessages {
-  messages: Message[];
-}
+import {
+  getChannelPosts,
+  getPostReference,
+  getTextContent,
+  searchChannel,
+} from "@tloncorp/api";
+import type { ContentReference, Post } from "@tloncorp/api";
+import { ensureClient, normalizeShip } from "./api-client";
 
 // Extract text content from a Story
 function extractText(content: any): string {
-  if (!content) return '';
-  
-  // Content is an array of blocks
-  if (Array.isArray(content)) {
-    return content.map((block: any) => {
-      if (block.inline) {
-        return extractInlines(block.inline);
-      }
-      if (block.block) {
-        return extractBlocks(block.block);
-      }
-      return '';
-    }).join('');
-  }
-  
-  // Handle legacy format
-  if (content.inline) {
-    return extractInlines(content.inline);
-  }
-  
-  return '';
-}
-
-function extractInlines(inlines: any[]): string {
-  return inlines.map((inline: any) => {
-    if (typeof inline === 'string') return inline;
-    if (!inline || typeof inline !== 'object') return '';
-    if (inline.break) return '\n';
-    if (inline.ship) return inline.ship;
-    if (inline.bold) return `**${extractInlines(inline.bold)}**`;
-    if (inline.italics) return `*${extractInlines(inline.italics)}*`;
-    if (inline.strike) return `~~${extractInlines(inline.strike)}~~`;
-    if (inline.blockquote) return `> ${extractInlines(inline.blockquote)}`;
-    if (inline.link) return `[${inline.link.content || inline.link.href}](${inline.link.href})`;
-    if (inline['inline-code']) return `\`${inline['inline-code']}\``;
-    if (inline.code) return `\`\`\`\n${inline.code}\n\`\`\``;
-    return '';
-  }).join('');
-}
-
-// Cite types
-interface ParsedCite {
-  type: "chan" | "group" | "desk" | "bait";
-  nest?: string;
-  author?: string;
-  postId?: string;
-  group?: string;
-  where?: string;
-}
-
-// Extract cite info from a cite block
-function parseCite(cite: any): ParsedCite | null {
-  if (!cite || typeof cite !== 'object') return null;
-  
-  if (cite.chan && typeof cite.chan === 'object') {
-    const { nest, where } = cite.chan;
-    const whereMatch = where?.match(/\/msg\/(~[a-z-]+)\/(.+)/);
-    return {
-      type: 'chan',
-      nest,
-      where,
-      author: whereMatch?.[1],
-      postId: whereMatch?.[2],
-    };
-  }
-  if (cite.group && typeof cite.group === 'string') {
-    return { type: 'group', group: cite.group };
-  }
-  if (cite.desk && typeof cite.desk === 'object') {
-    return { type: 'desk', where: cite.desk.where };
-  }
-  if (cite.bait && typeof cite.bait === 'object') {
-    return { type: 'bait', group: cite.bait.group, nest: cite.bait.graph, where: cite.bait.where };
-  }
-  return null;
-}
-
-// Fetch cited message content
-async function fetchCiteContent(cite: ParsedCite): Promise<string | null> {
-  if (cite.type !== 'chan' || !cite.nest || !cite.postId) return null;
-  
-  try {
-    const scryPath = `/v4/${cite.nest}/posts/post/${cite.postId}`;
-    const data = await scry<any>({
-      app: 'channels',
-      path: scryPath,
-    });
-    
-    if (data?.essay?.content) {
-      return extractText(data.essay.content);
+  if (!content) return "";
+  // getTextContent expects an array (Story/Verse[])
+  if (!Array.isArray(content)) {
+    // Handle case where content might be wrapped or in unexpected format
+    if (typeof content === "string") return content;
+    if (content.story && Array.isArray(content.story)) {
+      return getTextContent(content.story) || "";
     }
-    return null;
-  } catch {
-    return null;
+    return JSON.stringify(content);
   }
+  return getTextContent(content) || "";
 }
 
-function extractBlocks(blocks: any): string {
-  // Handle both single block and array of blocks
-  const blockArray = Array.isArray(blocks) ? blocks : [blocks];
-  
-  return blockArray.map((block: any) => {
-    if (!block || typeof block !== 'object') return '';
-    if (block.quote) return `> ${extractText(block.quote)}`;
-    if (block.code) return `\`\`\`${block.code.lang || ''}\n${block.code.code}\n\`\`\``;
-    if (block.header) return `## ${block.header.tag} ${extractText(block.header.content)}`;
-    if (block.cite) {
-      const cite = parseCite(block.cite);
-      if (cite?.type === 'chan' && cite.author) {
-        return `> [quoted: ${cite.author}]`;
-      }
-      if (cite?.type === 'group' && cite.group) {
-        return `> [ref: group ${cite.group}]`;
-      }
-      return '> [quoted message]';
-    }
-    if (block.list) {
-      const items = Array.isArray(block.list) ? block.list : [block.list];
-      return items.map((item: any, i: number) => {
-        const prefix = block.list.type === 'ordered' ? `${i + 1}.` : '-';
-        return `${prefix} ${extractText(item)}`;
-      }).join('\n');
-    }
-    return '';
-  }).join('\n');
+function extractChannelReferences(content: any): ContentReference[] {
+  if (!Array.isArray(content)) return [];
+  return content.filter(
+    (verse) => verse && typeof verse === "object" && verse.type === "reference"
+  ) as ContentReference[];
 }
 
 // Format a timestamp
 function formatTime(timeVal: string | number): string {
   try {
-    // Check if it's already a Unix timestamp (numeric)
-    const num = typeof timeVal === 'number' ? timeVal : parseInt(timeVal, 10);
+    const num = typeof timeVal === "number" ? timeVal : parseInt(timeVal, 10);
     if (!isNaN(num) && num > 1600000000000) {
-      // Looks like a Unix timestamp in milliseconds
       const date = new Date(num);
       return date.toLocaleString();
     }
-    
-    // Otherwise try @da parsing
     const timeStr = String(timeVal);
-    const daNum = BigInt(timeStr.replace(/\./g, ''));
-    const DA_SECOND = BigInt('18446744073709551616');
-    const DA_UNIX_EPOCH = BigInt('170141184475152167957503069145530368000');
+    const daNum = BigInt(timeStr.replace(/\./g, ""));
+    const DA_SECOND = BigInt("18446744073709551616");
+    const DA_UNIX_EPOCH = BigInt("170141184475152167957503069145530368000");
     const offset = DA_SECOND / BigInt(2000);
     const epochAdjusted = offset + (daNum - DA_UNIX_EPOCH);
-    const unixMs = Math.round(Number(epochAdjusted * BigInt(1000) / DA_SECOND));
-    
+    const unixMs = Math.round(Number((epochAdjusted * BigInt(1000)) / DA_SECOND));
+
     const date = new Date(unixMs);
     if (date.getFullYear() > 2020 && date.getFullYear() < 2100) {
       return date.toLocaleString();
     }
-    return 'unknown';
+    return "unknown";
   } catch {
-    return 'unknown';
+    return "unknown";
+  }
+}
+
+async function resolveCites(post: Post): Promise<string[]> {
+  const references = extractChannelReferences(post.content);
+  if (!references.length) return [];
+
+  const citeTexts: string[] = [];
+  for (const ref of references) {
+    if (ref.referenceType !== "channel") continue;
+    try {
+      const refPost = await getPostReference({
+        channelId: ref.channelId,
+        postId: ref.postId,
+        replyId: ref.replyId,
+      });
+      const text = extractText(refPost.content);
+      if (text) {
+        citeTexts.push(text);
+      }
+    } catch {
+      // ignore cite failures
+    }
+  }
+  return citeTexts;
+}
+
+async function printPosts(posts: Post[], resolve: boolean) {
+  if (!posts.length) {
+    console.log("No messages found.");
+    return;
+  }
+
+  const sorted = [...posts].sort((a, b) => a.sentAt - b.sentAt);
+
+  for (const post of sorted) {
+    const author = post.authorId || "unknown";
+    const time = formatTime(post.sentAt);
+    const text = extractText(post.content);
+    const replySuffix = post.parentId ? ` (reply to ${post.parentId})` : "";
+
+    console.log(`- ${author} @ ${time}${replySuffix}`);
+    console.log(`  ID: ${post.id}`);
+    if (text) {
+      console.log(`  ${text}`);
+    }
+
+    if (resolve) {
+      const cites = await resolveCites(post);
+      for (const cite of cites) {
+        console.log(`  > ${cite}`);
+      }
+    }
+
+    console.log("");
   }
 }
 
 // Fetch DM messages via the chat agent (not channels)
-async function fetchDmMessages(ship: string, limit: number = 20, resolveCites: boolean = false): Promise<void> {
-  getConfig();
+async function fetchDmMessages(
+  ship: string,
+  limit: number = 20,
+  resolveCites: boolean = false
+): Promise<void> {
+  ensureClient();
   const normalizedShip = normalizeShip(ship);
 
   console.log(`Fetching DMs with: ${normalizedShip}`);
-  console.log(`Limit: ${limit}${resolveCites ? ' (resolving quotes)' : ''}\n`);
+  console.log(`Limit: ${limit}${resolveCites ? " (resolving quotes)" : ""}\n`);
 
   try {
-    // DMs use the chat agent with v3 API, not channels
-    const data = await scry<any>({
-      app: 'chat',
-      path: `/v3/dm/${normalizedShip}/writs/newest/${limit}/light`,
+    const data = await getChannelPosts({
+      channelId: normalizedShip,
+      mode: "newest",
+      count: limit,
+      includeReplies: true,
     });
 
-    if (!data) {
-      console.log('No messages found.');
-      return;
-    }
-
-    // Parse writs from response
-    const writsObj = data.writs || data.posts || data;
-    let entries: [string, any][];
-
-    if (typeof writsObj === 'object' && !Array.isArray(writsObj)) {
-      entries = Object.entries(writsObj);
-    } else if (Array.isArray(writsObj)) {
-      entries = writsObj.map((item: any, i: number) => [String(i), item]);
-    } else {
-      console.log('No messages found.');
-      return;
-    }
-
-    // Sort by sent time (oldest first for reading chronologically)
-    entries.sort((a, b) => {
-      const timeA = a[1]?.essay?.sent || a[1]?.memo?.sent || 0;
-      const timeB = b[1]?.essay?.sent || b[1]?.memo?.sent || 0;
-      return timeA - timeB;
-    });
-
-    const recent = entries.slice(-limit);
-
-    if (recent.length === 0) {
-      console.log('No messages found.');
-      return;
-    }
-
-    console.log(`=== DMs with ${normalizedShip} (${recent.length}) ===\n`);
-
-    for (const [id, item] of recent) {
-      const essay = item.essay || item.memo || item;
-      const seal = item.seal;
-      const author = essay?.author || "unknown";
-      const time = essay?.sent ? formatTime(essay.sent) : 'unknown';
-      const replyRef = seal?.meta?.replyCount ? ` (${seal.meta.replyCount} replies)` : '';
-
-      let quotedText = '';
-      if (resolveCites && essay?.content) {
-        const cites = extractCites(essay.content);
-        for (const cite of cites) {
-          const citedContent = await fetchCiteContent(cite);
-          if (citedContent) {
-            const citeAuthor = cite.author || 'unknown';
-            quotedText += `> ${citeAuthor} wrote: ${citedContent.substring(0, 200)}${citedContent.length > 200 ? '...' : ''}\n`;
-          }
-        }
-      }
-
-      const text = extractText(essay?.content || []);
-
-      console.log(`[${author}] ${time}${replyRef}`);
-      if (quotedText) console.log(quotedText);
-      console.log(text.substring(0, 500));
-      if (text.length > 500) console.log('...');
-      console.log('');
-    }
+    console.log(`=== DMs with ${normalizedShip} (${data.posts.length}) ===\n`);
+    await printPosts(data.posts, resolveCites);
   } catch (error: any) {
-    console.log(`Error: ${error.message}`);
-    console.log('Note: Ensure the ship name is correct (e.g., ~sampel-palnet)');
+    console.error(`Error fetching DMs: ${error.message}`);
   }
-}
-
-// Extract all cites from content for resolution
-function extractCites(content: any[]): ParsedCite[] {
-  const cites: ParsedCite[] = [];
-  if (!Array.isArray(content)) return cites;
-  
-  for (const block of content) {
-    if (block?.block?.cite) {
-      const cite = parseCite(block.block.cite);
-      if (cite) cites.push(cite);
-    }
-  }
-  return cites;
 }
 
 // Fetch messages from a channel
-async function fetchMessages(channel: string, limit: number = 20, resolveCites: boolean = false): Promise<void> {
-  getConfig(); // Validate config
-  
-  console.log(`Fetching messages from: ${channel}`);
-  console.log(`Limit: ${limit}${resolveCites ? ' (resolving quotes)' : ''}\n`);
-  
-  try {
-    // Use channels v4 API with outline endpoint
-    const scryPath = `/v4/${channel}/posts/newest/${limit}/outline`;
-    const data = await scry<any>({
-      app: 'channels',
-      path: scryPath,
-    });
-    
-    if (!data) {
-      console.log('No messages found.');
-      return;
-    }
+async function fetchMessages(
+  channel: string,
+  limit: number = 20,
+  resolveCites: boolean = false
+): Promise<void> {
+  ensureClient();
 
-    // Parse posts from response
-    const postsObj = data.posts || {};
-    const postIds = Object.keys(postsObj).sort((a, b) => {
-      // Sort by sent time (oldest first for reading chronologically)
-      const timeA = postsObj[a]?.essay?.sent || 0;
-      const timeB = postsObj[b]?.essay?.sent || 0;
-      return timeA - timeB;
+  console.log(`Fetching messages from: ${channel}`);
+  console.log(`Limit: ${limit}${resolveCites ? " (resolving quotes)" : ""}\n`);
+
+  try {
+    const data = await getChannelPosts({
+      channelId: channel,
+      mode: "newest",
+      count: limit,
+      includeReplies: true,
     });
-    
-    // Take the most recent posts (end of sorted array)
-    const recentIds = postIds.slice(-limit);
-    
-    if (recentIds.length === 0) {
-      console.log('No messages found.');
-      return;
-    }
-    
-    console.log(`=== Messages (${recentIds.length}) ===\n`);
-    
-    for (const id of recentIds) {
-      const item = postsObj[id];
-      const essay = item.essay;
-      const seal = item.seal;
-      const author = essay?.author || "unknown";
-      const time = essay?.sent ? formatTime(essay.sent) : 'unknown';
-      const replyRef = seal?.meta?.replyCount ? ` (${seal.meta.replyCount} replies)` : '';
-      
-      // Resolve cited content if requested
-      let quotedText = '';
-      if (resolveCites && essay?.content) {
-        const cites = extractCites(essay.content);
-        for (const cite of cites) {
-          const citedContent = await fetchCiteContent(cite);
-          if (citedContent) {
-            const citeAuthor = cite.author || 'unknown';
-            quotedText += `> ${citeAuthor} wrote: ${citedContent.substring(0, 200)}${citedContent.length > 200 ? '...' : ''}\n`;
-          }
-        }
-      }
-      
-      const text = extractText(essay?.content || []);
-      
-      // Show post ID for notebook posts (useful for delete)
-      const title = essay?.meta?.title;
-      const idLine = title ? `📓 ${title}` : `ID: ${id}`;
-      console.log(`[${author}] ${time}${replyRef}`);
-      console.log(idLine);
-      if (quotedText) console.log(quotedText);
-      console.log(text.substring(0, 500));
-      if (text.length > 500) console.log('...');
-      console.log('');
-    }
+
+    console.log(`=== Messages in ${channel} (${data.posts.length}) ===\n`);
+    await printPosts(data.posts, resolveCites);
   } catch (error: any) {
-    console.log(`Error: ${error.message}`);
-    console.log('Note: Check that the channel path is correct (e.g., chat/~host/slug)');
+    console.error(`Error fetching messages: ${error.message}`);
+    console.log("Note: Check that the channel path is correct (e.g., chat/~host/slug)");
   }
 }
 
 // Search messages in a channel
 async function searchMessages(query: string, channel: string): Promise<void> {
-  getConfig();
-  
+  ensureClient();
+
   console.log(`Searching "${query}" in: ${channel}\n`);
-  
+
   try {
-    const results = await scry<any>({
-      app: 'chat',
-      path: `/v1/chats/${channel}/search/${query}`,
+    const results = await searchChannel({
+      channelId: channel,
+      query,
     });
-    
-    console.log('Search results:', JSON.stringify(results, null, 2));
+
+    if (!results.posts.length) {
+      console.log("No results found.");
+      return;
+    }
+
+    console.log(`Found ${results.posts.length} results:\n`);
+    await printPosts(results.posts, false);
   } catch (error: any) {
-    console.log(`Search failed: ${error.message}`);
-    console.log('Note: Search may require a different API endpoint.');
+    console.error(`Error searching messages: ${error.message}`);
   }
 }
 
-// Main
+// CLI
 async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
-  
-  // Parse flags
+
+  // Parse --limit flag
   let limit = 20;
-  let channel: string | null = null;
-  let resolveCites = false;
-  
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--limit' && args[i + 1]) {
-      limit = parseInt(args[i + 1], 10);
-      i++;
-    }
-    if (args[i] === '--channel' && args[i + 1]) {
-      channel = args[i + 1];
-      i++;
-    }
-    if (args[i] === '--resolve-cites' || args[i] === '--quotes') {
-      resolveCites = true;
-    }
+  const limitIdx = args.indexOf("--limit");
+  if (limitIdx !== -1 && args[limitIdx + 1]) {
+    limit = parseInt(args[limitIdx + 1], 10);
   }
-  
-  switch (command) {
-    case 'dm': {
-      const ship = args[1];
-      if (!ship) {
-        console.log('Usage: npx ts-node scripts/messages.ts dm ~ship [--limit N] [--resolve-cites]');
-        process.exit(1);
+
+  const resolveCites =
+    args.includes("--resolve-cites") || args.includes("--quotes");
+
+  try {
+    switch (command) {
+      case "dm": {
+        const ship = args[1];
+        if (!ship) {
+          console.log(
+            "Usage: npx ts-node scripts/messages.ts dm ~ship [--limit N] [--resolve-cites]"
+          );
+          process.exit(1);
+        }
+        await fetchDmMessages(ship, limit, resolveCites);
+        break;
       }
-      await fetchDmMessages(ship, limit, resolveCites);
-      break;
-    }
-    
-    case 'channel': {
-      const channelPath = args[1];
-      if (!channelPath) {
-        console.log('Usage: npx ts-node scripts/messages.ts channel chat/~host/slug [--limit N] [--resolve-cites]');
-        process.exit(1);
+
+      case "channel": {
+        const channelPath = args[1];
+        if (!channelPath) {
+          console.log(
+            "Usage: npx ts-node scripts/messages.ts channel chat/~host/slug [--limit N] [--resolve-cites]"
+          );
+          process.exit(1);
+        }
+        await fetchMessages(channelPath, limit, resolveCites);
+        break;
       }
-      await fetchMessages(channelPath, limit, resolveCites);
-      break;
-    }
-    
-    case 'history': {
-      const channelPath = args[1] || channel;
-      if (!channelPath) {
-        console.log('Usage: npx ts-node scripts/messages.ts history "chat/~host/slug" [--limit N] [--resolve-cites]');
-        process.exit(1);
+
+      case "history": {
+        const channelPath = args[1];
+        if (!channelPath) {
+          console.log(
+            "Usage: npx ts-node scripts/messages.ts history \"chat/~host/channel-slug\" [--limit N] [--resolve-cites]"
+          );
+          process.exit(1);
+        }
+        await fetchMessages(channelPath, limit, resolveCites);
+        break;
       }
-      await fetchMessages(channelPath, limit, resolveCites);
-      break;
-    }
-    
-    case 'search': {
-      const query = args[1];
-      const channelPath = channel || args[2];
-      if (!query || !channelPath) {
-        console.log('Usage: npx ts-node scripts/messages.ts search "query" --channel chat/~host/slug');
-        process.exit(1);
+
+      case "search": {
+        const query = args[1];
+        let channel: string | null = null;
+        for (let i = 2; i < args.length; i++) {
+          if (args[i] === "--channel" && args[i + 1]) {
+            channel = args[i + 1];
+          }
+        }
+
+        if (!query || !channel) {
+          console.log(
+            'Usage: npx ts-node scripts/messages.ts search "query" --channel chat/~host/slug'
+          );
+          process.exit(1);
+        }
+        await searchMessages(query, channel);
+        break;
       }
-      await searchMessages(query, channelPath);
-      break;
+
+      default:
+        console.log(`Usage: messages.ts <command>
+
+Commands:
+  dm ~ship                          Show DM history
+  channel <nest>                    Show channel messages
+  history <nest>                    Alias for channel
+  search "query" --channel <nest>   Search in channel
+
+Examples:
+  npx ts-node scripts/messages.ts dm ~sampel-palnet --limit 10
+  npx ts-node scripts/messages.ts channel chat/~host/channel-slug --limit 20
+  npx ts-node scripts/messages.ts search "hello" --channel chat/~host/slug
+`);
+        process.exit(1);
     }
-    
-    default:
-      console.log('Usage:');
-      console.log('  npx ts-node scripts/messages.ts dm ~sampel-palnet [--limit N] [--resolve-cites]');
-      console.log('  npx ts-node scripts/messages.ts channel chat/~host/channel-slug [--limit N] [--resolve-cites]');
-      console.log('  npx ts-node scripts/messages.ts history "chat/~host/channel-slug" [--limit N] [--resolve-cites]');
-      console.log('  npx ts-node scripts/messages.ts search "query" --channel chat/~host/slug');
-      console.log('');
-      console.log('Options:');
-      console.log('  --limit N         Number of messages to fetch (default: 20)');
-      console.log('  --resolve-cites   Fetch and display quoted message content');
-      console.log('  --quotes          Alias for --resolve-cites');
-      process.exit(1);
+  } catch (error: any) {
+    console.error(`Error: ${error.message}`);
+    process.exit(1);
   }
 }
 
-main().catch(console.error);
+main();
