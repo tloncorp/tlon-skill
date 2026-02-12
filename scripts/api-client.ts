@@ -56,37 +56,38 @@ function getConfigFromOpenClaw(): UrbitConfig | null {
  * Get config from ship file or environment
  *
  * Priority:
- * 1. TLON_CONFIG_FILE env var (direct path to config file)
- * 2. TLON_SHIP + TLON_SKILL_DIR (loads ships/<ship>.json)
- * 3. URBIT_URL/URBIT_SHIP/URBIT_CODE env vars
+ * 1. TLON_CONFIG_FILE env var (direct path to config file, set by --config)
+ * 2. URBIT_URL + URBIT_SHIP + URBIT_CODE env vars (all three required, set by --url/--ship/--code)
+ * 3. TLON_SHIP + TLON_SKILL_DIR (loads ships/<ship>.json)
  * 4. OpenClaw config (~/.openclaw/openclaw.yaml)
  */
 export function getConfig(): UrbitConfig {
   if (cachedConfig) return cachedConfig;
 
-  // Option 1: Direct config file path
+  // Option 1: Direct config file path (--config flag or TLON_CONFIG_FILE)
   const configFile = process.env.TLON_CONFIG_FILE;
   if (configFile) {
     cachedConfig = loadConfigFile(configFile);
     return cachedConfig;
   }
 
-  // Option 2: Ship name + skill dir
-  const shipName = process.env.TLON_SHIP;
-  const skillDir = process.env.TLON_SKILL_DIR;
-  if (shipName && skillDir) {
-    const shipFile = path.join(skillDir, "ships", `${shipName.replace(/^~/, "")}.json`);
-    cachedConfig = loadConfigFile(shipFile);
-    return cachedConfig;
-  }
-
-  // Option 3: Legacy env vars
+  // Option 2: Explicit env vars (--url/--ship/--code flags or URBIT_* env vars)
+  // All three must be present
   const url = process.env.URBIT_URL;
   const ship = process.env.URBIT_SHIP;
   const code = process.env.URBIT_CODE;
 
   if (url && ship && code) {
     cachedConfig = { url, ship: ship.replace(/^~/, ""), code };
+    return cachedConfig;
+  }
+
+  // Option 3: Ship name + skill dir (loads ships/<ship>.json)
+  const shipName = process.env.TLON_SHIP;
+  const skillDir = process.env.TLON_SKILL_DIR;
+  if (shipName && skillDir) {
+    const shipFile = path.join(skillDir, "ships", `${shipName.replace(/^~/, "")}.json`);
+    cachedConfig = loadConfigFile(shipFile);
     return cachedConfig;
   }
 
@@ -99,6 +100,7 @@ export function getConfig(): UrbitConfig {
 
   throw new Error(
     "Missing Urbit config. Either:\n" +
+      "  - Use CLI flags: --config <file>, or --url + --ship + --code, or\n" +
       "  - Set TLON_CONFIG_FILE, or TLON_SHIP + TLON_SKILL_DIR, or\n" +
       "  - Set URBIT_URL, URBIT_SHIP, and URBIT_CODE environment variables, or\n" +
       "  - Configure Tlon channel in OpenClaw (~/.openclaw/openclaw.yaml)"

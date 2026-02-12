@@ -228,7 +228,7 @@ Commands:
   delete <channel> <post-id>            Delete a post
 
 Channel format: chat/~host/channel-name, diary/~host/name, heap/~host/name
-Use 'tlon-run messages channel <nest> --limit N' to see post IDs.
+Use 'tlon messages channel <nest> --limit N' to see post IDs.
 `);
         process.exit(1);
     }

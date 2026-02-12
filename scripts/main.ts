@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 /**
- * tlon-run - Unified CLI for Tlon/Urbit operations
+ * tlon - Unified CLI for Tlon/Urbit operations
  *
  * Usage:
- *   tlon-run [--ship ~name] <command> <subcommand> [args...]
+ *   tlon [options] <command> <subcommand> [args...]
  *
  * Commands:
  *   activity     Activity/notifications (mentions, replies, all, unreads)
@@ -20,10 +20,10 @@
 const VERSION = "2.0.0";
 
 function printHelp() {
-  console.log(`tlon-run v${VERSION} - Tlon/Urbit CLI
+  console.log(`tlon v${VERSION} - Tlon/Urbit CLI
 
 Usage:
-  tlon-run [--ship ~name] <command> <subcommand> [args...]
+  tlon [options] <command> <subcommand> [args...]
 
 Commands:
   activity     Activity/notifications (mentions, replies, all, unreads)
@@ -37,28 +37,70 @@ Commands:
   settings     OpenClaw settings management (get, set, delete, allow-dm, ...)
   upload       Upload an image from URL to Tlon storage
 
-Options:
-  --ship ~name   Select which ship to use (sets TLON_SHIP env var)
+Credential Options (override defaults):
+  --config <file>   Path to JSON config file with url, ship, code
+  --url <url>       Ship URL (e.g., https://your-ship.tlon.network)
+  --ship <~name>    Ship name (e.g., ~sampel-palnet)
+  --code <code>     Access code (e.g., sampel-ticlyt-migfun-falmel)
+
+Other Options:
   --help, -h     Show this help
   --version, -v  Show version
 
+Config Resolution (first match wins):
+  1. CLI flags (--url, --ship, --code or --config)
+  2. TLON_CONFIG_FILE env var
+  3. TLON_SHIP + TLON_SKILL_DIR (loads ships/<ship>.json)
+  4. URBIT_URL, URBIT_SHIP, URBIT_CODE env vars
+  5. OpenClaw config (~/.openclaw/openclaw.yaml)
+
 Examples:
-  tlon-run contacts list
-  tlon-run messages dm ~sampel-palnet --limit 10
-  tlon-run groups create "My Group" --description "A cool group"
-  tlon-run posts react chat/~host/channel 170.141.184... 👍
-  tlon-run --ship ~zod contacts self
+  tlon contacts list
+  tlon messages dm ~sampel-palnet --limit 10
+  tlon groups create "My Group" --description "A cool group"
+  tlon posts react chat/~host/channel 170.141.184... 👍
+  tlon --ship ~zod contacts self
+  tlon --config ~/ships/zod.json contacts self
+  tlon --url https://zod.tlon.network --ship ~zod --code abcd-efgh-ijkl-mnop contacts self
 `);
 }
 
 async function main() {
   const rawArgs = process.argv.slice(2);
 
-  // Handle --ship flag before command
+  // Parse credential flags before command
+  let urlOverride: string | null = null;
   let shipOverride: string | null = null;
+  let codeOverride: string | null = null;
+  let configOverride: string | null = null;
   const args: string[] = [];
+
   for (let i = 0; i < rawArgs.length; i += 1) {
     const arg = rawArgs[i];
+
+    // --config
+    if (arg === "--config" && rawArgs[i + 1]) {
+      configOverride = rawArgs[i + 1];
+      i += 1;
+      continue;
+    }
+    if (arg.startsWith("--config=")) {
+      configOverride = arg.split("=", 2)[1] || "";
+      continue;
+    }
+
+    // --url
+    if (arg === "--url" && rawArgs[i + 1]) {
+      urlOverride = rawArgs[i + 1];
+      i += 1;
+      continue;
+    }
+    if (arg.startsWith("--url=")) {
+      urlOverride = arg.split("=", 2)[1] || "";
+      continue;
+    }
+
+    // --ship
     if (arg === "--ship" && rawArgs[i + 1]) {
       shipOverride = rawArgs[i + 1];
       i += 1;
@@ -68,11 +110,40 @@ async function main() {
       shipOverride = arg.split("=", 2)[1] || "";
       continue;
     }
+
+    // --code
+    if (arg === "--code" && rawArgs[i + 1]) {
+      codeOverride = rawArgs[i + 1];
+      i += 1;
+      continue;
+    }
+    if (arg.startsWith("--code=")) {
+      codeOverride = arg.split("=", 2)[1] || "";
+      continue;
+    }
+
     args.push(arg);
   }
 
-  if (shipOverride) {
+  // Apply credential overrides
+  // Priority: --config > (--url + --ship + --code) > --ship alone
+  if (configOverride) {
+    // --config sets TLON_CONFIG_FILE for direct file loading
+    process.env.TLON_CONFIG_FILE = configOverride;
+  } else if (urlOverride && shipOverride && codeOverride) {
+    // All three flags: set URBIT_* env vars for direct use
+    process.env.URBIT_URL = urlOverride;
+    process.env.URBIT_SHIP = shipOverride.replace(/^~/, "");
+    process.env.URBIT_CODE = codeOverride;
+  } else if (shipOverride && !urlOverride && !codeOverride) {
+    // Only --ship: set TLON_SHIP for ships/ directory lookup
     process.env.TLON_SHIP = shipOverride.replace(/^~/, "");
+  } else if (urlOverride || codeOverride) {
+    // Partial flags (--url or --code without all three) - set what we have
+    // This allows merging with existing env vars
+    if (urlOverride) process.env.URBIT_URL = urlOverride;
+    if (shipOverride) process.env.URBIT_SHIP = shipOverride.replace(/^~/, "");
+    if (codeOverride) process.env.URBIT_CODE = codeOverride;
   }
 
   const command = args[0];
@@ -90,7 +161,7 @@ async function main() {
   // Rewrite process.argv so scripts see their args correctly
   // Scripts expect: [node, script, subcommand, ...args]
   const scriptArgs = args.slice(1);
-  process.argv = ["tlon-run", command, ...scriptArgs];
+  process.argv = ["tlon", command, ...scriptArgs];
 
   try {
     switch (command) {
@@ -137,7 +208,7 @@ async function main() {
       }
       default:
         console.error(`Unknown command: ${command}`);
-        console.error('Run "tlon-run --help" for usage information.');
+        console.error('Run "tlon --help" for usage information.');
         process.exit(1);
     }
   } catch (error: any) {
