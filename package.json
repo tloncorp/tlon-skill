@@ -4,7 +4,7 @@
   "description": "Tlon/Urbit skill for OpenClaw agents",
   "type": "module",
   "bin": {
-    "tlon-run": "./bin/tlon-run.js"
+    "tlon": "./bin/tlon.js"
   },
   "files": [
     "bin/",
