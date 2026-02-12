@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 /**
- * tlon-run - Unified CLI for Tlon/Urbit operations
+ * tlon - Unified CLI for Tlon/Urbit operations
  *
  * Usage:
- *   tlon-run [options] <command> <subcommand> [args...]
+ *   tlon [options] <command> <subcommand> [args...]
  *
  * Commands:
  *   activity     Activity/notifications (mentions, replies, all, unreads)
@@ -20,10 +20,10 @@
 const VERSION = "2.0.0";
 
 function printHelp() {
-  console.log(`tlon-run v${VERSION} - Tlon/Urbit CLI
+  console.log(`tlon v${VERSION} - Tlon/Urbit CLI
 
 Usage:
-  tlon-run [options] <command> <subcommand> [args...]
+  tlon [options] <command> <subcommand> [args...]
 
 Commands:
   activity     Activity/notifications (mentions, replies, all, unreads)
@@ -55,13 +55,13 @@ Config Resolution (first match wins):
   5. OpenClaw config (~/.openclaw/openclaw.yaml)
 
 Examples:
-  tlon-run contacts list
-  tlon-run messages dm ~sampel-palnet --limit 10
-  tlon-run groups create "My Group" --description "A cool group"
-  tlon-run posts react chat/~host/channel 170.141.184... 👍
-  tlon-run --ship ~zod contacts self
-  tlon-run --config ~/ships/zod.json contacts self
-  tlon-run --url https://zod.tlon.network --ship ~zod --code abcd-efgh-ijkl-mnop contacts self
+  tlon contacts list
+  tlon messages dm ~sampel-palnet --limit 10
+  tlon groups create "My Group" --description "A cool group"
+  tlon posts react chat/~host/channel 170.141.184... 👍
+  tlon --ship ~zod contacts self
+  tlon --config ~/ships/zod.json contacts self
+  tlon --url https://zod.tlon.network --ship ~zod --code abcd-efgh-ijkl-mnop contacts self
 `);
 }
 
@@ -161,7 +161,7 @@ async function main() {
   // Rewrite process.argv so scripts see their args correctly
   // Scripts expect: [node, script, subcommand, ...args]
   const scriptArgs = args.slice(1);
-  process.argv = ["tlon-run", command, ...scriptArgs];
+  process.argv = ["tlon", command, ...scriptArgs];
 
   try {
     switch (command) {
@@ -208,7 +208,7 @@ async function main() {
       }
       default:
         console.error(`Unknown command: ${command}`);
-        console.error('Run "tlon-run --help" for usage information.');
+        console.error('Run "tlon --help" for usage information.');
         process.exit(1);
     }
   } catch (error: any) {
