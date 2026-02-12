@@ -38,6 +38,10 @@ function getConfigFromOpenClaw(): UrbitConfig | null {
 
       const tlon = parsed?.channels?.tlon;
       if (tlon?.url && tlon?.ship && tlon?.code) {
+        // Skip if values look like unexpanded env var templates
+        if (tlon.url.includes("${") || tlon.ship.includes("${") || tlon.code.includes("${")) {
+          continue;
+        }
         return {
           url: tlon.url,
           ship: tlon.ship.replace(/^~/, ""),
