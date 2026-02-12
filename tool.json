@@ -1,6 +1,6 @@
 {
   "name": "tlon",
-  "description": "Tlon/Urbit API access. Use for checking activity, listing channels/groups, fetching message history, and looking up contacts.",
+  "description": "Tlon/Urbit API access. Use for checking activity, listing channels/groups, fetching message history, looking up contacts, and uploading images.",
   "command": "tlon-run",
   "parameters": {
     "type": "object",
@@ -23,6 +23,7 @@
     {"args": "groups info ~host-ship/group-slug"},
     {"args": "messages dm ~friend --limit 20"},
     {"args": "messages channel chat/~host/slug --limit 20"},
-    {"args": "--ship ~pinser-botter-nisrun-filnul activity mentions"}
+    {"args": "--ship ~pinser-botter-nisrun-filnul activity mentions"},
+    {"args": "upload https://example.com/image.png"}
   ]
 }
