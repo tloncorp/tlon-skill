@@ -17,7 +17,9 @@
  *   settings     OpenClaw settings management
  */
 
-const VERSION = "2.0.0";
+// Version is injected at build time via --define
+declare const __VERSION__: string;
+const VERSION = typeof __VERSION__ !== "undefined" ? __VERSION__ : "dev";
 
 function printHelp() {
   console.log(`tlon v${VERSION} - Tlon/Urbit CLI

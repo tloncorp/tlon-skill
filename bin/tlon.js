@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { chmodSync, existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,6 +14,7 @@ const PLATFORMS = {
   "darwin-arm64": "@tloncorp/tlon-skill-darwin-arm64",
   "darwin-x64": "@tloncorp/tlon-skill-darwin-x64",
   "linux-x64": "@tloncorp/tlon-skill-linux-x64",
+  "linux-arm64": "@tloncorp/tlon-skill-linux-arm64",
 };
 
 function getBinaryPath() {
@@ -34,22 +35,49 @@ function getBinaryPath() {
     process.exit(1);
   }
 
-  try {
-    // Try to resolve the platform-specific package
-    const packagePath = require.resolve(`${packageName}/package.json`);
-    const binaryPath = join(dirname(packagePath), "tlon");
-    
-    if (!existsSync(binaryPath)) {
-      throw new Error(`Binary not found at ${binaryPath}`);
+  // Try multiple resolution strategies
+  const searchPaths = [
+    // Strategy 1: resolve via require (works when installed normally)
+    () => {
+      try {
+        const packagePath = require.resolve(`${packageName}/package.json`);
+        return join(dirname(packagePath), "tlon");
+      } catch {
+        return null;
+      }
+    },
+    // Strategy 2: sibling in node_modules (when installed as dep of another package)
+    () => {
+      const sibling = join(__dirname, "..", "..", packageName, "tlon");
+      return existsSync(sibling) ? sibling : null;
+    },
+    // Strategy 3: up one more level (nested node_modules)
+    () => {
+      const nested = join(__dirname, "..", "..", "..", packageName, "tlon");
+      return existsSync(nested) ? nested : null;
+    },
+  ];
+
+  for (const search of searchPaths) {
+    const path = search();
+    if (path && existsSync(path)) {
+      // Ensure binary is executable
+      try {
+        chmodSync(path, 0o755);
+      } catch {
+        // Ignore chmod errors (might be read-only filesystem)
+      }
+      return path;
     }
-    
-    return binaryPath;
-  } catch (err) {
-    console.error(`Failed to find binary for ${platform}-${arch}`);
-    console.error(`Package ${packageName} may not be installed.`);
-    console.error(`Try: npm install ${packageName}`);
-    process.exit(1);
   }
+
+  console.error(`Failed to find binary for ${platform}-${arch}`);
+  console.error(`Package ${packageName} may not be installed.`);
+  console.error(`\nTried searching in:`);
+  console.error(`  - require.resolve('${packageName}/package.json')`);
+  console.error(`  - ${join(__dirname, "..", "..", packageName, "tlon")}`);
+  console.error(`\nTry: npm install ${packageName}`);
+  process.exit(1);
 }
 
 const binaryPath = getBinaryPath();
