@@ -34,7 +34,7 @@ async function getSettings(): Promise<Record<string, unknown>> {
 }
 
 async function putEntry(key: string, value: unknown): Promise<void> {
-  await poke({
+  await poke({ waitForAck: false,
     app: 'settings',
     mark: 'settings-event',
     json: {
@@ -50,7 +50,7 @@ async function putEntry(key: string, value: unknown): Promise<void> {
 }
 
 async function delEntry(key: string): Promise<void> {
-  await poke({
+  await poke({ waitForAck: false,
     app: 'settings',
     mark: 'settings-event',
     json: {

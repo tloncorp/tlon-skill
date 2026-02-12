@@ -110,7 +110,7 @@ async function updateProfile(updates: {
     throw new Error("No profile fields to update");
   }
 
-  await poke({
+  await poke({ waitForAck: false,
     app: "contacts",
     mark: "contact-action",
     json: { edit: editFields },
@@ -134,7 +134,7 @@ async function getSelf() {
 // Add a contact
 async function addContact(ship: string) {
   const normalizedShip = normalizeShip(ship);
-  await poke({
+  await poke({ waitForAck: false,
     app: "contacts",
     mark: "contact-action-1",
     json: { page: { kip: normalizedShip, contact: {} } },
@@ -145,7 +145,7 @@ async function addContact(ship: string) {
 // Remove a contact
 async function removeContact(ship: string) {
   const normalizedShip = normalizeShip(ship);
-  await poke({
+  await poke({ waitForAck: false,
     app: "contacts",
     mark: "contact-action-1",
     json: { wipe: [normalizedShip] },
