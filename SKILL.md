@@ -47,6 +47,26 @@ export URBIT_CODE="sampel-ticlyt-migfun-falmel"
 
 **Resolution order:** CLI flags → `TLON_CONFIG_FILE` → `TLON_SHIP`+`TLON_SKILL_DIR` → `URBIT_*` env vars → OpenClaw config
 
+## Multi-Ship Usage
+
+If you have credentials for multiple ships, you can use this skill to operate on behalf of any of them. This is useful for:
+
+- **Managing multiple identities** — switch between ships without changing environment variables
+- **Bot operations** — act as a bot ship while authenticated as yourself
+- **Moon management** — operate moons from their parent planet
+
+Simply pass the target ship's credentials via CLI flags:
+
+```bash
+# Post to a channel as ~other-ship
+tlon --url https://other-ship.tlon.network --ship ~other-ship --code their-access-code \
+  posts send chat/~host/channel "Hello from other-ship"
+
+# Or keep credentials in config files
+tlon --config ~/ships/bot.json channels groups
+tlon --config ~/ships/moon.json contacts self
+```
+
 ## Commands
 
 ### Activity

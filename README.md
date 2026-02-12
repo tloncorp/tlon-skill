@@ -49,6 +49,18 @@ export URBIT_CODE="sampel-ticlyt-migfun-falmel"
 
 If you have OpenClaw configured with a Tlon channel, credentials are loaded automatically.
 
+## Multi-Ship Usage
+
+If you have credentials for multiple ships, you can operate on behalf of any of them by passing their credentials via CLI flags. This is useful for managing multiple identities, bot operations, or moon management:
+
+```bash
+# Act as a different ship
+tlon --config ~/ships/bot.json channels groups
+
+# Or pass credentials directly
+tlon --url https://bot.tlon.network --ship ~bot-ship --code bot-code contacts self
+```
+
 ## Usage
 
 ```bash
