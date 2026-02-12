@@ -25,12 +25,27 @@ Replace `darwin-arm64` with `darwin-x64` or `linux-x64` as needed.
 
 ## Configuration
 
-Set environment variables:
+**CLI Flags (highest priority):**
+```bash
+# Pass all three credentials directly
+tlon --url https://your-ship.tlon.network --ship ~your-ship --code sampel-ticlyt-migfun-falmel <command>
+
+# Or load from a JSON config file
+tlon --config ~/ships/my-ship.json <command>
+```
+
+Config file format: `{"url": "...", "ship": "~...", "code": "..."}`
+
+**Environment Variables:**
 ```bash
 export URBIT_URL="https://your-ship.tlon.network"
 export URBIT_SHIP="~your-ship"
 export URBIT_CODE="sampel-ticlyt-migfun-falmel"
 ```
+
+**OpenClaw:** If configured with a Tlon channel, credentials load automatically.
+
+**Resolution order:** CLI flags → `TLON_CONFIG_FILE` → `TLON_SHIP`+`TLON_SKILL_DIR` → `URBIT_*` env vars → OpenClaw config
 
 ## Commands
 

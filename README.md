@@ -24,11 +24,30 @@ curl -L https://registry.npmjs.org/@tloncorp/tlon-skill-linux-x64/-/tlon-skill-l
 
 ## Configuration
 
+**Option 1: CLI flags (highest priority)**
+```bash
+# Pass credentials directly
+tlon --url https://your-ship.tlon.network --ship ~your-ship --code sampel-ticlyt-migfun-falmel contacts self
+
+# Or use a config file
+tlon --config ~/ships/my-ship.json contacts self
+```
+
+Config file format:
+```json
+{"url": "https://your-ship.tlon.network", "ship": "~your-ship", "code": "sampel-ticlyt-migfun-falmel"}
+```
+
+**Option 2: Environment variables**
 ```bash
 export URBIT_URL="https://your-ship.tlon.network"
 export URBIT_SHIP="~your-ship"
 export URBIT_CODE="sampel-ticlyt-migfun-falmel"
 ```
+
+**Option 3: OpenClaw config**
+
+If you have OpenClaw configured with a Tlon channel, credentials are loaded automatically.
 
 ## Usage
 
