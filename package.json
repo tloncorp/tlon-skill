@@ -8,6 +8,7 @@
   },
   "files": [
     "bin/",
+    "scripts/postinstall.js",
     "SKILL.md"
   ],
   "scripts": {
@@ -15,7 +16,8 @@
     "build:all": "node scripts/build-all.js",
     "dev:link": "bun run build:all && cp \"npm/$(node -e 'console.log(process.platform + \"-\" + process.arch)')/tlon\" bin/",
     "test": "bun test",
-    "version": "node scripts/bump-version.js"
+    "version": "node scripts/bump-version.js",
+    "postinstall": "node scripts/postinstall.js"
   },
   "optionalDependencies": {
     "@tloncorp/tlon-skill-darwin-arm64": "0.1.5",
