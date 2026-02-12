@@ -11,12 +11,16 @@
  */
 
 import { execSync } from "node:child_process";
-import { cpSync, mkdirSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
+
+// Read version from package.json
+const pkg = JSON.parse(readFileSync(join(rootDir, "package.json"), "utf-8"));
+const version = pkg.version;
 
 // Parse --target argument
 const targetArg = process.argv.find((arg) => arg.startsWith("--target="));
@@ -39,7 +43,7 @@ if (!bunTarget) {
   process.exit(1);
 }
 
-console.log(`Building for ${target} (bun target: ${bunTarget})...`);
+console.log(`Building tlon v${version} for ${target} (bun target: ${bunTarget})...`);
 
 // Build the binary
 const distDir = join(rootDir, "dist");
@@ -49,7 +53,7 @@ const binaryName = target.startsWith("win") ? "tlon.exe" : "tlon";
 const binaryPath = join(distDir, binaryName);
 
 execSync(
-  `bun build scripts/main.ts --compile --target=${bunTarget} --outfile ${binaryPath}`,
+  `bun build scripts/main.ts --compile --target=${bunTarget} --outfile ${binaryPath} --define __VERSION__='"${version}"'`,
   {
     cwd: rootDir,
     stdio: "inherit",
