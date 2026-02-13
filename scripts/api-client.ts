@@ -146,8 +146,7 @@ export function ensureClient(): UrbitConfig {
     configureClient({
       shipName: cfg.ship,
       shipUrl: cfg.url,
-      getCode: async () => cfg.code,
-      verbose: true
+      getCode: async () => cfg.code
     });
     initialized = true;
   }
