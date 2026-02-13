@@ -275,6 +275,7 @@ Examples:
     if (result) {
       console.log(JSON.stringify(result, null, 2));
     }
+    process.exit(0);
   } catch (error: any) {
     console.error(`Error: ${error.message}`);
     process.exit(1);

@@ -283,6 +283,7 @@ Examples:
   npx ts-node scripts/settings.ts set showModelSig true
 `);
     }
+    process.exit(0);
   } finally {
     // no-op: @tloncorp/api client is process-scoped
   }

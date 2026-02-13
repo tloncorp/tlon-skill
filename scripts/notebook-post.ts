@@ -111,6 +111,7 @@ Examples:
 
   if (result.success) {
     console.log(`✓ Posted successfully!`);
+    process.exit(0);
   } else {
     console.error(`✗ Failed: ${result.error}`);
     process.exit(1);

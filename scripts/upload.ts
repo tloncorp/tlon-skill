@@ -51,4 +51,5 @@ Examples:
 
   const uploadedUrl = await uploadImageFromUrl(url);
   console.log(uploadedUrl);
+  process.exit(0);
 }

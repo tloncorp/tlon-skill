@@ -290,6 +290,7 @@ Examples:
 `);
         process.exit(1);
     }
+    process.exit(0);
   } catch (error: any) {
     console.error(`Error: ${error.message}`);
     process.exit(1);

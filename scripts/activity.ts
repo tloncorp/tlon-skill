@@ -245,6 +245,7 @@ async function main() {
       console.log('  npx ts-node scripts/activity.ts unreads');
       process.exit(1);
   }
+  process.exit(0);
 }
 
 main().catch(console.error);

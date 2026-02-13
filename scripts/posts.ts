@@ -232,6 +232,7 @@ Use 'tlon messages channel <nest> --limit N' to see post IDs.
 `);
         process.exit(1);
     }
+    process.exit(0);
   } catch (error: any) {
     console.error(`Error: ${error.message}`);
     process.exit(1);
