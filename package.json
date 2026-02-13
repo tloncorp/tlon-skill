@@ -20,10 +20,10 @@
     "postinstall": "node scripts/postinstall.js"
   },
   "optionalDependencies": {
-    "@tloncorp/tlon-skill-darwin-arm64": "0.1.8",
-    "@tloncorp/tlon-skill-darwin-x64": "0.1.8",
-    "@tloncorp/tlon-skill-linux-x64": "0.1.8",
-    "@tloncorp/tlon-skill-linux-arm64": "0.1.8"
+    "@tloncorp/tlon-skill-darwin-arm64": "0.1.9",
+    "@tloncorp/tlon-skill-darwin-x64": "0.1.9",
+    "@tloncorp/tlon-skill-linux-x64": "0.1.9",
+    "@tloncorp/tlon-skill-linux-arm64": "0.1.9"
   },
   "devDependencies": {
     "@tloncorp/api": "git+https://github.com/tloncorp/api-beta.git#main",
