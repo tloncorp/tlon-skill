@@ -140,17 +140,32 @@ function loadConfigFile(filePath: string): UrbitConfig {
 
 /**
  * Set up subscriptions required for trackedPoke to receive acks.
+ * These must match the paths used by trackedPoke calls in @tloncorp/api.
  */
 async function setupSubscriptions(): Promise<void> {
   if (subscribed) return;
   
+  // groups mutations (createGroup, deleteGroup, updateGroupMeta, etc.)
   await subscribe(
     { app: 'groups', path: '/v1/groups' },
     () => {}
   );
   
+  // channel mutations (createChannel, updateChannel, deleteChannel, etc.)
   await subscribe(
     { app: 'channels', path: '/v2' },
+    () => {}
+  );
+  
+  // DM mutations (updateDMMeta)
+  await subscribe(
+    { app: 'chat', path: '/' },
+    () => {}
+  );
+  
+  // lanyard/attestation mutations (phone verify, twitter attestation, etc.)
+  await subscribe(
+    { app: 'lanyard', path: '/v1/records' },
     () => {}
   );
   
