@@ -49,7 +49,7 @@ import {
   updateGroupRole,
 } from "@tloncorp/api";
 import type { Group } from "@tloncorp/api";
-import { ensureClient, getCurrentShip, normalizeShip } from "./api-client";
+import { ensureClient, ensureConnectedClient, disconnectClient, getCurrentShip, normalizeShip } from "./api-client";
 
 // Generate a random short ID for the group
 function generateGroupSlug(): string {
@@ -144,6 +144,9 @@ async function getGroupInfo(groupId: string) {
 
 // Create a new group
 async function createGroupWithChannel(title: string, description: string = "") {
+  // Use connected client for mutations that require trackedPoke
+  await ensureConnectedClient();
+  
   const ship = getCurrentShip();
   const slug = generateGroupSlug();
   const groupId = `${ship}/${slug}`;
@@ -170,9 +173,13 @@ async function createGroupWithChannel(title: string, description: string = "") {
     ],
   };
 
-  await createGroup({
-    group,
-  });
+  try {
+    await createGroup({
+      group,
+    });
+  } finally {
+    disconnectClient();
+  }
 
   console.log(`✅ Group created successfully!`);
   console.log(`   ID: ${groupId}`);
@@ -431,6 +438,9 @@ async function addChannel(
   kind: "chat" | "diary" | "heap" = "chat",
   description: string = ""
 ) {
+  // Use connected client for mutations that require trackedPoke
+  await ensureConnectedClient();
+  
   const ship = getCurrentShip();
   const slug = generateGroupSlug();
   const name = slug;
@@ -450,30 +460,9 @@ async function addChannel(
       readers: [],
       writers: [],
     });
-  } catch (err: any) {
-    // @tloncorp/api uses tracked pokes that wait for subscription confirmation.
-    // Sometimes the confirmation times out even though the channel was created.
-    // Check if the channel exists before reporting failure.
-    const errStr = String(err);
-    const isTimeout = err.name === "TimeoutError" || err.timeoutDuration || errStr.includes("TimeoutError") || errStr.includes("timeout");
-    if (isTimeout) {
-      // Give the ship a moment to process
-      await new Promise((r) => setTimeout(r, 1000));
-      try {
-        const group = await getGroup(groupId);
-        const channelExists = (group.channels || []).some((ch) => ch.id === nest);
-        if (channelExists) {
-          console.log(`✅ Channel created!`);
-          console.log(`   Nest: ${nest}`);
-          console.log(`   Title: ${title}`);
-          console.log(`   Group: ${groupId}`);
-          return nest;
-        }
-      } catch {
-        // Verification failed, re-throw original error
-      }
-    }
-    throw err;
+  } finally {
+    // Clean up connection after mutation
+    disconnectClient();
   }
 
   console.log(`✅ Channel created!`);

@@ -6,7 +6,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { configureClient, preSig } from "@tloncorp/api";
+import { configureClient, preSig, Urbit } from "@tloncorp/api";
 
 export interface UrbitConfig {
   url: string;
@@ -15,7 +15,9 @@ export interface UrbitConfig {
 }
 
 let initialized = false;
+let connectedInitialized = false;
 let cachedConfig: UrbitConfig | null = null;
+let connectedUrbit: Urbit | null = null;
 
 /**
  * Try to read Tlon credentials from OpenClaw config
@@ -166,4 +168,54 @@ export function getCurrentShip(): string {
  */
 export function normalizeShip(ship: string): string {
   return preSig(ship);
+}
+
+/**
+ * Ensure @tloncorp/api client is configured with an active connection.
+ * Use this for mutations that require trackedPoke (subscriptions).
+ * 
+ * The connected client maintains an SSE subscription which allows
+ * trackedPoke to receive acknowledgments.
+ */
+export async function ensureConnectedClient(): Promise<UrbitConfig> {
+  const cfg = getConfig();
+  
+  if (!connectedInitialized) {
+    // Create and connect the Urbit client
+    connectedUrbit = new Urbit(cfg.url, cfg.code);
+    // Set ship identity (not typed but works at runtime)
+    (connectedUrbit as any).ship = cfg.ship;
+    
+    await connectedUrbit.connect();
+    
+    // Configure the API with the connected client
+    configureClient({
+      shipName: cfg.ship,
+      shipUrl: cfg.url,
+      getCode: async () => cfg.code,
+      client: connectedUrbit,
+    });
+    
+    connectedInitialized = true;
+    initialized = true; // Also mark as initialized for reads
+  }
+  
+  return cfg;
+}
+
+/**
+ * Disconnect the active client connection.
+ * Call this when done with mutations to clean up.
+ */
+export function disconnectClient(): void {
+  if (connectedUrbit) {
+    try {
+      // Reset the connection state
+      connectedUrbit.reset();
+    } catch {
+      // Ignore reset errors
+    }
+    connectedUrbit = null;
+    connectedInitialized = false;
+  }
 }
