@@ -14,7 +14,7 @@
 
 import { deleteChannel, getGroups, getInitData, updateChannel } from "@tloncorp/api";
 import type { Channel as ApiChannel, Group as ApiGroup } from "@tloncorp/api";
-import { disconnectClient, ensureClient, ensureConnectedClient, getCurrentShip } from "./api-client";
+import { ensureClient, getCurrentShip } from "./api-client";
 
 // Get DMs
 async function getDms() {
@@ -158,9 +158,6 @@ async function updateChannelMeta(
   nest: string,
   options: { title?: string; description?: string }
 ) {
-  // Use connected client for mutations that require trackedPoke
-  await ensureConnectedClient();
-
   const match = await findChannelGroup(nest);
   if (!match) {
     throw new Error(`Channel ${nest} not found in any group`);
@@ -190,16 +187,11 @@ async function updateChannelMeta(
 
   console.log(`Updating channel ${nest}...`);
 
-  try {
-    await updateChannel({
-      groupId: group.id,
-      channelId: nest,
-      channel: channelUpdate,
-    });
-  } finally {
-    // Clean up connection after mutation
-    disconnectClient();
-  }
+  await updateChannel({
+    groupId: group.id,
+    channelId: nest,
+    channel: channelUpdate,
+  });
 
   console.log(`✅ Channel updated.`);
   console.log(`   Title: ${channelUpdate.meta.title}`);
@@ -208,9 +200,6 @@ async function updateChannelMeta(
 
 // Delete a channel
 async function deleteChannelByNest(nest: string) {
-  // Use connected client for mutations that require trackedPoke
-  await ensureConnectedClient();
-
   const match = await findChannelGroup(nest);
   if (!match) {
     throw new Error(`Channel ${nest} not found in any group`);
@@ -218,15 +207,10 @@ async function deleteChannelByNest(nest: string) {
 
   console.log(`Deleting channel ${nest} from group ${match.group.id}...`);
 
-  try {
-    await deleteChannel({
-      groupId: match.group.id,
-      channelId: nest,
-    });
-  } finally {
-    // Clean up connection after mutation
-    disconnectClient();
-  }
+  await deleteChannel({
+    groupId: match.group.id,
+    channelId: nest,
+  });
 
   console.log(`✅ Channel deleted.`);
 }

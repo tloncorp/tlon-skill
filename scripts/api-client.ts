@@ -15,6 +15,7 @@ export interface UrbitConfig {
 }
 
 let initialized = false;
+let subscribed = false;
 let cachedConfig: UrbitConfig | null = null;
 
 /**
@@ -138,7 +139,26 @@ function loadConfigFile(filePath: string): UrbitConfig {
 }
 
 /**
- * Ensure @tloncorp/api client is configured and connected
+ * Set up subscriptions required for trackedPoke to receive acks.
+ */
+async function setupSubscriptions(): Promise<void> {
+  if (subscribed) return;
+  
+  await subscribe(
+    { app: 'groups', path: '/v1/groups' },
+    () => {}
+  );
+  
+  await subscribe(
+    { app: 'channels', path: '/v2' },
+    () => {}
+  );
+  
+  subscribed = true;
+}
+
+/**
+ * Ensure @tloncorp/api client is configured, connected, and subscribed.
  */
 export async function ensureClient(): Promise<UrbitConfig> {
   const cfg = getConfig();
@@ -148,6 +168,7 @@ export async function ensureClient(): Promise<UrbitConfig> {
       shipUrl: cfg.url,
       getCode: async () => cfg.code
     });
+    await setupSubscriptions();
     initialized = true;
   }
   return cfg;
@@ -166,39 +187,4 @@ export async function getCurrentShip(): Promise<string> {
  */
 export function normalizeShip(ship: string): string {
   return preSig(ship);
-}
-
-let subscribed = false;
-
-/**
- * Disconnect the client (no-op, kept for API compatibility).
- * The shared client persists across operations.
- */
-export function disconnectClient(): void {
-  // No-op: we use a shared client that persists
-}
-
-/**
- * Ensure @tloncorp/api client is configured with an active connection
- * and subscribed to paths required for trackedPoke.
- */
-export async function ensureConnectedClient(): Promise<UrbitConfig> {
-  const cfg = await ensureClient();
-  
-  if (!subscribed) {
-    // Subscribe to paths required for trackedPoke to receive acks
-    await subscribe(
-      { app: 'groups', path: '/v1/groups' },
-      () => {}
-    );
-    
-    await subscribe(
-      { app: 'channels', path: '/v2' },
-      () => {}
-    );
-    
-    subscribed = true;
-  }
-  
-  return cfg;
 }

@@ -49,7 +49,7 @@ import {
   updateGroupRole,
 } from "@tloncorp/api";
 import type { Group } from "@tloncorp/api";
-import { ensureClient, ensureConnectedClient, disconnectClient, getCurrentShip, normalizeShip } from "./api-client";
+import { ensureClient, getCurrentShip, normalizeShip } from "./api-client";
 
 // Generate a random short ID for the group
 function generateGroupSlug(): string {
@@ -144,9 +144,6 @@ async function getGroupInfo(groupId: string) {
 
 // Create a new group
 async function createGroupWithChannel(title: string, description: string = "") {
-  // Use connected client for mutations that require trackedPoke
-  await ensureConnectedClient();
-  
   const ship = await getCurrentShip();
   const slug = generateGroupSlug();
   const groupId = `${ship}/${slug}`;
@@ -173,13 +170,9 @@ async function createGroupWithChannel(title: string, description: string = "") {
     ],
   };
 
-  try {
-    await createGroup({
-      group,
-    });
-  } finally {
-    disconnectClient();
-  }
+  await createGroup({
+    group,
+  });
 
   console.log(`✅ Group created successfully!`);
   console.log(`   ID: ${groupId}`);
@@ -223,9 +216,7 @@ async function joinGroupById(groupId: string) {
 
 // Delete a group (must be host)
 async function deleteGroupById(groupId: string) {
-  // Use connected client for mutations that require trackedPoke
-  await ensureConnectedClient();
-  
+  await ensureClient();
   console.log(`Deleting group ${groupId}...`);
 
   await deleteGroup(groupId);
@@ -441,9 +432,6 @@ async function addChannel(
   kind: "chat" | "diary" | "heap" = "chat",
   description: string = ""
 ) {
-  // Use connected client for mutations that require trackedPoke
-  await ensureConnectedClient();
-  
   const ship = await getCurrentShip();
   const slug = generateGroupSlug();
   const name = slug;
@@ -451,22 +439,17 @@ async function addChannel(
 
   console.log(`Adding channel "${title}" to group ${groupId}...`);
 
-  try {
-    await createChannel({
-      id: nest,
-      kind,
-      group: groupId,
-      name,
-      title,
-      description,
-      meta: null,
-      readers: [],
-      writers: [],
-    });
-  } finally {
-    // Clean up connection after mutation
-    disconnectClient();
-  }
+  await createChannel({
+    id: nest,
+    kind,
+    group: groupId,
+    name,
+    title,
+    description,
+    meta: null,
+    readers: [],
+    writers: [],
+  });
 
   console.log(`✅ Channel created!`);
   console.log(`   Nest: ${nest}`);
