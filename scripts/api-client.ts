@@ -172,38 +172,33 @@ export function normalizeShip(ship: string): string {
 
 /**
  * Parse just the cookie key=value from a full Set-Cookie header.
- * The Set-Cookie header includes attributes like "Path=/; Max-Age=..." 
- * but we only want to send "urbauth-~ship=value" in subsequent requests.
+ * Workaround for @tloncorp/api bug that stores full header including attributes.
  */
 function parseCookieValue(setCookieHeader: string): string {
-  // Take everything before the first semicolon
   return setCookieHeader.split(';')[0].trim();
 }
 
 /**
  * Ensure @tloncorp/api client is configured with an active connection
  * and subscribed to paths required for trackedPoke.
- * 
- * The connected client maintains SSE subscriptions which allow
- * trackedPoke to receive acknowledgments for mutations.
  */
 export async function ensureConnectedClient(): Promise<UrbitConfig> {
   const cfg = getConfig();
   
   if (!connectedInitialized) {
-    // Create and connect the Urbit client
+    // Create and connect our own Urbit client so we can fix the cookie
     connectedUrbit = new Urbit(cfg.url, cfg.code);
     connectedUrbit.nodeId = preSig(cfg.ship);
     
     await connectedUrbit.connect();
     
-    // Fix: @tloncorp/api stores full Set-Cookie header but should only store key=value
-    // This causes auth failures because "Path=/; Max-Age=..." gets sent as part of Cookie header
+    // Fix: @tloncorp/api stores full Set-Cookie header but Cookie request header
+    // should only contain key=value, not "Path=/; Max-Age=..." attributes
     if (connectedUrbit.cookie) {
       connectedUrbit.cookie = parseCookieValue(connectedUrbit.cookie);
     }
     
-    // Configure the API with the connected client
+    // Configure the API with our fixed client
     configureClient({
       shipName: cfg.ship,
       shipUrl: cfg.url,
@@ -212,20 +207,18 @@ export async function ensureConnectedClient(): Promise<UrbitConfig> {
     });
     
     // Subscribe to paths required for trackedPoke to receive acks
-    // Groups subscription - for group mutations
     await subscribe(
       { app: 'groups', path: '/v1/groups' },
-      () => {} // We don't need to handle events, just need the subscription active
+      () => {}
     );
     
-    // Channels subscription - for channel mutations
     await subscribe(
       { app: 'channels', path: '/v2' },
-      () => {} // We don't need to handle events, just need the subscription active
+      () => {}
     );
     
     connectedInitialized = true;
-    initialized = true; // Also mark as initialized for reads
+    initialized = true;
   }
   
   return cfg;
@@ -233,12 +226,10 @@ export async function ensureConnectedClient(): Promise<UrbitConfig> {
 
 /**
  * Disconnect the active client connection.
- * Call this when done with mutations to clean up.
  */
 export function disconnectClient(): void {
   if (connectedUrbit) {
     try {
-      // Reset the connection state
       connectedUrbit.reset();
     } catch {
       // Ignore reset errors
