@@ -26,7 +26,7 @@
     "@tloncorp/tlon-skill-linux-arm64": "0.1.9"
   },
   "devDependencies": {
-    "@tloncorp/api": "git+https://github.com/tloncorp/api-beta.git#main",
+    "@tloncorp/api": "git+https://github.com/tloncorp/api-beta.git#hm/fix-cookie-parsing",
     "@urbit/aura": "^3.0.0",
     "@types/node": "^22.0.0",
     "typescript": "^5.9.3"
