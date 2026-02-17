@@ -6,7 +6,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { configureClient, preSig, Urbit } from "@tloncorp/api";
+import { configureClient, preSig, subscribe, Urbit } from "@tloncorp/api";
 
 export interface UrbitConfig {
   url: string;
@@ -171,11 +171,11 @@ export function normalizeShip(ship: string): string {
 }
 
 /**
- * Ensure @tloncorp/api client is configured with an active connection.
- * Use this for mutations that require trackedPoke (subscriptions).
+ * Ensure @tloncorp/api client is configured with an active connection
+ * and subscribed to paths required for trackedPoke.
  * 
- * The connected client maintains an SSE subscription which allows
- * trackedPoke to receive acknowledgments.
+ * The connected client maintains SSE subscriptions which allow
+ * trackedPoke to receive acknowledgments for mutations.
  */
 export async function ensureConnectedClient(): Promise<UrbitConfig> {
   const cfg = getConfig();
@@ -195,6 +195,19 @@ export async function ensureConnectedClient(): Promise<UrbitConfig> {
       getCode: async () => cfg.code,
       client: connectedUrbit,
     });
+    
+    // Subscribe to paths required for trackedPoke to receive acks
+    // Groups subscription - for group mutations
+    await subscribe(
+      { app: 'groups', path: '/v1/groups' },
+      () => {} // We don't need to handle events, just need the subscription active
+    );
+    
+    // Channels subscription - for channel mutations
+    await subscribe(
+      { app: 'channels', path: '/v2' },
+      () => {} // We don't need to handle events, just need the subscription active
+    );
     
     connectedInitialized = true;
     initialized = true; // Also mark as initialized for reads
