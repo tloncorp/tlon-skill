@@ -29,7 +29,7 @@ async function getDms() {
 
 // Get group DMs (clubs)
 async function getGroupDms() {
-  const currentShip = getCurrentShip();
+  const currentShip = await getCurrentShip();
   const init = await getInitData();
   const groupDms = init.channels.filter((channel) => channel.type === "groupDm");
 
@@ -232,7 +232,7 @@ async function deleteChannelByNest(nest: string) {
 }
 
 async function getGroupsApi(): Promise<ApiGroup[]> {
-  ensureClient();
+  await ensureClient();
   return getGroups();
 }
 
@@ -249,7 +249,7 @@ async function main() {
   const command = args[0];
 
   try {
-    ensureClient();
+    await ensureClient();
     switch (command) {
       case "dms": {
         const dms = await getDms();

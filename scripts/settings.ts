@@ -131,7 +131,7 @@ async function main() {
   const [,, command, ...args] = process.argv;
   
   try {
-    ensureClient();
+    await ensureClient();
     switch (command) {
       case 'get': {
         const settings = await getSettings();

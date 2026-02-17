@@ -47,7 +47,7 @@ Examples:
     process.exit(url ? 0 : 1);
   }
 
-  ensureClient();
+  await ensureClient();
 
   const uploadedUrl = await uploadImageFromUrl(url);
   console.log(uploadedUrl);

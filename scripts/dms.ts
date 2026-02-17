@@ -216,7 +216,7 @@ async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
 
-  ensureClient();
+  await ensureClient();
 
   switch (command) {
     case "send": {

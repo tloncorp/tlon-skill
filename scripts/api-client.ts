@@ -6,7 +6,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { configureClient, preSig, subscribe, Urbit } from "@tloncorp/api";
+import { configureClient, preSig, subscribe } from "@tloncorp/api";
 
 export interface UrbitConfig {
   url: string;
@@ -15,9 +15,7 @@ export interface UrbitConfig {
 }
 
 let initialized = false;
-let connectedInitialized = false;
 let cachedConfig: UrbitConfig | null = null;
-let connectedUrbit: Urbit | null = null;
 
 /**
  * Try to read Tlon credentials from OpenClaw config
@@ -140,12 +138,12 @@ function loadConfigFile(filePath: string): UrbitConfig {
 }
 
 /**
- * Ensure @tloncorp/api client is configured
+ * Ensure @tloncorp/api client is configured and connected
  */
-export function ensureClient(): UrbitConfig {
+export async function ensureClient(): Promise<UrbitConfig> {
   const cfg = getConfig();
   if (!initialized) {
-    configureClient({
+    await configureClient({
       shipName: cfg.ship,
       shipUrl: cfg.url,
       getCode: async () => cfg.code
@@ -158,8 +156,8 @@ export function ensureClient(): UrbitConfig {
 /**
  * Get current ship name (with ~)
  */
-export function getCurrentShip(): string {
-  const cfg = ensureClient();
+export async function getCurrentShip(): Promise<string> {
+  const cfg = await ensureClient();
   return preSig(cfg.ship);
 }
 
@@ -170,12 +168,14 @@ export function normalizeShip(ship: string): string {
   return preSig(ship);
 }
 
+let subscribed = false;
+
 /**
- * Parse just the cookie key=value from a full Set-Cookie header.
- * Workaround for @tloncorp/api bug that stores full header including attributes.
+ * Disconnect the client (no-op, kept for API compatibility).
+ * The shared client persists across operations.
  */
-function parseCookieValue(setCookieHeader: string): string {
-  return setCookieHeader.split(';')[0].trim();
+export function disconnectClient(): void {
+  // No-op: we use a shared client that persists
 }
 
 /**
@@ -183,29 +183,9 @@ function parseCookieValue(setCookieHeader: string): string {
  * and subscribed to paths required for trackedPoke.
  */
 export async function ensureConnectedClient(): Promise<UrbitConfig> {
-  const cfg = getConfig();
+  const cfg = await ensureClient();
   
-  if (!connectedInitialized) {
-    // Create and connect our own Urbit client so we can fix the cookie
-    connectedUrbit = new Urbit(cfg.url, cfg.code);
-    connectedUrbit.nodeId = preSig(cfg.ship);
-    
-    await connectedUrbit.connect();
-    
-    // Fix: @tloncorp/api stores full Set-Cookie header but Cookie request header
-    // should only contain key=value, not "Path=/; Max-Age=..." attributes
-    if (connectedUrbit.cookie) {
-      connectedUrbit.cookie = parseCookieValue(connectedUrbit.cookie);
-    }
-    
-    // Configure the API with our fixed client
-    configureClient({
-      shipName: cfg.ship,
-      shipUrl: cfg.url,
-      getCode: async () => cfg.code,
-      client: connectedUrbit,
-    });
-    
+  if (!subscribed) {
     // Subscribe to paths required for trackedPoke to receive acks
     await subscribe(
       { app: 'groups', path: '/v1/groups' },
@@ -217,24 +197,8 @@ export async function ensureConnectedClient(): Promise<UrbitConfig> {
       () => {}
     );
     
-    connectedInitialized = true;
-    initialized = true;
+    subscribed = true;
   }
   
   return cfg;
-}
-
-/**
- * Disconnect the active client connection.
- */
-export function disconnectClient(): void {
-  if (connectedUrbit) {
-    try {
-      connectedUrbit.reset();
-    } catch {
-      // Ignore reset errors
-    }
-    connectedUrbit = null;
-    connectedInitialized = false;
-  }
 }

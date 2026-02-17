@@ -147,7 +147,7 @@ async function createGroupWithChannel(title: string, description: string = "") {
   // Use connected client for mutations that require trackedPoke
   await ensureConnectedClient();
   
-  const ship = getCurrentShip();
+  const ship = await getCurrentShip();
   const slug = generateGroupSlug();
   const groupId = `${ship}/${slug}`;
   const channelSlug = `${slug}-general`;
@@ -223,6 +223,9 @@ async function joinGroupById(groupId: string) {
 
 // Delete a group (must be host)
 async function deleteGroupById(groupId: string) {
+  // Use connected client for mutations that require trackedPoke
+  await ensureConnectedClient();
+  
   console.log(`Deleting group ${groupId}...`);
 
   await deleteGroup(groupId);
@@ -441,7 +444,7 @@ async function addChannel(
   // Use connected client for mutations that require trackedPoke
   await ensureConnectedClient();
   
-  const ship = getCurrentShip();
+  const ship = await getCurrentShip();
   const slug = generateGroupSlug();
   const name = slug;
   const nest = `${kind}/${ship}/${name}`;
@@ -486,7 +489,7 @@ async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
 
-  ensureClient();
+  await ensureClient();
 
   switch (command) {
     case "list":
