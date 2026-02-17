@@ -171,6 +171,16 @@ export function normalizeShip(ship: string): string {
 }
 
 /**
+ * Parse just the cookie key=value from a full Set-Cookie header.
+ * The Set-Cookie header includes attributes like "Path=/; Max-Age=..." 
+ * but we only want to send "urbauth-~ship=value" in subsequent requests.
+ */
+function parseCookieValue(setCookieHeader: string): string {
+  // Take everything before the first semicolon
+  return setCookieHeader.split(';')[0].trim();
+}
+
+/**
  * Ensure @tloncorp/api client is configured with an active connection
  * and subscribed to paths required for trackedPoke.
  * 
@@ -183,10 +193,15 @@ export async function ensureConnectedClient(): Promise<UrbitConfig> {
   if (!connectedInitialized) {
     // Create and connect the Urbit client
     connectedUrbit = new Urbit(cfg.url, cfg.code);
-    // Set ship identity (not typed but works at runtime)
-    (connectedUrbit as any).ship = cfg.ship;
+    connectedUrbit.nodeId = preSig(cfg.ship);
     
     await connectedUrbit.connect();
+    
+    // Fix: @tloncorp/api stores full Set-Cookie header but should only store key=value
+    // This causes auth failures because "Path=/; Max-Age=..." gets sent as part of Cookie header
+    if (connectedUrbit.cookie) {
+      connectedUrbit.cookie = parseCookieValue(connectedUrbit.cookie);
+    }
     
     // Configure the API with the connected client
     configureClient({
