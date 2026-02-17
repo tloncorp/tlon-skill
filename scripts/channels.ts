@@ -14,7 +14,7 @@
 
 import { deleteChannel, getGroups, getInitData, updateChannel } from "@tloncorp/api";
 import type { Channel as ApiChannel, Group as ApiGroup } from "@tloncorp/api";
-import { ensureClient, getCurrentShip } from "./api-client";
+import { disconnectClient, ensureClient, ensureConnectedClient, getCurrentShip } from "./api-client";
 
 // Get DMs
 async function getDms() {
@@ -158,7 +158,8 @@ async function updateChannelMeta(
   nest: string,
   options: { title?: string; description?: string }
 ) {
-  ensureClient();
+  // Use connected client for mutations that require trackedPoke
+  await ensureConnectedClient();
 
   const match = await findChannelGroup(nest);
   if (!match) {
@@ -189,11 +190,16 @@ async function updateChannelMeta(
 
   console.log(`Updating channel ${nest}...`);
 
-  await updateChannel({
-    groupId: group.id,
-    channelId: nest,
-    channel: channelUpdate,
-  });
+  try {
+    await updateChannel({
+      groupId: group.id,
+      channelId: nest,
+      channel: channelUpdate,
+    });
+  } finally {
+    // Clean up connection after mutation
+    disconnectClient();
+  }
 
   console.log(`✅ Channel updated.`);
   console.log(`   Title: ${channelUpdate.meta.title}`);
@@ -202,7 +208,8 @@ async function updateChannelMeta(
 
 // Delete a channel
 async function deleteChannelByNest(nest: string) {
-  ensureClient();
+  // Use connected client for mutations that require trackedPoke
+  await ensureConnectedClient();
 
   const match = await findChannelGroup(nest);
   if (!match) {
@@ -211,10 +218,15 @@ async function deleteChannelByNest(nest: string) {
 
   console.log(`Deleting channel ${nest} from group ${match.group.id}...`);
 
-  await deleteChannel({
-    groupId: match.group.id,
-    channelId: nest,
-  });
+  try {
+    await deleteChannel({
+      groupId: match.group.id,
+      channelId: nest,
+    });
+  } finally {
+    // Clean up connection after mutation
+    disconnectClient();
+  }
 
   console.log(`✅ Channel deleted.`);
 }
