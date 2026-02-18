@@ -64,7 +64,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          # No registry-url - using OIDC provenance for auth
+          registry-url: "https://registry.npmjs.org"
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -79,8 +79,10 @@ jobs:
             chmod +x npm/$target/tlon
           done
 
-      # Pure OIDC trusted publishing (no token needed)
+      # Pure OIDC trusted publishing - explicitly unset any stale token
       - name: Publish platform packages
+        env:
+          NODE_AUTH_TOKEN: ""
         run: |
           for target in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
             echo "Publishing @tloncorp/tlon-skill-$target..."
@@ -90,4 +92,6 @@ jobs:
           done
 
       - name: Publish main package
+        env:
+          NODE_AUTH_TOKEN: ""
         run: npm publish --access public --provenance
