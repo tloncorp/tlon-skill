@@ -79,31 +79,40 @@ jobs:
             chmod +x npm/$target/tlon
           done
 
-      # Use token if provided (for bootstrapping), otherwise OIDC
+      # Try OIDC first (trusted publishing), fall back to NPM_TOKEN
       - name: Publish platform packages
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN_FALLBACK: ${{ secrets.NPM_TOKEN }}
         run: |
-          PROVENANCE=""
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "No NPM_TOKEN, using OIDC with provenance"
-            PROVENANCE="--provenance"
-          else
-            echo "Using NPM_TOKEN"
-          fi
           for target in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
             echo "Publishing @tloncorp/tlon-skill-$target..."
             cd npm/$target
-            npm publish --access public $PROVENANCE
+            
+            # Try OIDC first
+            if npm publish --access public --provenance 2>/dev/null; then
+              echo "✓ Published with OIDC provenance"
+            elif [ -n "$NPM_TOKEN_FALLBACK" ]; then
+              echo "OIDC failed, trying NPM_TOKEN..."
+              NODE_AUTH_TOKEN="$NPM_TOKEN_FALLBACK" npm publish --access public
+            else
+              echo "OIDC failed and no NPM_TOKEN fallback"
+              exit 1
+            fi
+            
             cd ../..
           done
 
       - name: Publish main package
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN_FALLBACK: ${{ secrets.NPM_TOKEN }}
         run: |
-          PROVENANCE=""
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            PROVENANCE="--provenance"
+          # Try OIDC first
+          if npm publish --access public --provenance 2>/dev/null; then
+            echo "✓ Published with OIDC provenance"
+          elif [ -n "$NPM_TOKEN_FALLBACK" ]; then
+            echo "OIDC failed, trying NPM_TOKEN..."
+            NODE_AUTH_TOKEN="$NPM_TOKEN_FALLBACK" npm publish --access public
+          else
+            echo "OIDC failed and no NPM_TOKEN fallback"
+            exit 1
           fi
-          npm publish --access public $PROVENANCE
