@@ -1,6 +1,6 @@
 {
   "name": "@tloncorp/tlon-skill",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Tlon/Urbit skill for OpenClaw agents",
   "type": "module",
   "bin": {
@@ -20,13 +20,13 @@
     "postinstall": "node scripts/postinstall.js"
   },
   "optionalDependencies": {
-    "@tloncorp/tlon-skill-darwin-arm64": "0.1.9",
-    "@tloncorp/tlon-skill-darwin-x64": "0.1.9",
-    "@tloncorp/tlon-skill-linux-x64": "0.1.9",
-    "@tloncorp/tlon-skill-linux-arm64": "0.1.9"
+    "@tloncorp/tlon-skill-darwin-arm64": "0.1.10",
+    "@tloncorp/tlon-skill-darwin-x64": "0.1.10",
+    "@tloncorp/tlon-skill-linux-x64": "0.1.10",
+    "@tloncorp/tlon-skill-linux-arm64": "0.1.10"
   },
   "devDependencies": {
-    "@tloncorp/api": "git+https://github.com/tloncorp/api-beta.git#hm/fix-cookie-parsing",
+    "@tloncorp/api": "git+https://github.com/tloncorp/api-beta.git#v0.0.2",
     "@urbit/aura": "^3.0.0",
     "@types/node": "^22.0.0",
     "typescript": "^5.9.3"
