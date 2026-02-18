@@ -29,7 +29,7 @@ async function getDms() {
 
 // Get group DMs (clubs)
 async function getGroupDms() {
-  const currentShip = getCurrentShip();
+  const currentShip = await getCurrentShip();
   const init = await getInitData();
   const groupDms = init.channels.filter((channel) => channel.type === "groupDm");
 
@@ -158,8 +158,6 @@ async function updateChannelMeta(
   nest: string,
   options: { title?: string; description?: string }
 ) {
-  ensureClient();
-
   const match = await findChannelGroup(nest);
   if (!match) {
     throw new Error(`Channel ${nest} not found in any group`);
@@ -202,8 +200,6 @@ async function updateChannelMeta(
 
 // Delete a channel
 async function deleteChannelByNest(nest: string) {
-  ensureClient();
-
   const match = await findChannelGroup(nest);
   if (!match) {
     throw new Error(`Channel ${nest} not found in any group`);
@@ -220,7 +216,7 @@ async function deleteChannelByNest(nest: string) {
 }
 
 async function getGroupsApi(): Promise<ApiGroup[]> {
-  ensureClient();
+  await ensureClient();
   return getGroups();
 }
 
@@ -237,7 +233,7 @@ async function main() {
   const command = args[0];
 
   try {
-    ensureClient();
+    await ensureClient();
     switch (command) {
       case "dms": {
         const dms = await getDms();

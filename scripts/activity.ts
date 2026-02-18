@@ -142,7 +142,7 @@ function formatEvent(event: ActivityEvent): string {
 
 async function getActivity(bucket: 'all' | 'mentions' | 'replies', limit: number = 10) {
   // Initialize client (validates env vars)
-  ensureClient();
+  await ensureClient();
 
   const { events } = await getInitialActivity();
   const bucketEvents = events
@@ -168,7 +168,7 @@ async function getActivity(bucket: 'all' | 'mentions' | 'replies', limit: number
 
 async function getUnreads() {
   // Initialize client (validates env vars)
-  ensureClient();
+  await ensureClient();
 
   const activity = await getGroupAndChannelUnreads();
 

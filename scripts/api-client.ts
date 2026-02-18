@@ -6,7 +6,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { configureClient, preSig } from "@tloncorp/api";
+import { configureClient, preSig, subscribe } from "@tloncorp/api";
 
 export interface UrbitConfig {
   url: string;
@@ -15,6 +15,7 @@ export interface UrbitConfig {
 }
 
 let initialized = false;
+let subscribed = false;
 let cachedConfig: UrbitConfig | null = null;
 
 /**
@@ -138,16 +139,51 @@ function loadConfigFile(filePath: string): UrbitConfig {
 }
 
 /**
- * Ensure @tloncorp/api client is configured
+ * Set up subscriptions required for trackedPoke to receive acks.
+ * These must match the paths used by trackedPoke calls in @tloncorp/api.
  */
-export function ensureClient(): UrbitConfig {
+async function setupSubscriptions(): Promise<void> {
+  if (subscribed) return;
+  
+  // groups mutations (createGroup, deleteGroup, updateGroupMeta, etc.)
+  await subscribe(
+    { app: 'groups', path: '/v1/groups' },
+    () => {}
+  );
+  
+  // channel mutations (createChannel, updateChannel, deleteChannel, etc.)
+  await subscribe(
+    { app: 'channels', path: '/v2' },
+    () => {}
+  );
+  
+  // DM mutations (updateDMMeta)
+  await subscribe(
+    { app: 'chat', path: '/' },
+    () => {}
+  );
+  
+  // lanyard/attestation mutations (phone verify, twitter attestation, etc.)
+  await subscribe(
+    { app: 'lanyard', path: '/v1/records' },
+    () => {}
+  );
+  
+  subscribed = true;
+}
+
+/**
+ * Ensure @tloncorp/api client is configured, connected, and subscribed.
+ */
+export async function ensureClient(): Promise<UrbitConfig> {
   const cfg = getConfig();
   if (!initialized) {
-    configureClient({
+    await configureClient({
       shipName: cfg.ship,
       shipUrl: cfg.url,
       getCode: async () => cfg.code
     });
+    await setupSubscriptions();
     initialized = true;
   }
   return cfg;
@@ -156,8 +192,8 @@ export function ensureClient(): UrbitConfig {
 /**
  * Get current ship name (with ~)
  */
-export function getCurrentShip(): string {
-  const cfg = ensureClient();
+export async function getCurrentShip(): Promise<string> {
+  const cfg = await ensureClient();
   return preSig(cfg.ship);
 }
 

@@ -106,7 +106,7 @@ Examples:
   console.log(`Title: ${title}`);
   if (image) console.log(`Image: ${image}`);
 
-  ensureClient();
+  await ensureClient();
   const result = await postToNotebook(nest, title, content, image);
 
   if (result.success) {

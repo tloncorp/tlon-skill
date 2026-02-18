@@ -172,7 +172,7 @@ async function main() {
   const command = args[0];
 
   try {
-    ensureClient();
+    await ensureClient();
     let result: any;
 
     switch (command) {
