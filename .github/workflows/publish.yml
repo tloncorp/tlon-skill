@@ -89,7 +89,7 @@ jobs:
             cd npm/$target
             
             # Try OIDC first
-            if npm publish --access public --provenance 2>/dev/null; then
+            if npm publish --access public --provenance; then
               echo "✓ Published with OIDC provenance"
             elif [ -n "$NPM_TOKEN_FALLBACK" ]; then
               echo "OIDC failed, trying NPM_TOKEN..."
@@ -107,7 +107,7 @@ jobs:
           NPM_TOKEN_FALLBACK: ${{ secrets.NPM_TOKEN }}
         run: |
           # Try OIDC first
-          if npm publish --access public --provenance 2>/dev/null; then
+          if npm publish --access public --provenance; then
             echo "✓ Published with OIDC provenance"
           elif [ -n "$NPM_TOKEN_FALLBACK" ]; then
             echo "OIDC failed, trying NPM_TOKEN..."
