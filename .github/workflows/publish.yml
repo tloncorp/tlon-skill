@@ -64,7 +64,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          registry-url: "https://registry.npmjs.org"
+          # No registry-url - using OIDC provenance for auth
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -79,40 +79,15 @@ jobs:
             chmod +x npm/$target/tlon
           done
 
-      # Try OIDC first (trusted publishing), fall back to NPM_TOKEN
+      # Pure OIDC trusted publishing (no token needed)
       - name: Publish platform packages
-        env:
-          NPM_TOKEN_FALLBACK: ${{ secrets.NPM_TOKEN }}
         run: |
           for target in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
             echo "Publishing @tloncorp/tlon-skill-$target..."
             cd npm/$target
-            
-            # Try OIDC first
-            if npm publish --access public --provenance; then
-              echo "✓ Published with OIDC provenance"
-            elif [ -n "$NPM_TOKEN_FALLBACK" ]; then
-              echo "OIDC failed, trying NPM_TOKEN..."
-              NODE_AUTH_TOKEN="$NPM_TOKEN_FALLBACK" npm publish --access public
-            else
-              echo "OIDC failed and no NPM_TOKEN fallback"
-              exit 1
-            fi
-            
+            npm publish --access public --provenance
             cd ../..
           done
 
       - name: Publish main package
-        env:
-          NPM_TOKEN_FALLBACK: ${{ secrets.NPM_TOKEN }}
-        run: |
-          # Try OIDC first
-          if npm publish --access public --provenance; then
-            echo "✓ Published with OIDC provenance"
-          elif [ -n "$NPM_TOKEN_FALLBACK" ]; then
-            echo "OIDC failed, trying NPM_TOKEN..."
-            NODE_AUTH_TOKEN="$NPM_TOKEN_FALLBACK" npm publish --access public
-          else
-            echo "OIDC failed and no NPM_TOKEN fallback"
-            exit 1
-          fi
+        run: npm publish --access public --provenance
