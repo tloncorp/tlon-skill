@@ -183,11 +183,11 @@ Manage channel posts (reactions, edits, deletes).
 tlon posts react chat/~host/slug 170.141... "👍"         # React to a post
 tlon posts unreact chat/~host/slug 170.141...            # Remove reaction
 tlon posts edit chat/~host/slug 170.141... "New text"    # Edit with plain text
-tlon posts edit diary/~host/slug 170.141... --title "T" --content rich.json  # Edit with rich Story JSON
+tlon posts edit diary/~host/slug 170.141... --title "T" --image <url> --content rich.json  # Edit notebook
 tlon posts delete chat/~host/slug 170.141...             # Delete a post
 ```
 
-The `--content <file>` option accepts Story JSON for rich formatting (headers, code blocks, bold, etc.) — useful for notebook/diary posts.
+Edit options for notebooks: `--title`, `--image` (cover URL), `--content` (Story JSON file for rich formatting).
 
 ### Notebook
 
@@ -199,7 +199,7 @@ tlon notebook diary/~host/slug "Title" --content rich.json  # Post with Story JS
 tlon notebook diary/~host/slug "Title" --image <url>     # Post with cover image
 ```
 
-The `--content` file should be Story JSON format (array of verses with headers, code blocks, formatting). See [Story format docs](https://developers.urbit.org/reference/hoon/rune/tis/tis#story).
+The `--content` file should be Story JSON format (array of verses with headers, code blocks, formatting). See the [Story types in tlon-apps](https://github.com/tloncorp/tlon-apps/blob/develop/packages/shared/src/urbit/content.ts).
 
 ### Upload
 

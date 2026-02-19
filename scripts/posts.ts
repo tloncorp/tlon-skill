@@ -199,17 +199,26 @@ async function main() {
         const postId = args[2];
         const titleIdx = args.indexOf("--title");
         const contentIdx = args.indexOf("--content");
+        const imageIdx = args.indexOf("--image");
         
         // Find where flags start
         let flagStart = args.length;
         if (titleIdx !== -1 && titleIdx < flagStart) flagStart = titleIdx;
         if (contentIdx !== -1 && contentIdx < flagStart) flagStart = contentIdx;
+        if (imageIdx !== -1 && imageIdx < flagStart) flagStart = imageIdx;
         
         const title = titleIdx !== -1 ? args[titleIdx + 1] : undefined;
         const contentFile = contentIdx !== -1 ? args[contentIdx + 1] : undefined;
+        const image = imageIdx !== -1 ? args[imageIdx + 1] : undefined;
+        
+        // Build metadata object
+        const metadata: { title?: string; image?: string } = {};
+        if (title) metadata.title = title;
+        if (image) metadata.image = image;
+        const hasMetadata = Object.keys(metadata).length > 0;
         
         if (!channel || !postId) {
-          console.error("Usage: posts.ts edit <channel> <post-id> [message] [--title <title>] [--content <json-file>]");
+          console.error("Usage: posts.ts edit <channel> <post-id> [message] [--title <title>] [--image <url>] [--content <json-file>]");
           process.exit(1);
         }
 
@@ -218,15 +227,15 @@ async function main() {
           // Rich content from JSON file
           const jsonContent = fs.readFileSync(contentFile, "utf-8");
           const content = JSON.parse(jsonContent) as Story;
-          result = await editChannelPostWithContent(channel, postId, content, title ? { title } : undefined);
+          result = await editChannelPostWithContent(channel, postId, content, hasMetadata ? metadata : undefined);
         } else {
           // Plain text/markdown message
           const message = args.slice(3, flagStart).join(" ");
           if (!message) {
-            console.error("Usage: posts.ts edit <channel> <post-id> <message> [--title <title>] [--content <json-file>]");
+            console.error("Usage: posts.ts edit <channel> <post-id> <message> [--title <title>] [--image <url>] [--content <json-file>]");
             process.exit(1);
           }
-          result = await editChannelPost(channel, postId, message, title ? { title } : undefined);
+          result = await editChannelPost(channel, postId, message, hasMetadata ? metadata : undefined);
         }
         
         if (!result.success) {
@@ -273,19 +282,20 @@ Note: Sending and replying to posts is handled by the Tlon channel plugin.
 Commands:
   react <channel> <post-id> <emoji>     React to a post with an emoji
   unreact <channel> <post-id>           Remove your reaction from a post
-  edit <channel> <post-id> <message>    Edit a post [--title <t>] [--content <json>]
+  edit <channel> <post-id> <message>    Edit a post [--title <t>] [--image <url>] [--content <json>]
   delete <channel> <post-id>            Delete a post
 
 Edit options:
   --title <title>      Set/update notebook post title
+  --image <url>        Set/update cover image (notebooks)
   --content <file>     Use Story JSON file for rich content (notebooks)
 
 Examples:
   # Edit with plain text
   tlon posts edit chat/~host/channel 170.141... "Updated message"
   
-  # Edit notebook with rich Story JSON
-  tlon posts edit diary/~host/notes 170.141... --title "New Title" --content article.json
+  # Edit notebook with rich Story JSON and new cover image
+  tlon posts edit diary/~host/notes 170.141... --title "New Title" --image https://example.com/cover.jpg --content article.json
 
 Channel format: chat/~host/channel-name, diary/~host/name, heap/~host/name
 Use 'tlon messages channel <nest> --limit N' to see post IDs.
