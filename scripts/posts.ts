@@ -14,6 +14,7 @@
  * Channel format: chat/~host/channel-name, diary/~host/channel-name, heap/~host/channel-name
  */
 
+import * as fs from "fs";
 import { addReaction, deletePost, editPost, getCurrentUserId, removeReaction } from "@tloncorp/api";
 import { ensureClient } from "./api-client";
 import { markdownToStory, type Story } from "./story";
@@ -114,6 +115,32 @@ async function editChannelPost(
   }
 }
 
+// Edit a post with pre-parsed Story content (for rich notebook editing)
+async function editChannelPostWithContent(
+  nest: string,
+  postId: string,
+  content: Story,
+  metadata?: { title?: string; image?: string; description?: string; cover?: string }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const authorId = getCurrentUserId();
+    const sentAt = Date.now();
+
+    await editPost({
+      channelId: nest,
+      postId: formatUd(extractNumericId(postId)),
+      authorId,
+      sentAt,
+      content,
+      metadata,
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
 // Delete a post
 // Note: postId must be in @da format (e.g., "170.141.184.507.800.833.818.237.178.278.053.937.152")
 async function deleteChannelPost(
@@ -171,15 +198,37 @@ async function main() {
         const channel = args[1];
         const postId = args[2];
         const titleIdx = args.indexOf("--title");
-        const messageEndIdx = titleIdx !== -1 ? titleIdx : args.length;
-        const message = args.slice(3, messageEndIdx).join(" ");
-        if (!channel || !postId || !message) {
-          console.error("Usage: posts.ts edit <channel> <post-id> <new-message> [--title <title>]");
+        const contentIdx = args.indexOf("--content");
+        
+        // Find where flags start
+        let flagStart = args.length;
+        if (titleIdx !== -1 && titleIdx < flagStart) flagStart = titleIdx;
+        if (contentIdx !== -1 && contentIdx < flagStart) flagStart = contentIdx;
+        
+        const title = titleIdx !== -1 ? args[titleIdx + 1] : undefined;
+        const contentFile = contentIdx !== -1 ? args[contentIdx + 1] : undefined;
+        
+        if (!channel || !postId) {
+          console.error("Usage: posts.ts edit <channel> <post-id> [message] [--title <title>] [--content <json-file>]");
           process.exit(1);
         }
-        const title = titleIdx !== -1 ? args[titleIdx + 1] : undefined;
 
-        const result = await editChannelPost(channel, postId, message, title ? { title } : undefined);
+        let result;
+        if (contentFile) {
+          // Rich content from JSON file
+          const jsonContent = fs.readFileSync(contentFile, "utf-8");
+          const content = JSON.parse(jsonContent) as Story;
+          result = await editChannelPostWithContent(channel, postId, content, title ? { title } : undefined);
+        } else {
+          // Plain text/markdown message
+          const message = args.slice(3, flagStart).join(" ");
+          if (!message) {
+            console.error("Usage: posts.ts edit <channel> <post-id> <message> [--title <title>] [--content <json-file>]");
+            process.exit(1);
+          }
+          result = await editChannelPost(channel, postId, message, title ? { title } : undefined);
+        }
+        
         if (!result.success) {
           console.error(`Error: ${result.error}`);
           process.exit(1);
@@ -224,8 +273,19 @@ Note: Sending and replying to posts is handled by the Tlon channel plugin.
 Commands:
   react <channel> <post-id> <emoji>     React to a post with an emoji
   unreact <channel> <post-id>           Remove your reaction from a post
-  edit <channel> <post-id> <message>    Edit a post [--title <t> for notebooks]
+  edit <channel> <post-id> <message>    Edit a post [--title <t>] [--content <json>]
   delete <channel> <post-id>            Delete a post
+
+Edit options:
+  --title <title>      Set/update notebook post title
+  --content <file>     Use Story JSON file for rich content (notebooks)
+
+Examples:
+  # Edit with plain text
+  tlon posts edit chat/~host/channel 170.141... "Updated message"
+  
+  # Edit notebook with rich Story JSON
+  tlon posts edit diary/~host/notes 170.141... --title "New Title" --content article.json
 
 Channel format: chat/~host/channel-name, diary/~host/name, heap/~host/name
 Use 'tlon messages channel <nest> --limit N' to see post IDs.
