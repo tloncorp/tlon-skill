@@ -15,7 +15,8 @@
  */
 
 import * as fs from "fs";
-import { addReaction, deletePost, editPost, getCurrentUserId, removeReaction } from "@tloncorp/api";
+import { addReaction, deletePost, editPost, getChannelPosts, getCurrentUserId, removeReaction } from "@tloncorp/api";
+import type { Post } from "@tloncorp/api";
 import { ensureClient } from "./api-client";
 import { markdownToStory, type Story } from "./story";
 
@@ -39,6 +40,29 @@ function formatUd(id: string): string {
 // Parse content into Story format with rich markdown support
 function parseContent(message: string): Story {
   return markdownToStory(message);
+}
+
+// Fetch existing post to preserve metadata during edits
+async function fetchExistingPost(
+  nest: string,
+  postId: string
+): Promise<Post | null> {
+  const formattedId = formatUd(extractNumericId(postId));
+  try {
+    const data = await getChannelPosts({
+      channelId: nest,
+      mode: "around",
+      cursor: formattedId,
+      count: 1,
+      includeReplies: false,
+    });
+    
+    // Find the exact post by ID
+    const post = data.posts.find(p => formatUd(extractNumericId(p.id)) === formattedId);
+    return post || null;
+  } catch (error) {
+    return null;
+  }
 }
 
 // React to a post
@@ -207,27 +231,32 @@ async function main() {
         if (contentIdx !== -1 && contentIdx < flagStart) flagStart = contentIdx;
         if (imageIdx !== -1 && imageIdx < flagStart) flagStart = imageIdx;
         
-        const title = titleIdx !== -1 ? args[titleIdx + 1] : undefined;
+        const newTitle = titleIdx !== -1 ? args[titleIdx + 1] : undefined;
         const contentFile = contentIdx !== -1 ? args[contentIdx + 1] : undefined;
-        const image = imageIdx !== -1 ? args[imageIdx + 1] : undefined;
-        
-        // Build metadata object
-        const metadata: { title?: string; image?: string } = {};
-        if (title) metadata.title = title;
-        if (image) metadata.image = image;
-        const hasMetadata = Object.keys(metadata).length > 0;
+        const newImage = imageIdx !== -1 ? args[imageIdx + 1] : undefined;
         
         if (!channel || !postId) {
           console.error("Usage: posts.ts edit <channel> <post-id> [message] [--title <title>] [--image <url>] [--content <json-file>]");
           process.exit(1);
         }
 
+        // Fetch existing post to preserve metadata not being explicitly changed
+        const existingPost = await fetchExistingPost(channel, postId);
+        
+        // Merge: new values override existing, existing values preserved if not specified
+        const metadata: { title?: string; image?: string; description?: string; cover?: string } = {
+          title: newTitle ?? existingPost?.title ?? undefined,
+          image: newImage ?? existingPost?.image ?? undefined,
+          description: existingPost?.description ?? undefined,
+          cover: existingPost?.cover ?? undefined,
+        };
+
         let result;
         if (contentFile) {
           // Rich content from JSON file
           const jsonContent = fs.readFileSync(contentFile, "utf-8");
           const content = JSON.parse(jsonContent) as Story;
-          result = await editChannelPostWithContent(channel, postId, content, hasMetadata ? metadata : undefined);
+          result = await editChannelPostWithContent(channel, postId, content, metadata);
         } else {
           // Plain text/markdown message
           const message = args.slice(3, flagStart).join(" ");
@@ -235,7 +264,7 @@ async function main() {
             console.error("Usage: posts.ts edit <channel> <post-id> <message> [--title <title>] [--image <url>] [--content <json-file>]");
             process.exit(1);
           }
-          result = await editChannelPost(channel, postId, message, hasMetadata ? metadata : undefined);
+          result = await editChannelPost(channel, postId, message, metadata);
         }
         
         if (!result.success) {
