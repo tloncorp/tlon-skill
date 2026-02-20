@@ -79,17 +79,7 @@ jobs:
             chmod +x npm/$target/tlon
           done
 
-      # Remove setup-node's .npmrc (it has stale token), let npm use pure OIDC
-      - name: Configure npm for OIDC
-        run: |
-          rm -f /home/runner/work/_temp/.npmrc
-          echo "registry=https://registry.npmjs.org/" > ~/.npmrc
-        env:
-          NPM_CONFIG_USERCONFIG: ""
-
       - name: Publish platform packages
-        env:
-          NPM_CONFIG_USERCONFIG: ""
         run: |
           for target in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
             echo "Publishing @tloncorp/tlon-skill-$target..."
@@ -99,6 +89,4 @@ jobs:
           done
 
       - name: Publish main package
-        env:
-          NPM_CONFIG_USERCONFIG: ""
         run: npm publish --access public --provenance
