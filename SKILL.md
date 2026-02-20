@@ -1,6 +1,6 @@
 ---
 name: tlon
-description: Interact with Tlon/Urbit API. Use for contacts (get/update profiles), listing channels/groups, fetching message history, posting to channels, sending DMs, and group management.
+description: Interact with Tlon/Urbit API. Use for contacts (get/update profiles), listing channels/groups, fetching message history, posting to channels, sending DMs, group management, and exposing content to the clearweb.
 ---
 
 # Tlon Skill
@@ -174,6 +174,24 @@ tlon dms delete ~sampel ~author/170.141...               # Delete a DM
 tlon dms accept ~sampel                                  # Accept DM invite
 tlon dms decline ~sampel                                 # Decline DM invite
 ```
+
+### Expose
+
+Publish Tlon content to the clearweb via the %expose agent.
+
+```bash
+tlon expose list                                         # List all exposed content
+tlon expose show chat/~host/slug/170.141...              # Expose a post publicly
+tlon expose hide chat/~host/slug/170.141...              # Hide an exposed post
+tlon expose check diary/~host/blog/170.141...            # Check if a post is exposed
+tlon expose url diary/~host/blog/170.141...              # Get the public URL
+```
+
+Cite path formats:
+- Simplified: `chat/~host/channel/170.141...` (auto-expands)
+- Full: `/1/chan/chat/~host/channel/msg/170.141...`
+
+Channel kinds map to content types: chat→msg, diary→note, heap→curio
 
 ### Posts
 

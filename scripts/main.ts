@@ -32,6 +32,7 @@ Commands:
   channels     Channel listing and management (dms, groups, all, info, update, delete)
   contacts     Contact/profile management (list, get, self, sync, add, remove, update-profile)
   dms          Direct message operations (send, reply, react, unreact, delete, accept, decline)
+  expose       Manage public content exposure (list, show, hide, check, url)
   groups       Group management (list, create, info, invite, join, leave, delete, ...)
   messages     Message history and search (dm, channel, history, search)
   notebook     Post to diary/notebook channels
@@ -181,6 +182,10 @@ async function main() {
       }
       case "dms": {
         const mod = await import("./dms");
+        break;
+      }
+      case "expose": {
+        const mod = await import("./expose");
         break;
       }
       case "groups": {
