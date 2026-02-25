@@ -10,9 +10,21 @@
  *   npx ts-node channels.ts info <nest>   # Get channel info
  *   npx ts-node channels.ts update <nest> --title "..." [--description "..."]
  *   npx ts-node channels.ts delete <nest> # Delete a channel (must be group admin)
+ *   npx ts-node channels.ts add-writers <nest> <role1> [role2...]
+ *   npx ts-node channels.ts del-writers <nest> <role1> [role2...]
+ *   npx ts-node channels.ts add-readers <group-flag> <nest> <role1> [role2...]
+ *   npx ts-node channels.ts del-readers <group-flag> <nest> <role1> [role2...]
  */
 
-import { deleteChannel, getGroups, getInitData, updateChannel } from "@tloncorp/api";
+import {
+  addChannelWriters as apiAddWriters,
+  deleteChannel,
+  getGroups,
+  getInitData,
+  poke,
+  removeChannelWriters as apiRemoveWriters,
+  updateChannel,
+} from "@tloncorp/api";
 import type { Channel as ApiChannel, Group as ApiGroup } from "@tloncorp/api";
 import { ensureClient, getCurrentShip } from "./api-client";
 
@@ -227,6 +239,66 @@ function findChannelSectionId(group: ApiGroup, channelId: string): string {
   return section?.sectionId || "default";
 }
 
+// Add writers to a channel
+async function addWriters(nest: string, roles: string[]) {
+  console.log(`Adding writers to ${nest}: ${roles.join(", ")}...`);
+  await apiAddWriters({ channelId: nest, writers: roles });
+  console.log(`✅ Writers added: ${roles.join(", ")}`);
+}
+
+// Remove writers from a channel
+async function removeWriters(nest: string, roles: string[]) {
+  console.log(`Removing writers from ${nest}: ${roles.join(", ")}...`);
+  await apiRemoveWriters({ channelId: nest, writers: roles });
+  console.log(`✅ Writers removed: ${roles.join(", ")}`);
+}
+
+// Add readers to a channel (requires group context)
+async function addReaders(groupFlag: string, nest: string, roles: string[]) {
+  console.log(`Adding readers to ${nest} in group ${groupFlag}: ${roles.join(", ")}...`);
+  await poke({
+    app: "groups",
+    mark: "group-action-4",
+    json: {
+      group: {
+        flag: groupFlag,
+        "a-group": {
+          channel: {
+            nest,
+            "a-channel": {
+              "add-readers": roles,
+            },
+          },
+        },
+      },
+    },
+  });
+  console.log(`✅ Readers added: ${roles.join(", ")}`);
+}
+
+// Remove readers from a channel (requires group context)
+async function removeReaders(groupFlag: string, nest: string, roles: string[]) {
+  console.log(`Removing readers from ${nest} in group ${groupFlag}: ${roles.join(", ")}...`);
+  await poke({
+    app: "groups",
+    mark: "group-action-4",
+    json: {
+      group: {
+        flag: groupFlag,
+        "a-group": {
+          channel: {
+            nest,
+            "a-channel": {
+              "del-readers": roles,
+            },
+          },
+        },
+      },
+    },
+  });
+  console.log(`✅ Readers removed: ${roles.join(", ")}`);
+}
+
 // CLI
 async function main() {
   const args = process.argv.slice(2);
@@ -304,6 +376,56 @@ async function main() {
         break;
       }
 
+      case "add-writers": {
+        const nest = args[1];
+        const roles = args.slice(2);
+        if (!nest || roles.length === 0) {
+          console.error("Usage: channels.ts add-writers <nest> <role1> [role2...]");
+          console.error("Example: channels.ts add-writers chat/~host/slug admin");
+          process.exit(1);
+        }
+        await addWriters(nest, roles);
+        break;
+      }
+
+      case "del-writers": {
+        const nest = args[1];
+        const roles = args.slice(2);
+        if (!nest || roles.length === 0) {
+          console.error("Usage: channels.ts del-writers <nest> <role1> [role2...]");
+          console.error("Example: channels.ts del-writers chat/~host/slug member");
+          process.exit(1);
+        }
+        await removeWriters(nest, roles);
+        break;
+      }
+
+      case "add-readers": {
+        const groupFlag = args[1];
+        const nest = args[2];
+        const roles = args.slice(3);
+        if (!groupFlag || !nest || roles.length === 0) {
+          console.error("Usage: channels.ts add-readers <group-flag> <nest> <role1> [role2...]");
+          console.error("Example: channels.ts add-readers ~host/group chat/~host/slug admin");
+          process.exit(1);
+        }
+        await addReaders(groupFlag, nest, roles);
+        break;
+      }
+
+      case "del-readers": {
+        const groupFlag = args[1];
+        const nest = args[2];
+        const roles = args.slice(3);
+        if (!groupFlag || !nest || roles.length === 0) {
+          console.error("Usage: channels.ts del-readers <group-flag> <nest> <role1> [role2...]");
+          console.error("Example: channels.ts del-readers ~host/group chat/~host/slug admin");
+          process.exit(1);
+        }
+        await removeReaders(groupFlag, nest, roles);
+        break;
+      }
+
       default:
         console.log(`Usage: channels.ts <command>
 
@@ -315,6 +437,12 @@ Commands:
   info <nest>        Get channel info
   update <nest>      Update channel --title "..." [--description "..."]
   delete <nest>      Delete a channel (must be group admin)
+
+Permissions:
+  add-writers <nest> <role1> [role2...]                     Add write access
+  del-writers <nest> <role1> [role2...]                     Remove write access
+  add-readers <group-flag> <nest> <role1> [role2...]        Restrict viewing
+  del-readers <group-flag> <nest> <role1> [role2...]        Open viewing
 `);
         process.exit(1);
     }

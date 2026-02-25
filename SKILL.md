@@ -92,7 +92,21 @@ tlon channels all                                          # List everything
 tlon channels info chat/~host/slug                         # Get channel details
 tlon channels update chat/~host/slug --title "New Title"   # Update metadata
 tlon channels delete chat/~host/slug                       # Delete a channel
+
+# Writers (who can post)
+tlon channels add-writers chat/~host/slug admin member     # Add write access
+tlon channels del-writers chat/~host/slug member           # Remove write access
+
+# Readers (who can view - requires group flag)
+tlon channels add-readers ~host/group chat/~host/slug admin    # Restrict viewing
+tlon channels del-readers ~host/group chat/~host/slug admin    # Open viewing
 ```
+
+Notes on permissions:
+- Empty writers list = anyone in the group can post (default for chat)
+- Empty readers list = anyone in the group can view (default)
+- Diaries default to admin-only writers
+- Roles must exist in the group (use `tlon groups add-role` first)
 
 ### Contacts
 
