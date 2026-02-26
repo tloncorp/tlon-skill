@@ -200,12 +200,26 @@ async function editHook(
   id: string,
   options: { name?: string; srcPath?: string }
 ): Promise<void> {
-  const edit: Record<string, any> = { id };
-  
-  if (options.name) {
-    edit.name = options.name;
+  if (!options.name && !options.srcPath) {
+    console.error("Error: At least one of --name or --src is required");
+    process.exit(1);
   }
-  
+
+  const hooks = await scry<Hooks>({ app: "channels-server", path: "/v0/hooks" });
+  const existing = hooks.hooks[id];
+
+  if (!existing) {
+    console.error(`Hook not found: ${id}`);
+    process.exit(1);
+  }
+
+  const edit: Record<string, any> = {
+    id,
+    name: options.name ?? existing.name,
+    meta: existing.meta ?? {},
+    src: existing.src,
+  };
+
   if (options.srcPath) {
     if (!fs.existsSync(options.srcPath)) {
       console.error(`Source file not found: ${options.srcPath}`);
@@ -213,16 +227,11 @@ async function editHook(
     }
     edit.src = fs.readFileSync(options.srcPath, "utf-8");
   }
-  
-  if (!options.name && !options.srcPath) {
-    console.error("Error: At least one of --name or --src is required");
-    process.exit(1);
-  }
-  
+
   console.log(`Editing hook ${id}...`);
-  
+
   await pokeAndWaitForHooksUpdate("edit", { edit });
-  
+
   console.log(`✅ Hook ${id} updated.`);
 }
 
