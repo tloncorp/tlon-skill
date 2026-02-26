@@ -34,6 +34,7 @@ import {
   createGroup,
   deleteGroup,
   deleteGroupRole,
+  getContacts,
   getCurrentUserId,
   getGroup,
   getGroups,
@@ -85,9 +86,35 @@ async function listGroups() {
   }
 }
 
+// Build a map of ship -> nickname from contacts
+async function buildNicknameMap(): Promise<Map<string, string>> {
+  const nicknameMap = new Map<string, string>();
+  try {
+    const contacts = await getContacts();
+    for (const contact of contacts) {
+      const nickname = contact.nickname ?? contact.peerNickname;
+      if (nickname) {
+        nicknameMap.set(contact.id, nickname);
+      }
+    }
+  } catch {
+    // Contacts unavailable, continue without nicknames
+  }
+  return nicknameMap;
+}
+
+// Format a ship with optional nickname
+function formatShipWithNickname(ship: string, nicknameMap: Map<string, string>): string {
+  const nickname = nicknameMap.get(ship);
+  return nickname ? `${ship} (${nickname})` : ship;
+}
+
 // Get info about a specific group
 async function getGroupInfo(groupId: string) {
-  const group = await getGroup(groupId);
+  const [group, nicknameMap] = await Promise.all([
+    getGroup(groupId),
+    buildNicknameMap(),
+  ]);
 
   console.log(`\n=== ${group.title || groupId} ===\n`);
   console.log(`ID: ${groupId}`);
@@ -102,7 +129,8 @@ async function getGroupInfo(groupId: string) {
   for (const member of group.members || []) {
     const roles = (member.roles || []).map((r) => r.roleId);
     const roleList = roles.length > 0 ? ` [${roles.join(", ")}]` : "";
-    console.log(`  ${member.contactId}${roleList}`);
+    const displayName = formatShipWithNickname(member.contactId, nicknameMap);
+    console.log(`  ${displayName}${roleList}`);
   }
 
   if (group.roles && group.roles.length > 0) {
@@ -123,21 +151,21 @@ async function getGroupInfo(groupId: string) {
   if (group.pendingMembers && group.pendingMembers.length > 0) {
     console.log("\n--- Pending Invites ---");
     for (const member of group.pendingMembers) {
-      console.log(`  ${member.contactId}`);
+      console.log(`  ${formatShipWithNickname(member.contactId, nicknameMap)}`);
     }
   }
 
   if (group.joinRequests && group.joinRequests.length > 0) {
     console.log("\n--- Join Requests ---");
     for (const request of group.joinRequests) {
-      console.log(`  ${request.contactId}`);
+      console.log(`  ${formatShipWithNickname(request.contactId, nicknameMap)}`);
     }
   }
 
   if (group.bannedMembers && group.bannedMembers.length > 0) {
     console.log("\n--- Banned Ships ---");
     for (const ban of group.bannedMembers) {
-      console.log(`  ${ban.contactId}`);
+      console.log(`  ${formatShipWithNickname(ban.contactId, nicknameMap)}`);
     }
   }
 }
