@@ -160,6 +160,37 @@ tlon groups add-channel ~host/slug "Name" [--kind chat|diary|heap]
 
 Group format: `~host-ship/group-slug`
 
+### Hooks
+
+Manage channel hooks — functions that run on triggers (posts, replies, reactions, crons).
+
+```bash
+# List and inspect
+tlon hooks list                                          # List all hooks
+tlon hooks get 0v1a.2b3c4                                # Get hook details and source
+
+# Manage hooks
+tlon hooks add my-hook ./hook.hoon                       # Add a new hook from file
+tlon hooks edit 0v1a.2b3c4 --name "New Name"             # Rename a hook
+tlon hooks edit 0v1a.2b3c4 --src ./updated.hoon          # Update source
+tlon hooks delete 0v1a.2b3c4                             # Delete a hook
+
+# Configure for channels
+tlon hooks order chat/~host/slug 0v1a 0v2b 0v3c          # Set execution order
+tlon hooks config 0v1a chat/~host/slug key1=val1         # Configure hook instance
+
+# Scheduled execution
+tlon hooks cron 0v1a ~h1                                 # Run hourly (global)
+tlon hooks cron 0v1a ~m30 --nest chat/~host/slug         # Run every 30m for channel
+tlon hooks rest 0v1a                                     # Stop cron job
+```
+
+Notes:
+- Hook IDs are @uv format (e.g., `0v1a.2b3c4...`)
+- Schedules use @dr format: `~h1` (1 hour), `~m30` (30 minutes), `~d1` (1 day)
+- Hooks run in order when triggered; use `order` to set priority
+- Use `config` to pass channel-specific settings to a hook instance
+
 ### Messages
 
 Read and search message history.
