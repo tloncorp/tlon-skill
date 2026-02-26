@@ -15,7 +15,6 @@
  *   npx ts-node scripts/hooks.ts config <id> <nest> <key=value...> # Configure for channel
  *   npx ts-node scripts/hooks.ts cron <id> <schedule> [--nest]     # Schedule periodic run
  *   npx ts-node scripts/hooks.ts rest <id> [--nest]                # Stop a cron job
- *   npx ts-node scripts/hooks.ts watch [--seconds 60]             # Watch hook events/errors
  */
 
 import * as fs from "fs";
@@ -51,25 +50,54 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function watchHooks(seconds: number = 60): Promise<void> {
-  console.log(`Watching hooks updates for ${seconds}s...`);
-  const subId = await subscribe<any>({ app: "channels-server", path: "/v0/hooks" }, (update) => {
-    console.log("\n[hooks update]");
-    console.log(JSON.stringify(update, null, 2));
+async function pokeAndWaitForHooksUpdate(
+  actionName: string,
+  json: Record<string, any>,
+  timeoutMs: number = 5000
+): Promise<void> {
+  let settled = false;
+  let resolveUpdate: ((value: any) => void) | null = null;
 
-    const text = JSON.stringify(update).toLowerCase();
-    if (text.includes("error") || text.includes("fail") || text.includes("compile")) {
-      console.log("[hooks watch] ⚠️ possible error/compile issue detected");
-    }
+  const waitForUpdate = new Promise<any>((resolve) => {
+    resolveUpdate = resolve;
   });
 
+  const subId = await subscribe<any>(
+    { app: "channels-server", path: "/v0/hooks" },
+    (update) => {
+      if (settled) return;
+      settled = true;
+      resolveUpdate?.(update);
+    }
+  );
+
   try {
-    await sleep(seconds * 1000);
+    await poke({
+      app: "channels-server",
+      mark: "hook-action-0",
+      json,
+    });
+
+    const timeoutPromise = sleep(timeoutMs).then(() => ({ __timeout: true }));
+    const result = await Promise.race([waitForUpdate, timeoutPromise]);
+
+    if (result?.__timeout) {
+      console.log(`⚠️ ${actionName} sent, but timed out waiting for hooks update (${timeoutMs}ms).`);
+      return;
+    }
+
+    console.log(`[hooks update] ${JSON.stringify(result, null, 2)}`);
+
+    const text = JSON.stringify(result).toLowerCase();
+    if (text.includes("error") || text.includes("fail") || text.includes("compile")) {
+      console.log("⚠️ Update may contain an error/compile issue.");
+    }
   } finally {
+    settled = true;
     await unsubscribe(subId);
-    console.log("Stopped hooks watch.");
   }
 }
+
 // List all hooks
 async function listHooks(): Promise<void> {
   const hooks = await scry<Hooks>({ app: "channels-server", path: "/v0/hooks" });
@@ -156,14 +184,10 @@ async function addHook(name: string, srcPath: string): Promise<void> {
   
   console.log(`Adding hook "${name}"...`);
   
-  await poke({
-    app: "channels-server",
-    mark: "hook-action-0",
-    json: {
-      add: {
-        name,
-        src,
-      },
+  await pokeAndWaitForHooksUpdate("add", {
+    add: {
+      name,
+      src,
     },
   });
   
@@ -197,11 +221,7 @@ async function editHook(
   
   console.log(`Editing hook ${id}...`);
   
-  await poke({
-    app: "channels-server",
-    mark: "hook-action-0",
-    json: { edit },
-  });
+  await pokeAndWaitForHooksUpdate("edit", { edit });
   
   console.log(`✅ Hook ${id} updated.`);
 }
@@ -210,12 +230,8 @@ async function editHook(
 async function deleteHook(id: string): Promise<void> {
   console.log(`Deleting hook ${id}...`);
   
-  await poke({
-    app: "channels-server",
-    mark: "hook-action-0",
-    json: {
-      del: id,
-    },
+  await pokeAndWaitForHooksUpdate("delete", {
+    del: id,
   });
   
   console.log(`✅ Hook ${id} deleted.`);
@@ -225,14 +241,10 @@ async function deleteHook(id: string): Promise<void> {
 async function setOrder(nest: string, ids: string[]): Promise<void> {
   console.log(`Setting hook order for ${nest}...`);
   
-  await poke({
-    app: "channels-server",
-    mark: "hook-action-0",
-    json: {
-      order: {
-        nest,
-        seq: ids,
-      },
+  await pokeAndWaitForHooksUpdate("order", {
+    order: {
+      nest,
+      seq: ids,
     },
   });
   
@@ -247,15 +259,11 @@ async function configHook(
 ): Promise<void> {
   console.log(`Configuring hook ${id} for ${nest}...`);
   
-  await poke({
-    app: "channels-server",
-    mark: "hook-action-0",
-    json: {
-      config: {
-        id,
-        nest,
-        config,
-      },
+  await pokeAndWaitForHooksUpdate("config", {
+    config: {
+      id,
+      nest,
+      config,
     },
   });
   
@@ -270,16 +278,12 @@ async function cronHook(
 ): Promise<void> {
   console.log(`Scheduling hook ${id}...`);
   
-  await poke({
-    app: "channels-server",
-    mark: "hook-action-0",
-    json: {
-      cron: {
-        id,
-        origin: origin || null,
-        schedule,
-        config: {},
-      },
+  await pokeAndWaitForHooksUpdate("cron", {
+    cron: {
+      id,
+      origin: origin || null,
+      schedule,
+      config: {},
     },
   });
   
@@ -290,14 +294,10 @@ async function cronHook(
 async function restHook(id: string, origin?: string): Promise<void> {
   console.log(`Stopping cron for hook ${id}...`);
   
-  await poke({
-    app: "channels-server",
-    mark: "hook-action-0",
-    json: {
-      rest: {
-        id,
-        origin: origin || null,
-      },
+  await pokeAndWaitForHooksUpdate("rest", {
+    rest: {
+      id,
+      origin: origin || null,
     },
   });
   
@@ -325,11 +325,6 @@ async function main() {
       await listHooks();
       break;
 
-    case "watch": {
-      const seconds = Number(getOption(args, "seconds") || 60);
-      await watchHooks(Number.isFinite(seconds) && seconds > 0 ? seconds : 60);
-      break;
-    }
 
     case "get": {
       const id = args[1];
@@ -440,7 +435,6 @@ Commands:
   config <id> <nest> <key=value...> Configure hook for channel
   cron <id> <schedule> [--nest]     Schedule periodic execution
   rest <id> [--nest]                Stop a cron job
-  watch [--seconds 60]              Watch hook updates/errors
 
 Hook IDs are @uv format (e.g., 0v1a.2b3c4...)
 Schedule is @dr format (e.g., ~h1 for 1 hour, ~m30 for 30 minutes)
