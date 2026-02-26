@@ -29,7 +29,7 @@ Usage:
 
 Commands:
   activity     Activity/notifications (mentions, replies, all, unreads)
-  channels     Channel listing and management (dms, groups, all, info, update, delete)
+  channels     Channel listing and management (dms, groups, info, update, delete, add/del-writers, add/del-readers)
   contacts     Contact/profile management (list, get, self, sync, add, remove, update-profile)
   dms          Direct message operations (send, reply, react, unreact, delete, accept, decline)
   groups       Group management (list, create, info, invite, join, leave, delete, ...)
