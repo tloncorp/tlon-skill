@@ -10,7 +10,7 @@
  */
 
 import { getInitialActivity, getGroupAndChannelUnreads, getTextContent } from "@tloncorp/api";
-import { ensureClient } from "./api-client";
+import { buildNicknameMap, ensureClient, formatShipWithNickname } from "./api-client";
 
 interface ActivityEvent {
   id: string;
@@ -67,12 +67,12 @@ function formatTime(timeStr: string | number): string {
 }
 
 // Format an activity event for display
-function formatEvent(event: ActivityEvent): string {
+function formatEvent(event: ActivityEvent, nicknameMap: Map<string, string>): string {
   const lines: string[] = [];
   const timeStr = formatTime(event.timestamp);
   
   if (event.type === "post") {
-    const author = event.authorId || "unknown";
+    const author = formatShipWithNickname(event.authorId || "unknown", nicknameMap);
     const text = extractText(event.content);
     const mention = event.isMention ? " [MENTION]" : "";
     lines.push(`📝 Post${mention} by ${author} in ${event.channelId}`);
@@ -82,7 +82,7 @@ function formatEvent(event: ActivityEvent): string {
   }
   
   if (event.type === "reply") {
-    const author = event.authorId || "unknown";
+    const author = formatShipWithNickname(event.authorId || "unknown", nicknameMap);
     const text = extractText(event.content);
     const mention = event.isMention ? " [MENTION]" : "";
     lines.push(`💬 Reply${mention} by ${author} in ${event.channelId}`);
@@ -92,7 +92,7 @@ function formatEvent(event: ActivityEvent): string {
   }
   
   if (event.type === "dm-post") {
-    const author = event.authorId || "unknown";
+    const author = formatShipWithNickname(event.authorId || "unknown", nicknameMap);
     const text = extractText(event.content);
     const mention = event.isMention ? " [MENTION]" : "";
     lines.push(`📨 DM${mention} from ${author}`);
@@ -102,7 +102,7 @@ function formatEvent(event: ActivityEvent): string {
   }
   
   if (event.type === "dm-reply") {
-    const author = event.authorId || "unknown";
+    const author = formatShipWithNickname(event.authorId || "unknown", nicknameMap);
     const text = extractText(event.content);
     const mention = event.isMention ? " [MENTION]" : "";
     lines.push(`💬 DM Reply${mention} from ${author}`);
@@ -112,25 +112,29 @@ function formatEvent(event: ActivityEvent): string {
   }
   
   if (event.type === "group-ask") {
-    lines.push(`🙋 Join request from ${event.groupEventUserId || "unknown"}`);
+    const user = formatShipWithNickname(event.groupEventUserId || "unknown", nicknameMap);
+    lines.push(`🙋 Join request from ${user}`);
     if (event.groupId) lines.push(`   Group: ${event.groupId}`);
     lines.push(`   Time: ${timeStr}`);
   }
   
   if (event.type === "group-join") {
-    lines.push(`👋 ${event.groupEventUserId || "unknown"} joined`);
+    const user = formatShipWithNickname(event.groupEventUserId || "unknown", nicknameMap);
+    lines.push(`👋 ${user} joined`);
     if (event.groupId) lines.push(`   Group: ${event.groupId}`);
     lines.push(`   Time: ${timeStr}`);
   }
   
   if (event.type === "group-invite") {
-    lines.push(`📩 Invite from ${event.groupEventUserId || "unknown"}`);
+    const user = formatShipWithNickname(event.groupEventUserId || "unknown", nicknameMap);
+    lines.push(`📩 Invite from ${user}`);
     if (event.groupId) lines.push(`   Group: ${event.groupId}`);
     lines.push(`   Time: ${timeStr}`);
   }
   
   if (event.type === "contact") {
-    lines.push(`👤 Contact update from ${event.contactUserId || "unknown"}`);
+    const user = formatShipWithNickname(event.contactUserId || "unknown", nicknameMap);
+    lines.push(`👤 Contact update from ${user}`);
     if (event.contactUpdateType) {
       lines.push(`   Update: ${event.contactUpdateType}`);
     }
@@ -144,7 +148,11 @@ async function getActivity(bucket: 'all' | 'mentions' | 'replies', limit: number
   // Initialize client (validates env vars)
   await ensureClient();
 
-  const { events } = await getInitialActivity();
+  const [{ events }, nicknameMap] = await Promise.all([
+    getInitialActivity(),
+    buildNicknameMap(),
+  ]);
+
   const bucketEvents = events
     .filter((event) => event.bucketId === bucket)
     .sort((a, b) => b.timestamp - a.timestamp)
@@ -158,7 +166,7 @@ async function getActivity(bucket: 'all' | 'mentions' | 'replies', limit: number
   console.log(`\n=== ${bucket.toUpperCase()} (${bucketEvents.length} events) ===\n`);
 
   for (const event of bucketEvents) {
-    const formatted = formatEvent(event as ActivityEvent);
+    const formatted = formatEvent(event as ActivityEvent, nicknameMap);
     if (formatted) {
       console.log(formatted);
       console.log("");

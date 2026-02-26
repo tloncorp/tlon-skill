@@ -14,23 +14,34 @@
 
 import { deleteChannel, getGroups, getInitData, updateChannel } from "@tloncorp/api";
 import type { Channel as ApiChannel, Group as ApiGroup } from "@tloncorp/api";
-import { ensureClient, getCurrentShip } from "./api-client";
+import { buildNicknameMap, ensureClient, formatShipWithNickname, getCurrentShip } from "./api-client";
 
 // Get DMs
 async function getDms() {
-  const init = await getInitData();
+  const [init, nicknameMap] = await Promise.all([
+    getInitData(),
+    buildNicknameMap(),
+  ]);
   const dms = init.channels.filter((channel) => channel.type === "dm");
-  return dms.map((dm) => ({
-    type: "dm",
-    id: dm.id,
-    contact: dm.contactId || dm.id,
-  }));
+  return dms.map((dm) => {
+    const contact = dm.contactId || dm.id;
+    const nickname = nicknameMap.get(contact);
+    return {
+      type: "dm",
+      id: dm.id,
+      contact,
+      ...(nickname && { nickname }),
+    };
+  });
 }
 
 // Get group DMs (clubs)
 async function getGroupDms() {
   const currentShip = await getCurrentShip();
-  const init = await getInitData();
+  const [init, nicknameMap] = await Promise.all([
+    getInitData(),
+    buildNicknameMap(),
+  ]);
   const groupDms = init.channels.filter((channel) => channel.type === "groupDm");
 
   return groupDms.map((dm) => {
@@ -45,8 +56,14 @@ async function getGroupDms() {
       id: dm.id,
       title: dm.title || "Untitled",
       description: dm.description || "",
-      members: joined.map((member) => member.contactId),
-      invited: invited.map((member) => member.contactId),
+      members: joined.map((member) => {
+        const nickname = nicknameMap.get(member.contactId);
+        return nickname ? `${member.contactId} (${nickname})` : member.contactId;
+      }),
+      invited: invited.map((member) => {
+        const nickname = nicknameMap.get(member.contactId);
+        return nickname ? `${member.contactId} (${nickname})` : member.contactId;
+      }),
       status: isJoined ? "joined" : isInvited ? "invited" : "unknown",
     };
   });

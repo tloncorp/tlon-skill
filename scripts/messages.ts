@@ -19,7 +19,7 @@ import {
   searchChannel,
 } from "@tloncorp/api";
 import type { ContentReference, Post } from "@tloncorp/api";
-import { ensureClient, normalizeShip } from "./api-client";
+import { buildNicknameMap, ensureClient, formatShipWithNickname, normalizeShip } from "./api-client";
 
 // Extract text content from a Story
 function extractText(content: any): string {
@@ -93,7 +93,7 @@ async function resolveCites(post: Post): Promise<string[]> {
   return citeTexts;
 }
 
-async function printPosts(posts: Post[], resolve: boolean) {
+async function printPosts(posts: Post[], resolve: boolean, nicknameMap: Map<string, string>) {
   if (!posts.length) {
     console.log("No messages found.");
     return;
@@ -102,7 +102,7 @@ async function printPosts(posts: Post[], resolve: boolean) {
   const sorted = [...posts].sort((a, b) => a.sentAt - b.sentAt);
 
   for (const post of sorted) {
-    const author = post.authorId || "unknown";
+    const author = formatShipWithNickname(post.authorId || "unknown", nicknameMap);
     const time = formatTime(post.sentAt);
     const text = extractText(post.content);
     const replySuffix = post.parentId ? ` (reply to ${post.parentId})` : "";
@@ -137,15 +137,18 @@ async function fetchDmMessages(
   console.log(`Limit: ${limit}${resolveCites ? " (resolving quotes)" : ""}\n`);
 
   try {
-    const data = await getChannelPosts({
-      channelId: normalizedShip,
-      mode: "newest",
-      count: limit,
-      includeReplies: true,
-    });
+    const [data, nicknameMap] = await Promise.all([
+      getChannelPosts({
+        channelId: normalizedShip,
+        mode: "newest",
+        count: limit,
+        includeReplies: true,
+      }),
+      buildNicknameMap(),
+    ]);
 
     console.log(`=== DMs with ${normalizedShip} (${data.posts.length}) ===\n`);
-    await printPosts(data.posts, resolveCites);
+    await printPosts(data.posts, resolveCites, nicknameMap);
   } catch (error: any) {
     console.error(`Error fetching DMs: ${error.message}`);
   }
@@ -163,15 +166,18 @@ async function fetchMessages(
   console.log(`Limit: ${limit}${resolveCites ? " (resolving quotes)" : ""}\n`);
 
   try {
-    const data = await getChannelPosts({
-      channelId: channel,
-      mode: "newest",
-      count: limit,
-      includeReplies: true,
-    });
+    const [data, nicknameMap] = await Promise.all([
+      getChannelPosts({
+        channelId: channel,
+        mode: "newest",
+        count: limit,
+        includeReplies: true,
+      }),
+      buildNicknameMap(),
+    ]);
 
     console.log(`=== Messages in ${channel} (${data.posts.length}) ===\n`);
-    await printPosts(data.posts, resolveCites);
+    await printPosts(data.posts, resolveCites, nicknameMap);
   } catch (error: any) {
     console.error(`Error fetching messages: ${error.message}`);
     console.log("Note: Check that the channel path is correct (e.g., chat/~host/slug)");
@@ -185,10 +191,13 @@ async function searchMessages(query: string, channel: string): Promise<void> {
   console.log(`Searching "${query}" in: ${channel}\n`);
 
   try {
-    const results = await searchChannel({
-      channelId: channel,
-      query,
-    });
+    const [results, nicknameMap] = await Promise.all([
+      searchChannel({
+        channelId: channel,
+        query,
+      }),
+      buildNicknameMap(),
+    ]);
 
     if (!results.posts.length) {
       console.log("No results found.");
@@ -196,7 +205,7 @@ async function searchMessages(query: string, channel: string): Promise<void> {
     }
 
     console.log(`Found ${results.posts.length} results:\n`);
-    await printPosts(results.posts, false);
+    await printPosts(results.posts, false, nicknameMap);
   } catch (error: any) {
     console.error(`Error searching messages: ${error.message}`);
   }

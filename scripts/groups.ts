@@ -34,7 +34,6 @@ import {
   createGroup,
   deleteGroup,
   deleteGroupRole,
-  getContacts,
   getCurrentUserId,
   getGroup,
   getGroups,
@@ -50,7 +49,7 @@ import {
   updateGroupRole,
 } from "@tloncorp/api";
 import type { Group } from "@tloncorp/api";
-import { ensureClient, getCurrentShip, normalizeShip } from "./api-client";
+import { buildNicknameMap, ensureClient, formatShipWithNickname, getCurrentShip, normalizeShip } from "./api-client";
 
 // Generate a random short ID for the group
 function generateGroupSlug(): string {
@@ -84,29 +83,6 @@ async function listGroups() {
     }
     console.log("");
   }
-}
-
-// Build a map of ship -> nickname from contacts
-async function buildNicknameMap(): Promise<Map<string, string>> {
-  const nicknameMap = new Map<string, string>();
-  try {
-    const contacts = await getContacts();
-    for (const contact of contacts) {
-      const nickname = contact.nickname ?? contact.peerNickname;
-      if (nickname) {
-        nicknameMap.set(contact.id, nickname);
-      }
-    }
-  } catch {
-    // Contacts unavailable, continue without nicknames
-  }
-  return nicknameMap;
-}
-
-// Format a ship with optional nickname
-function formatShipWithNickname(ship: string, nicknameMap: Map<string, string>): string {
-  const nickname = nicknameMap.get(ship);
-  return nickname ? `${ship} (${nickname})` : ship;
 }
 
 // Get info about a specific group

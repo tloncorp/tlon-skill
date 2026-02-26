@@ -6,7 +6,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { configureClient, preSig, subscribe } from "@tloncorp/api";
+import { configureClient, getContacts, preSig, subscribe } from "@tloncorp/api";
 
 export interface UrbitConfig {
   url: string;
@@ -202,4 +202,32 @@ export async function getCurrentShip(): Promise<string> {
  */
 export function normalizeShip(ship: string): string {
   return preSig(ship);
+}
+
+/**
+ * Build a map of ship -> nickname from contacts.
+ * Returns empty map if contacts unavailable.
+ */
+export async function buildNicknameMap(): Promise<Map<string, string>> {
+  const nicknameMap = new Map<string, string>();
+  try {
+    const contacts = await getContacts();
+    for (const contact of contacts) {
+      const nickname = contact.nickname ?? contact.peerNickname;
+      if (nickname) {
+        nicknameMap.set(contact.id, nickname);
+      }
+    }
+  } catch {
+    // Contacts unavailable, continue without nicknames
+  }
+  return nicknameMap;
+}
+
+/**
+ * Format a ship with optional nickname: "~ship (nickname)" or just "~ship"
+ */
+export function formatShipWithNickname(ship: string, nicknameMap: Map<string, string>): string {
+  const nickname = nicknameMap.get(ship);
+  return nickname ? `${ship} (${nickname})` : ship;
 }
