@@ -191,6 +191,17 @@ Notes:
 - Hooks run in order when triggered; use `order` to set priority
 - Use `config` to pass channel-specific settings to a hook instance
 
+**Writing Hooks:** See `references/hooks.md` for full documentation on writing hooks, including:
+- Event types (`on-post`, `on-reply`, `cron`, `wake`)
+- Bowl context (channel, group, config access)
+- Effects (channel actions, group actions, scheduled wakes)
+- Config handling with clam (`;;`)
+
+**Examples:** See `references/hooks-examples/` for starter templates:
+- `auto-react.hoon` — React to new posts with emoji
+- `delete-old-posts.hoon` — Cron job to clean up old messages
+- `word-filter.hoon` — Block posts containing banned words
+
 ### Messages
 
 Read and search message history.
