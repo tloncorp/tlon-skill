@@ -15,10 +15,11 @@
  *   npx ts-node scripts/hooks.ts config <id> <nest> <key=value...> # Configure for channel
  *   npx ts-node scripts/hooks.ts cron <id> <schedule> [--nest]     # Schedule periodic run
  *   npx ts-node scripts/hooks.ts rest <id> [--nest]                # Stop a cron job
+ *   npx ts-node scripts/hooks.ts watch [--seconds 60]             # Watch hook events/errors
  */
 
 import * as fs from "fs";
-import { poke, scry } from "@tloncorp/api";
+import { poke, scry, subscribe, unsubscribe } from "@tloncorp/api";
 import { ensureClient } from "./api-client";
 
 // Types based on sur/hooks.hoon
@@ -44,6 +45,31 @@ interface Hooks {
   crons: Record<string, Record<string, Job>>;
 }
 
+
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function watchHooks(seconds: number = 60): Promise<void> {
+  console.log(`Watching hooks updates for ${seconds}s...`);
+  const subId = await subscribe<any>({ app: "channels-server", path: "/v0/hooks" }, (update) => {
+    console.log("\n[hooks update]");
+    console.log(JSON.stringify(update, null, 2));
+
+    const text = JSON.stringify(update).toLowerCase();
+    if (text.includes("error") || text.includes("fail") || text.includes("compile")) {
+      console.log("[hooks watch] ⚠️ possible error/compile issue detected");
+    }
+  });
+
+  try {
+    await sleep(seconds * 1000);
+  } finally {
+    await unsubscribe(subId);
+    console.log("Stopped hooks watch.");
+  }
+}
 // List all hooks
 async function listHooks(): Promise<void> {
   const hooks = await scry<Hooks>({ app: "channels-server", path: "/v0/hooks" });
@@ -299,6 +325,12 @@ async function main() {
       await listHooks();
       break;
 
+    case "watch": {
+      const seconds = Number(getOption(args, "seconds") || 60);
+      await watchHooks(Number.isFinite(seconds) && seconds > 0 ? seconds : 60);
+      break;
+    }
+
     case "get": {
       const id = args[1];
       if (!id) {
@@ -408,6 +440,7 @@ Commands:
   config <id> <nest> <key=value...> Configure hook for channel
   cron <id> <schedule> [--nest]     Schedule periodic execution
   rest <id> [--nest]                Stop a cron job
+  watch [--seconds 60]              Watch hook updates/errors
 
 Hook IDs are @uv format (e.g., 0v1a.2b3c4...)
 Schedule is @dr format (e.g., ~h1 for 1 hour, ~m30 for 30 minutes)
