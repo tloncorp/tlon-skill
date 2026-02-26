@@ -83,7 +83,7 @@ tlon groups create "My Group" --description "A cool group"
 ## Features
 
 - **Activity**: Mentions, replies, unreads (with nicknames)
-- **Channels**: List DMs, group DMs, subscribed groups (nicknames shown)
+- **Channels**: List DMs, group DMs, subscribed groups (nicknames shown), reader/writer permissions
 - **Contacts**: List, get, update profiles
 - **Groups**: Create, join, invite, roles, privacy (member nicknames shown)
 - **Messages**: History, search (author nicknames shown)
