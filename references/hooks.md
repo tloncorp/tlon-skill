@@ -2,6 +2,16 @@
 
 Hooks are hoon functions that modify events, cause effects, and/or build state for channels.
 
+## Version Compatibility
+
+Hooks are tightly coupled to `channels-server` / `tlon-apps` types.
+When docs/examples drift from runtime types, compilation can fail even if logic is correct.
+
+Recommended practice:
+- Pin your local references to a known `tlon-apps` commit/tag
+- Record that version in PRs when adding/updating hooks
+- Prefer examples in this folder that were verified against the current runtime
+
 ## Hook Structure
 
 ```hoon
@@ -130,7 +140,9 @@ The most common effect pattern for channel actions:
 
 ## Config
 
-Config is `(map @t *)` - use clam (`;;`) to extract typed values:
+Config is `(map @t *)` on the Hoon side.
+From CLI, values are sent as text and then clammed/coerced in-hook.
+Use clam (`;;`) to extract typed values with defaults:
 
 ```hoon
 ::  With bowl face (=bowl:h)
@@ -140,6 +152,32 @@ Config is `(map @t *)` - use clam (`;;`) to extract typed values:
 ::  Without bowl face (bowl:h)
 =+  ;;(delay=@dr (~(gut by config) 'delay' ~s30))
 ```
+
+CLI tips:
+- Prefer simple text/cord values first (`password=owl-pass`)
+- For booleans/durations, verify with `hooks get <id>` after setting config
+- If a config poke fails, inspect the exact update payload from CLI output
+
+## Plaintext Helper Pattern
+
+A common need is extracting plain text from a post's story.
+This minimal pattern reads the first inline atom from a post event:
+
+```hoon
+++  plaintext
+  |=  =story:c
+  ^-  cord
+  ?~  story  ''
+  =/  verse  i.story
+  ?.  ?=(%inline -.verse)  ''
+  ?~  p.verse  ''
+  =/  inl  i.p.verse
+  ?@  inl
+    (trip inl)
+  ''
+```
+
+For richer matching (contains/multi-verse), extend this gate to fold over all `%inline` verses.
 
 ## Writing a Hook
 

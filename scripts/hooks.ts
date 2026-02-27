@@ -22,7 +22,7 @@ import { poke, scry, subscribe, unsubscribe } from "@tloncorp/api";
 import { Atom, jam } from "@urbit/nockjs";
 import { render } from "@urbit/aura";
 import { ensureClient } from "./api-client";
-import { getOption } from "./cli-utils";
+import { getOption, hasFlag } from "./cli-utils";
 
 // Types based on sur/hooks.hoon
 interface Hook {
@@ -51,6 +51,70 @@ interface Hooks {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+type HookTemplateType = "on-post" | "cron" | "moderation";
+
+function getHookTemplate(name: string, type: HookTemplateType): string {
+  const safeName = name.replace(/[^a-zA-Z0-9-_ ]/g, "").trim() || "my-hook";
+
+  if (type === "cron") {
+    return `:: ${safeName} (${type})
+:: Runs on cron ticks and leaves state unchanged by default
+|=  [=event:h =bowl:h]
+^-  outcome:h
+?.  ?=(%cron -.event)
+  &+[[[%allowed event] ~] state.hook.bowl]
+:: TODO: add effects here
+&+[[[%allowed event] ~] state.hook.bowl]
+`;
+  }
+
+  if (type === "moderation") {
+    return `:: ${safeName} (${type})
+:: Blocks posts containing a configured password/token
+|=  [=event:h =bowl:h]
+^-  outcome:h
+=+  ;;(password=cord (~(gut by config.bowl) 'password' 'change-me'))
+?.  ?=([%on-post %add *] event)
+  &+[[[%allowed event] ~] state.hook.bowl]
+:: Basic plaintext extraction from first inline atom
+=/  entered=cord
+  ?~  content.post.event  ''
+  =/  verse  i.content.post.event
+  ?.  ?=(%inline -.verse)  ''
+  ?~  p.verse  ''
+  =/  inl  i.p.verse
+  ?@  inl  (trip inl)
+  ''
+?:  =(entered password)
+  &+[[[%denied 'blocked by moderation hook'] ~] state.hook.bowl]
+&+[[[%allowed event] ~] state.hook.bowl]
+`;
+  }
+
+  return `:: ${safeName} (${type})
+:: Trigger on new posts; allow by default
+|=  [=event:h =bowl:h]
+^-  outcome:h
+?.  ?=([%on-post %add *] event)
+  &+[[[%allowed event] ~] state.hook.bowl]
+:: TODO: add effects/state updates
+&+[[[%allowed event] ~] state.hook.bowl]
+`;
+}
+
+function initHookTemplate(name: string, type: HookTemplateType, outPath?: string, force: boolean = false): void {
+  const path = outPath || `./${name.replace(/\s+/g, "-").toLowerCase()}.hoon`;
+  if (fs.existsSync(path) && !force) {
+    console.error(`Refusing to overwrite existing file: ${path}`);
+    console.error("Use --force to overwrite.");
+    process.exit(1);
+  }
+  const src = getHookTemplate(name, type);
+  fs.writeFileSync(path, src, "utf-8");
+  console.log(`✅ Created ${type} hook template: ${path}`);
+  console.log("Next: edit the file, then run: tlon hooks add <name> <file>");
 }
 
 async function pokeAndWaitForHooksUpdate(
@@ -332,6 +396,23 @@ async function main() {
   await ensureClient();
 
   switch (command) {
+    case "init": {
+      const name = args[1];
+      if (!name) {
+        console.error("Usage: hooks.ts init <name> [--type on-post|cron|moderation] [--out <file>] [--force]");
+        process.exit(1);
+      }
+      const typeRaw = (getOption(args, "type") || "on-post") as HookTemplateType;
+      if (!["on-post", "cron", "moderation"].includes(typeRaw)) {
+        console.error(`Invalid --type: ${typeRaw}. Expected one of: on-post, cron, moderation`);
+        process.exit(1);
+      }
+      const out = getOption(args, "out");
+      const force = hasFlag(args, "force");
+      initHookTemplate(name, typeRaw, out, force);
+      break;
+    }
+
     case "list":
       await listHooks();
       break;
@@ -437,13 +518,14 @@ async function main() {
       console.log(`Usage: hooks.ts <command>
 
 Commands:
+  init <name> [--type] [--out]      Create a starter hook template
   list                              List all hooks
   get <id>                          Get hook details and source
   add <name> <src-file>             Add a new hook from file
   edit <id> [--name] [--src]        Edit hook name or source
   delete <id>                       Delete a hook
   order <nest> <id1> [id2...]       Set execution order for channel
-  config <id> <nest> <key=value...> Configure hook for channel
+  config <id> <nest> <key=value...> Configure hook for channel (values are nouns serialized as text)
   cron <id> <schedule> [--nest]     Schedule periodic execution
   rest <id> [--nest]                Stop a cron job
 
@@ -451,7 +533,8 @@ Hook IDs are @uv format (e.g., 0v1a.2b3c4...)
 Schedule is @dr format (e.g., ~h1 for 1 hour, ~m30 for 30 minutes)
 
 Examples:
-  tlon hooks add my-hook ./hook.hoon
+  tlon hooks init my-hook --type on-post
+  tlon hooks add my-hook ./my-hook.hoon
   tlon hooks config 0v1a.2b3c4 chat/~host/channel key1=value1 key2=value2
   tlon hooks cron 0v1a.2b3c4 ~h1 --nest chat/~host/channel
 `);
