@@ -88,7 +88,7 @@ function getHookTemplate(name: string, type: HookTemplateType): string {
 ?.  ?=([%on-post %add *] event)
   &+[[[%allowed event] ~] state.hook.bowl]
 =/  text=tape
-  (trip (plaintext content.post.event))
+  (trip (flatten content.post.event))
 =/  bad=(list tape)
   %+  turn
     (rash blocked (more com (star ;~(less com prn))))
@@ -100,17 +100,6 @@ function getHookTemplate(name: string, type: HookTemplateType): string {
 ?:  has-bad
   &+[[[%denied (some reason)] ~] state.hook.bowl]
 &+[[[%allowed event] ~] state.hook.bowl]
-++  plaintext
-  |=  =story:c
-  ^-  cord
-  ?~  story  ''
-  =/  verse  i.story
-  ?.  ?=(%inline -.verse)  ''
-  ?~  p.verse  ''
-  =/  inl  i.p.verse
-  ?@  inl
-    (trip inl)
-  ''
 `;
   }
 

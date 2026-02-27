@@ -160,24 +160,18 @@ CLI tips:
 
 ## Plaintext Helper Pattern
 
-A common need is extracting plain text from a post's story.
-This minimal pattern reads the first inline atom from a post event:
+The hook subject includes a `flatten` gate via `channel-utils`.
+For moderation/search-like use cases, prefer this default:
 
 ```hoon
-++  plaintext
-  |=  =story:c
-  ^-  cord
-  ?~  story  ''
-  =/  verse  i.story
-  ?.  ?=(%inline -.verse)  ''
-  ?~  p.verse  ''
-  =/  inl  i.p.verse
-  ?@  inl
-    (trip inl)
-  ''
+=/  text=tape
+  (trip (flatten content.post.event))
 ```
 
-For richer matching (contains/multi-verse), extend this gate to fold over all `%inline` verses.
+`flatten` intentionally focuses on searchable/user-visible text and may skip some structures
+(e.g. code blocks or other rich content forms depending on story shape).
+
+If you need strict/full extraction (including code), implement a custom story walker gate.
 
 ## Writing a Hook
 
