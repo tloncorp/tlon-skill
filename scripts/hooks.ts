@@ -53,54 +53,93 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-type HookTemplateType = "on-post" | "cron" | "moderation";
+type HookTemplateType = "on-post" | "cron" | "moderation" | "bare";
 
 function getHookTemplate(name: string, type: HookTemplateType): string {
   const safeName = name.replace(/[^a-zA-Z0-9-_ ]/g, "").trim() || "my-hook";
 
   if (type === "cron") {
     return `:: ${safeName} (${type})
-:: Runs on cron ticks and leaves state unchanged by default
-|=  [=event:h =bowl:h]
+:: Deletes posts older than configured delay on cron ticks
+|=  [=event:h bowl:h]
 ^-  outcome:h
-?.  ?=(%cron -.event)
-  &+[[[%allowed event] ~] state.hook.bowl]
-:: TODO: add effects here
-&+[[[%allowed event] ~] state.hook.bowl]
+=-  &+[[[%allowed event] -] state.hook.bowl]
+?.  ?=(%cron -.event)  ~
+^-  (list effect:h)
+=+  ;;(delay=@dr (~(gut by config.bowl) 'delay' ~m30))
+=/  cutoff  (sub now.bowl delay)
+?~  channel.bowl  ~
+%+  murn
+  (tap:on-v-posts:c (lot:on-v-posts:c posts.u.channel.bowl ~ \`cutoff))
+|=  [=id-post:c post=(may:c v-post:c)]
+^-  (unit effect:h)
+?:  ?=(%| -.post)  ~
+\`[%channels %channel nest.u.channel.bowl %post %del id-post]
 `;
   }
 
   if (type === "moderation") {
     return `:: ${safeName} (${type})
-:: Blocks posts containing a configured password/token
+:: Blocks posts containing configured words
 |=  [=event:h =bowl:h]
 ^-  outcome:h
-=+  ;;(password=cord (~(gut by config.bowl) 'password' 'change-me'))
+=+  ;;(blocked=cord (~(gut by config.bowl) 'blocked' 'spam,scam'))
+=+  ;;(reason=cord (~(gut by config.bowl) 'reason' 'Message contains blocked content'))
 ?.  ?=([%on-post %add *] event)
   &+[[[%allowed event] ~] state.hook.bowl]
-:: Basic plaintext extraction from first inline atom
-=/  entered=cord
-  ?~  content.post.event  ''
-  =/  verse  i.content.post.event
+=/  text=tape
+  (trip (plaintext content.post.event))
+=/  bad=(list tape)
+  %+  turn
+    (rash blocked (more com (star ;~(less com prn))))
+  trip
+=/  has-bad=?
+  %+  lien  bad
+  |=  w=tape
+  !=(~(find w text))
+?:  has-bad
+  &+[[[%denied (some reason)] ~] state.hook.bowl]
+&+[[[%allowed event] ~] state.hook.bowl]
+++  plaintext
+  |=  =story:c
+  ^-  cord
+  ?~  story  ''
+  =/  verse  i.story
   ?.  ?=(%inline -.verse)  ''
   ?~  p.verse  ''
   =/  inl  i.p.verse
-  ?@  inl  (trip inl)
+  ?@  inl
+    (trip inl)
   ''
-?:  =(entered password)
-  &+[[[%denied 'blocked by moderation hook'] ~] state.hook.bowl]
+`;
+  }
+
+  if (type === "bare") {
+    return `:: ${safeName} (${type})
+|=  [=event:h =bowl:h]
+^-  outcome:h
 &+[[[%allowed event] ~] state.hook.bowl]
 `;
   }
 
   return `:: ${safeName} (${type})
-:: Trigger on new posts; allow by default
+:: Reacts to new posts with configurable emoji
 |=  [=event:h =bowl:h]
 ^-  outcome:h
+=+  ;;(emoji=cord (~(gut by config.bowl) 'emoji' ':thumbsup:'))
 ?.  ?=([%on-post %add *] event)
   &+[[[%allowed event] ~] state.hook.bowl]
-:: TODO: add effects/state updates
-&+[[[%allowed event] ~] state.hook.bowl]
+=/  react-effect=effect:h
+  :*  %channels
+      %channel
+      nest.u.channel.bowl
+      %post
+      %reply
+      id.post.event
+      %add
+      [our.bowl now.bowl (some emoji) ~ ~]
+  ==
+&+[[[%allowed event] [react-effect ~]] state.hook.bowl]
 `;
 }
 
@@ -403,8 +442,8 @@ async function main() {
         process.exit(1);
       }
       const typeRaw = (getOption(args, "type") || "on-post") as HookTemplateType;
-      if (!["on-post", "cron", "moderation"].includes(typeRaw)) {
-        console.error(`Invalid --type: ${typeRaw}. Expected one of: on-post, cron, moderation`);
+      if (!["on-post", "cron", "moderation", "bare"].includes(typeRaw)) {
+        console.error(`Invalid --type: ${typeRaw}. Expected one of: on-post, cron, moderation, bare`);
         process.exit(1);
       }
       const out = getOption(args, "out");
