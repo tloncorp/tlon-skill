@@ -8,10 +8,10 @@
 =+  ;;(delay=@dr (~(gut by config.bowl) 'delay' ~s5))
 ::  Only react to new posts
 ?.  ?=([%on-post %add *] event)
-  &+[[[%allowed event] ~] state.hook]
+  &+[[[%allowed event] ~] state.hook.bowl]
 ::  Don't react to our own posts
 ?:  =(src.bowl our.bowl)
-  &+[[[%allowed event] ~] state.hook]
+  &+[[[%allowed event] ~] state.hook.bowl]
 ::  Schedule a delayed reaction using %wait
 =/  wait-effect=effect:h
   :*  %wait
@@ -20,4 +20,4 @@
       !>(event)              :: data to pass when waking
       (add now.bowl delay)   :: when to fire
   ==
-&+[[[%allowed event] [wait-effect ~]] state.hook]
+&+[[[%allowed event] [wait-effect ~]] state.hook.bowl]

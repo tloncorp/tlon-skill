@@ -1,40 +1,35 @@
 :: Word filter hook: blocks posts containing banned words
-:: Config: words (comma-separated list of banned words)
+:: Config: word (single word to block)
 ::
 |=  [=event:h =bowl:h]
 ^-  outcome:h
+|^
 ::  Only filter new posts
 ?.  ?=([%on-post %add *] event)
-  &+[[[%allowed event] ~] state.hook]
-::  Get banned words from config
-=+  ;;(words=cord (~(gut by config.bowl) 'words' ''))
-::  Convert to list of words (split on comma)
-=/  banned=(list tape)
-  %+  turn
-    (rash words (more com (star ;~(less com prn))))
-  trip
-::  Get message content as tape
-=/  content=tape
-  %-  trip
-  ?~  story.essay.post.on-post.event  ''
-  ::  Extract text from first inline block
-  =/  first  (head story.essay.post.on-post.event)
-  ?+  -.first  ''
-    %block  ''
-    %inline  
-      ?~  p.first  ''
-      =/  inline  (head p.first)
-      ?+  -.inline  ''
-        %text  p.inline
-      ==
-  ==
-::  Check if content contains any banned word
-=/  has-banned=?
-  %+  lien  banned
-  |=  word=tape
-  !=(~ (find word content))
-::  If banned word found, deny the post
+  &+[[[%allowed event] ~] state.hook.bowl]
+::  Get banned word from config
+=+  ;;(word=cord (~(gut by config.bowl) 'word' ''))
+::  Skip if no word configured
+?:  =('' word)
+  &+[[[%allowed event] ~] state.hook.bowl]
+::  Get message content
+=/  content=tape  (extract-text content.post.event)
+::  Check if banned word appears in content
+=/  has-banned=?  !=(~ (find (trip word) content))
+::  If found, deny
 ?:  has-banned
-  &+[[[%denied `'Message contains prohibited content'] ~] state.hook]
+  &+[[[%denied `'Message contains prohibited content'] ~] state.hook.bowl]
 ::  Otherwise allow
-&+[[[%allowed event] ~] state.hook]
+&+[[[%allowed event] ~] state.hook.bowl]
+++  extract-text
+  |=  =story:c
+  ^-  tape
+  ?~  story  ""
+  =/  verse  i.story
+  ?.  ?=(%inline -.verse)  ""
+  ?~  p.verse  ""
+  =/  inl  i.p.verse
+  ?@  inl
+    (trip inl)
+  ""
+--
