@@ -1,10 +1,10 @@
 :: Auto-react hook: reacts to new posts with configured emoji
-:: Config: emoji (default :thumbsup:)
+:: Config: emoji (default 👍)
 ::
 |=  [=event:h =bowl:h]
 ^-  outcome:h
 ::  Extract config with defaults
-=+  ;;(emoji=cord (~(gut by config.bowl) 'emoji' ':thumbsup:'))
+=+  ;;(emoji=cord (~(gut by config.bowl) 'emoji' '👍'))
 ::  Only react to new posts
 ?.  ?=([%on-post %add *] event)
   &+[[[%allowed event] ~] state.hook.bowl]
@@ -14,7 +14,7 @@
 ::  Need channel context
 ?~  channel.bowl
   &+[[[%allowed event] ~] state.hook.bowl]
-::  React to the post - structure: [%channels %channel nest [%post [%add-react id author react]]]
+::  React to the post
 =/  react-effect=effect:h
   :*  %channels
       %channel
