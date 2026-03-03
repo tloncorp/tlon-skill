@@ -26,7 +26,10 @@ curl -L https://registry.npmjs.org/@tloncorp/tlon-skill-linux-x64/-/tlon-skill-l
 
 **Option 1: CLI flags (highest priority)**
 ```bash
-# Pass credentials directly
+# Cookie-based auth (fastest - ship parsed from cookie)
+tlon --url https://your-ship.tlon.network --cookie "urbauth-~your-ship=0v..." contacts self
+
+# Code-based auth (requires all three)
 tlon --url https://your-ship.tlon.network --ship ~your-ship --code sampel-ticlyt-migfun-falmel contacts self
 
 # Or use a config file
@@ -35,11 +38,20 @@ tlon --config ~/ships/my-ship.json contacts self
 
 Config file format:
 ```json
+// Cookie-based (ship derived from cookie)
+{"url": "https://your-ship.tlon.network", "cookie": "urbauth-~your-ship=0v..."}
+
+// Code-based
 {"url": "https://your-ship.tlon.network", "ship": "~your-ship", "code": "sampel-ticlyt-migfun-falmel"}
 ```
 
 **Option 2: Environment variables**
 ```bash
+# Cookie-based (ship derived from cookie)
+export URBIT_URL="https://your-ship.tlon.network"
+export URBIT_COOKIE="urbauth-~your-ship=0v..."
+
+# Code-based
 export URBIT_URL="https://your-ship.tlon.network"
 export URBIT_SHIP="~your-ship"
 export URBIT_CODE="sampel-ticlyt-migfun-falmel"
@@ -49,16 +61,41 @@ export URBIT_CODE="sampel-ticlyt-migfun-falmel"
 
 If you have OpenClaw configured with a Tlon channel, credentials are loaded automatically.
 
+## Cookie Caching
+
+The skill automatically caches auth cookies to `~/.tlon/cache/<ship>.json` after successful authentication.
+
+```bash
+# First time - auth and cache
+$ tlon --url https://zod.tlon.network --ship ~zod --code abcd-efgh contacts self
+Note: Credentials cached for ~zod. Next time just run: tlon <command>
+
+# After that - no flags needed!
+$ tlon contacts self
+
+# Multiple cached ships? Specify which one:
+$ tlon --ship ~zod contacts self
+```
+
+Clear cache: `rm ~/.tlon/cache/*.json`
+
+## Cookie vs Code Authentication
+
+- **Cookie-based auth**: Uses a pre-authenticated session cookie. Faster since it skips login.
+- **Code-based auth**: Performs a login request to get a session cookie.
+
+The ship name is embedded in the cookie (`urbauth-~ship=...`), so you don't need to specify it separately with cookie auth.
+
 ## Multi-Ship Usage
 
-If you have credentials for multiple ships, you can operate on behalf of any of them by passing their credentials via CLI flags. This is useful for managing multiple identities, bot operations, or moon management:
+If you have credentials for multiple ships, you can operate on behalf of any of them:
 
 ```bash
 # Act as a different ship
 tlon --config ~/ships/bot.json channels groups
 
 # Or pass credentials directly
-tlon --url https://bot.tlon.network --ship ~bot-ship --code bot-code contacts self
+tlon --url https://bot.tlon.network --cookie "urbauth-~bot=0v..." contacts self
 ```
 
 ## Usage
