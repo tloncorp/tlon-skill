@@ -86,6 +86,7 @@ tlon groups create "My Group" --description "A cool group"
 - **Channels**: List DMs, group DMs, subscribed groups (nicknames shown), reader/writer permissions
 - **Contacts**: List, get, update profiles
 - **Groups**: Create, join, invite, roles, privacy (member nicknames shown)
+- **Hooks**: Manage channel hooks (add, edit, delete, order, config, cron)
 - **Messages**: History, search (author nicknames shown)
 - **DMs**: Send, react, accept/decline
 - **Posts**: React, delete

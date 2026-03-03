@@ -34,6 +34,7 @@ Commands:
   dms          Direct message operations (send, reply, react, unreact, delete, accept, decline)
   expose       Manage public content exposure (list, show, hide, check, url)
   groups       Group management (list, create, info, invite, join, leave, delete, ...)
+  hooks        Channel hooks management (list, add, edit, delete, order, config, cron, rest)
   messages     Message history and search (dm, channel, history, search)
   notebook     Post to diary/notebook channels
   posts        Post reactions, edits, deletes (react, unreact, edit, delete)
@@ -190,6 +191,10 @@ async function main() {
       }
       case "groups": {
         const mod = await import("./groups");
+        break;
+      }
+      case "hooks": {
+        const mod = await import("./hooks");
         break;
       }
       case "messages": {

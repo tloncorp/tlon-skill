@@ -51,6 +51,7 @@ import {
 } from "@tloncorp/api";
 import type { Group } from "@tloncorp/api";
 import { ensureClient, getCurrentShip, normalizeShip } from "./api-client";
+import { getOption } from "./cli-utils";
 
 // Generate a random short ID for the group
 function generateGroupSlug(): string {
@@ -484,15 +485,6 @@ async function addChannel(
   console.log(`   Title: ${title}`);
   console.log(`   Group: ${groupId}`);
   return nest;
-}
-
-// Parse command line argument for named options
-function getOption(args: string[], name: string): string | undefined {
-  const idx = args.indexOf(`--${name}`);
-  if (idx !== -1 && args[idx + 1]) {
-    return args[idx + 1];
-  }
-  return undefined;
 }
 
 // Main

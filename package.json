@@ -9,7 +9,8 @@
   "files": [
     "bin/",
     "scripts/postinstall.js",
-    "SKILL.md"
+    "SKILL.md",
+    "references/"
   ],
   "scripts": {
     "build": "node scripts/build.js",
