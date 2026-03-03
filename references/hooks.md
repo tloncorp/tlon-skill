@@ -77,6 +77,10 @@ Hooks receive ambient state via the bowl:
   ==
 ```
 
+**Important:** Access patterns depend on whether you use a face:
+- `|= [=event:h =bowl:h]` (with face) → access via `config.bowl`, `channel.bowl`, `state.hook.bowl`
+- `|= [=event:h bowl:h]` (no face) → access via `config`, `channel`, `state.hook`
+
 ## Return Type
 
 ```hoon
@@ -110,21 +114,48 @@ Hooks can trigger actions on other agents:
   ==
 ```
 
+### Channel Effects
+
+The most common effect pattern for channel actions:
+
+```hoon
+::  React to a post
+[%channels %channel nest [%post [%add-react post-id ship emoji]]]
+
+::  Delete a post
+[%channels %channel nest %post %del post-id]
+```
+
+**Note:** Use actual unicode emoji (`'👍'`, `'🔥'`) not shortcodes (`:thumbsup:`).
+
 ## Config
 
 Config is `(map @t *)` - use clam (`;;`) to extract typed values:
 
 ```hoon
+::  With bowl face (=bowl:h)
 =+  ;;(delay=@dr (~(gut by config.bowl) 'delay' ~s30))
-=+  ;;(emoji=cord (~(gut by config.bowl) 'emoji' ':thumbsup:'))
+=+  ;;(emoji=cord (~(gut by config.bowl) 'emoji' '👍'))
+
+::  Without bowl face (bowl:h)
+=+  ;;(delay=@dr (~(gut by config) 'delay' ~s30))
 ```
 
 ## Writing a Hook
 
-Basic hook template:
+Basic hook template (with bowl face):
 
 ```hoon
 |=  [=event:h =bowl:h]
+^-  outcome:h
+::  Return success with: [allowed-result effects new-state]
+&+[[[%allowed event] ~] state.hook.bowl]
+```
+
+Basic hook template (without bowl face):
+
+```hoon
+|=  [=event:h bowl:h]
 ^-  outcome:h
 ::  Return success with: [allowed-result effects new-state]
 &+[[[%allowed event] ~] state.hook]
@@ -133,68 +164,130 @@ Basic hook template:
 ### Example: Auto-react to new posts
 
 ```hoon
+:: Auto-react hook: reacts to new posts with configured emoji
+:: Config: emoji (default 👍)
+::
 |=  [=event:h =bowl:h]
 ^-  outcome:h
-::  Get emoji from config, default to thumbsup
-=+  ;;(emoji=cord (~(gut by config.bowl) 'emoji' ':thumbsup:'))
+::  Extract config with defaults
+=+  ;;(emoji=cord (~(gut by config.bowl) 'emoji' '👍'))
 ::  Only react to new posts
 ?.  ?=([%on-post %add *] event)
-  &+[[[%allowed event] ~] state.hook]
-::  Build the react effect
-=/  react-effect
+  &+[[[%allowed event] ~] state.hook.bowl]
+::  Don't react to our own posts
+?:  =(author.post.event our.bowl)
+  &+[[[%allowed event] ~] state.hook.bowl]
+::  Need channel context
+?~  channel.bowl
+  &+[[[%allowed event] ~] state.hook.bowl]
+::  React to the post
+=/  react-effect=effect:h
   :*  %channels
       %channel
       nest.u.channel.bowl
-      %post
-      %reply
-      id.post.on-post.event
-      %add
-      [our.bowl now.bowl (some emoji) ~ ~]
+      [%post [%add-react id.post.event our.bowl emoji]]
   ==
-&+[[[%allowed event] [react-effect ~]] state.hook]
+&+[[[%allowed event] [react-effect ~]] state.hook.bowl]
 ```
 
-### Example: Delete old messages (cron)
+**Key points:**
+- Check `author.post.event` (not `src.bowl`) for self-detection
+- Check `channel.bowl` for null before accessing `u.channel.bowl`
+- Effect structure: `[%channels %channel nest [%post [%add-react ...]]]`
+- Use actual emoji unicode, not shortcodes
+
+### Example: Disappearing messages (cron)
+
+From [tloncorp/hooks](https://github.com/tloncorp/hooks/blob/master/hooks/disappearing.hoon):
 
 ```hoon
+:: Disappearing messages: deletes posts older than configured delay
+:: Config: delay (default ~s30 = 30 seconds)
+::
 |=  [=event:h bowl:h]
 ^-  outcome:h
-::  Only run on cron events
-?.  ?=(%cron -.event)
-  &+[[[%allowed event] ~] state.hook]
-::  Get delay from config
-=+  ;;(delay=@dr (~(gut by config.bowl) 'delay' ~s30))
+=-  &+[[[%allowed event] -] state.hook]
+?.  ?=(%cron -.event)  ~
+^-  (list effect:h)
+=+  ;;(delay=@dr (~(gut by config) 'delay' ~s30))
 =/  cutoff  (sub now delay)
-?~  channel  &+[[[%allowed event] ~] state.hook]
-::  Find posts older than cutoff and delete them
-=/  effects=(list effect:h)
-  %+  murn
-    (tap:on-v-posts:c (lot:on-v-posts:c posts.u.channel ~ `cutoff))
-  |=  [=id-post:c post=(unit v-post:c)]
-  ^-  (unit effect:h)
-  ?~  post  ~
-  `[%channels %channel nest.u.channel %post %del id-post]
-&+[[[%allowed event] effects] state.hook]
+?~  channel  ~
+%+  murn
+  (tap:on-v-posts:c (lot:on-v-posts:c posts.u.channel ~ `cutoff))
+|=  [=id-post:c post=(may:c v-post:c)]
+^-  (unit effect:h)
+?:  ?=(%| -.post)  ~
+`[%channels %channel nest.u.channel %post %del id-post]
 ```
 
-### Example: Ban users who post slurs
+**Key points:**
+- Uses `bowl:h` without face → access `config`, `channel`, `state.hook` directly
+- Uses `on-v-posts:c` ordered map with `lot:` for cutoff filtering
+- Uses `(may:c v-post:c)` type - posts can be deleted (`%|`) or present (`%&`)
+- Check `?=(%| -.post)` to skip already-deleted posts
+
+### Example: Word filter
 
 ```hoon
+:: Word filter hook: blocks posts containing banned words
+:: Config: words (comma-separated list of words to block)
+::
 |=  [=event:h =bowl:h]
 ^-  outcome:h
+|^
+::  Only filter new posts
 ?.  ?=([%on-post %add *] event)
-  &+[[[%allowed event] ~] state.hook]
-::  Check if message contains banned words (simplified)
-=/  content  (trip content.essay.post.on-post.event)
-=/  has-slur  :: your detection logic here
-  %.n
-?.  has-slur
-  &+[[[%allowed event] ~] state.hook]
-::  Deny the post and ban the user
-=/  ban-effect
-  [%groups flag.u.group.bowl %fleet (sy src.bowl ~) %del ~]
-&+[[[%denied `'Banned for prohibited content'] [ban-effect ~]] state.hook]
+  &+[[[%allowed event] ~] state.hook.bowl]
+::  Get banned words from config (comma-separated)
+=+  ;;(words-cord=cord (~(gut by config.bowl) 'words' ''))
+::  Skip if no words configured
+?:  =('' words-cord)
+  &+[[[%allowed event] ~] state.hook.bowl]
+::  Split on commas into list of tapes
+=/  banned=(list tape)
+  (split-on-comma (trip words-cord))
+::  Get message content
+=/  content=tape  (extract-text content.post.event)
+::  Check if any banned word appears in content
+=/  has-banned=?
+  %+  lien  banned
+  |=  word=tape
+  !=(~ (find word content))
+::  If found, deny
+?:  has-banned
+  &+[[[%denied `'Message contains prohibited content'] ~] state.hook.bowl]
+::  Otherwise allow
+&+[[[%allowed event] ~] state.hook.bowl]
+::
+++  split-on-comma
+  |=  txt=tape
+  ^-  (list tape)
+  =/  idx  (find "," txt)
+  ?~  idx
+    ?~  txt  *(list tape)
+    ~[txt]
+  :-  (scag u.idx txt)
+  $(txt (slag +(u.idx) txt))
+::
+++  extract-text
+  |=  =story:c
+  ^-  tape
+  ?~  story  ""
+  =/  verse  i.story
+  ?.  ?=(%inline -.verse)  ""
+  ?~  p.verse  ""
+  =/  inl  i.p.verse
+  ?@  inl
+    (trip inl)
+  ""
+--
 ```
+
+**Key points:**
+- Access post content via `content.post.event`
+- Use `lien` to check if any word in list matches
+- Helper arms (`++`) for text processing go inside `|^` ... `--`
+- Config supports comma-separated values
 
 ## CLI Commands
 
@@ -203,7 +296,7 @@ Basic hook template:
 tlon hooks add "my-hook" ./hook.hoon
 
 # Configure for a channel
-tlon hooks config <id> chat/~host/channel delay=~m5 emoji=:fire:
+tlon hooks config <id> chat/~host/channel delay=~m5 emoji=👍
 
 # Set execution order
 tlon hooks order chat/~host/channel <id1> <id2>
@@ -213,6 +306,9 @@ tlon hooks cron <id> ~h1 --nest chat/~host/channel
 
 # List hooks
 tlon hooks list
+
+# Watch for hook updates (debugging)
+tlon hooks watch
 ```
 
 ## Testing Hooks (Dojo)
@@ -223,7 +319,16 @@ Test without affecting channels:
 -groups!hooks-run <event> [%origin nest optional-state optional-config] <src>
 ```
 
+## Common Pitfalls
+
+1. **Bowl face confusion** - `=bowl:h` vs `bowl:h` changes how you access fields
+2. **Wrong effect structure** - channel effects need exact nesting: `[%channels %channel nest ...]`
+3. **Emoji shortcodes** - use actual unicode (`'👍'`), not `:thumbsup:`
+4. **Self-detection** - check `author.post.event`, not `src.bowl`
+5. **Deleted posts** - in cron, posts can be `%|` (deleted) or `%&` (present)
+
 ## Type References
 
 - Full hooks types: https://github.com/tloncorp/tlon-apps/blob/develop/desk/sur/hooks.hoon
 - Channel types (v-post, v-reply, etc): https://github.com/tloncorp/tlon-apps/blob/develop/desk/sur/channels.hoon
+- Official hooks examples: https://github.com/tloncorp/hooks
