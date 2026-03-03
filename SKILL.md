@@ -23,21 +23,37 @@ curl -L https://registry.npmjs.org/@tloncorp/tlon-skill-darwin-arm64/-/tlon-skil
 
 Replace `darwin-arm64` with `darwin-x64` or `linux-x64` as needed.
 
+
 ## Configuration
 
 **CLI Flags (highest priority):**
 ```bash
-# Pass all three credentials directly
+# Cookie-based auth (fastest - ship parsed from cookie name)
+tlon --url https://your-ship.tlon.network --cookie "urbauth-~your-ship=0v..." <command>
+
+# Code-based auth (requires url + ship + code)
 tlon --url https://your-ship.tlon.network --ship ~your-ship --code sampel-ticlyt-migfun-falmel <command>
 
 # Or load from a JSON config file
 tlon --config ~/ships/my-ship.json <command>
 ```
 
-Config file format: `{"url": "...", "ship": "~...", "code": "..."}`
+Config file format:
+```json
+// Cookie-based (ship derived from cookie)
+{"url": "...", "cookie": "urbauth-~ship=..."}
+
+// Code-based
+{"url": "...", "ship": "~...", "code": "..."}
+```
 
 **Environment Variables:**
 ```bash
+# Cookie-based (ship derived from cookie)
+export URBIT_URL="https://your-ship.tlon.network"
+export URBIT_COOKIE="urbauth-~your-ship=0v..."
+
+# Code-based
 export URBIT_URL="https://your-ship.tlon.network"
 export URBIT_SHIP="~your-ship"
 export URBIT_CODE="sampel-ticlyt-migfun-falmel"
@@ -45,7 +61,43 @@ export URBIT_CODE="sampel-ticlyt-migfun-falmel"
 
 **OpenClaw:** If configured with a Tlon channel, credentials load automatically.
 
-**Resolution order:** CLI flags → `TLON_CONFIG_FILE` → `TLON_SHIP`+`TLON_SKILL_DIR` → `URBIT_*` env vars → OpenClaw config
+**Resolution order:** CLI flags → `TLON_CONFIG_FILE` → `URL + COOKIE` → `URL + SHIP + CODE` → `--ship` with cache → OpenClaw config → cached ships (auto-select if only one)
+
+**Cookie vs Code:**
+- **Cookie-based:** Uses pre-authenticated session cookie. Ship is parsed from the cookie name (`urbauth-~ship=...`). Fastest option.
+- **Code-based:** Performs login to get session cookie. Requires URL + ship + code.
+
+You can provide both cookie and code — cookie is used first, code serves as fallback if cookie expires.
+
+## Cookie Caching
+
+The skill automatically caches auth cookies to `~/.tlon/cache/<ship>.json` after successful authentication. This makes subsequent invocations much faster by skipping the login request.
+
+**How it works:**
+```bash
+# First time - authenticates and caches
+$ tlon --url https://zod.tlon.network --ship ~zod --code abcd-efgh contacts self
+~zod
+Note: Credentials cached for ~zod. Next time just run: tlon <command>
+
+# After that - no flags needed (if only one cached ship)
+$ tlon contacts self
+~zod
+
+# With multiple cached ships - specify which one
+$ tlon --ship ~zod contacts self
+$ tlon --ship ~bus contacts self
+```
+
+**Cache behavior:**
+- Cached cookies are URL-specific (won't use a cookie for the wrong host)
+- If only one ship is cached, it's auto-selected (no flags needed)
+- If multiple ships are cached, you'll be prompted to specify with `--ship`
+- The skill reminds you when you pass credentials that aren't needed
+
+**Clear cache:** `rm ~/.tlon/cache/*.json`
+
+
 
 ## Multi-Ship Usage
 
