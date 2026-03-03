@@ -71,7 +71,7 @@ tlon --config ~/ships/moon.json contacts self
 
 ### Activity
 
-Check recent notifications and unread counts.
+Check recent notifications and unread counts. Ships are shown with nicknames when available.
 
 ```bash
 tlon activity mentions --limit 10   # Recent mentions (max 25)
@@ -82,11 +82,11 @@ tlon activity unreads               # Unread counts per channel
 
 ### Channels
 
-List and manage channels.
+List and manage channels. DMs and group DMs show nicknames when available.
 
 ```bash
-tlon channels dms                                          # List DM contacts
-tlon channels group-dms                                    # List group DMs (clubs)
+tlon channels dms                                          # List DM contacts (with nicknames)
+tlon channels group-dms                                    # List group DMs (clubs, with nicknames)
 tlon channels groups                                       # List subscribed groups
 tlon channels all                                          # List everything
 tlon channels info chat/~host/slug                         # Get channel details
@@ -138,7 +138,7 @@ tlon groups leave ~host/slug                             # Leave a group
 tlon groups delete ~host/slug                            # Delete (host only)
 tlon groups update ~host/slug --title "..." [--description "..."]
 
-# Members
+# Members (shown with nicknames when available)
 tlon groups invite ~host/slug ~ship1 ~ship2              # Invite members
 tlon groups kick ~host/slug ~ship1                       # Kick members
 tlon groups ban ~host/slug ~ship1                        # Ban members
@@ -204,7 +204,7 @@ Notes:
 
 ### Messages
 
-Read and search message history.
+Read and search message history. Authors are shown with nicknames when available.
 
 ```bash
 tlon messages dm ~sampel --limit 20                      # DM history (max 50)
