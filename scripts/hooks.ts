@@ -22,7 +22,7 @@ import { poke, scry, subscribe, unsubscribe } from "@tloncorp/api";
 import { Atom, jam } from "@urbit/nockjs";
 import { render } from "@urbit/aura";
 import { ensureClient } from "./api-client";
-import { getOption } from "./cli-utils";
+import { getOption, hasFlag } from "./cli-utils";
 
 // Types based on sur/hooks.hoon
 interface Hook {
@@ -51,6 +51,101 @@ interface Hooks {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+type HookTemplateType = "on-post" | "cron" | "moderation" | "bare";
+
+function getHookTemplate(name: string, type: HookTemplateType): string {
+  const safeName = name.replace(/[^a-zA-Z0-9-_ ]/g, "").trim() || "my-hook";
+
+  if (type === "cron") {
+    return `:: ${safeName} (${type})
+:: Deletes posts older than configured delay on cron ticks
+:: Config: delay (default ~m30 = 30 minutes)
+|=  [=event:h bowl:h]
+^-  outcome:h
+=-  &+[[[%allowed event] -] state.hook]
+?.  ?=(%cron -.event)  ~
+^-  (list effect:h)
+=+  ;;(delay=@dr (~(gut by config) 'delay' ~m30))
+=/  cutoff  (sub now delay)
+?~  channel  ~
+%+  murn
+  (tap:on-v-posts:c (lot:on-v-posts:c posts.u.channel ~ \`cutoff))
+|=  [=id-post:c post=(may:c v-post:c)]
+^-  (unit effect:h)
+?:  ?=(%| -.post)  ~
+\`[%channels %channel nest.u.channel %post %del id-post]
+`;
+  }
+
+  if (type === "moderation") {
+    return `:: ${safeName} (${type})
+:: Blocks posts containing configured words
+:: Config: blocked (comma-separated), reason
+|=  [=event:h =bowl:h]
+^-  outcome:h
+=+  ;;(blocked=cord (~(gut by config.bowl) 'blocked' 'spam,scam'))
+=+  ;;(reason=cord (~(gut by config.bowl) 'reason' 'Message contains blocked content'))
+?.  ?=([%on-post %add *] event)
+  &+[[[%allowed event] ~] state.hook.bowl]
+=/  text=tape
+  (trip (flatten content.post.event))
+=/  bad=(list tape)
+  %+  turn
+    (rash blocked (more com (star ;~(less com prn))))
+  trip
+=/  has-bad=?
+  %+  lien  bad
+  |=  w=tape
+  !=(~ (find w text))
+?:  has-bad
+  &+[[[%denied (some reason)] ~] state.hook.bowl]
+&+[[[%allowed event] ~] state.hook.bowl]
+`;
+  }
+
+  if (type === "bare") {
+    return `:: ${safeName} (${type})
+|=  [=event:h =bowl:h]
+^-  outcome:h
+&+[[[%allowed event] ~] state.hook.bowl]
+`;
+  }
+
+  return `:: ${safeName} (${type})
+:: Reacts to new posts with configurable emoji
+:: Config: emoji (default 👍)
+|=  [=event:h =bowl:h]
+^-  outcome:h
+=+  ;;(emoji=cord (~(gut by config.bowl) 'emoji' '👍'))
+?.  ?=([%on-post %add *] event)
+  &+[[[%allowed event] ~] state.hook.bowl]
+?:  =(author.post.event our.bowl)
+  &+[[[%allowed event] ~] state.hook.bowl]
+?~  channel.bowl
+  &+[[[%allowed event] ~] state.hook.bowl]
+=/  react-effect=effect:h
+  :*  %channels
+      %channel
+      nest.u.channel.bowl
+      [%post [%add-react id.post.event our.bowl emoji]]
+  ==
+&+[[[%allowed event] [react-effect ~]] state.hook.bowl]
+`;
+}
+
+function initHookTemplate(name: string, type: HookTemplateType, outPath?: string, force: boolean = false): void {
+  const path = outPath || `./${name.replace(/\s+/g, "-").toLowerCase()}.hoon`;
+  if (fs.existsSync(path) && !force) {
+    console.error(`Refusing to overwrite existing file: ${path}`);
+    console.error("Use --force to overwrite.");
+    process.exit(1);
+  }
+  const src = getHookTemplate(name, type);
+  fs.writeFileSync(path, src, "utf-8");
+  console.log(`✅ Created ${type} hook template: ${path}`);
+  console.log("Next: edit the file, then run: tlon hooks add <name> <file>");
 }
 
 async function pokeAndWaitForHooksUpdate(
@@ -332,6 +427,23 @@ async function main() {
   await ensureClient();
 
   switch (command) {
+    case "init": {
+      const name = args[1];
+      if (!name) {
+        console.error("Usage: hooks.ts init <name> [--type on-post|cron|moderation|bare] [--out <file>] [--force]");
+        process.exit(1);
+      }
+      const typeRaw = (getOption(args, "type") || "on-post") as HookTemplateType;
+      if (!["on-post", "cron", "moderation", "bare"].includes(typeRaw)) {
+        console.error(`Invalid --type: ${typeRaw}. Expected one of: on-post, cron, moderation, bare`);
+        process.exit(1);
+      }
+      const out = getOption(args, "out");
+      const force = hasFlag(args, "force");
+      initHookTemplate(name, typeRaw, out, force);
+      break;
+    }
+
     case "list":
       await listHooks();
       break;
@@ -437,13 +549,14 @@ async function main() {
       console.log(`Usage: hooks.ts <command>
 
 Commands:
+  init <name> [--type] [--out]      Create a starter hook template
   list                              List all hooks
   get <id>                          Get hook details and source
   add <name> <src-file>             Add a new hook from file
   edit <id> [--name] [--src]        Edit hook name or source
   delete <id>                       Delete a hook
   order <nest> <id1> [id2...]       Set execution order for channel
-  config <id> <nest> <key=value...> Configure hook for channel
+  config <id> <nest> <key=value...> Configure hook for channel (values are nouns serialized as text)
   cron <id> <schedule> [--nest]     Schedule periodic execution
   rest <id> [--nest]                Stop a cron job
 
@@ -451,7 +564,8 @@ Hook IDs are @uv format (e.g., 0v1a.2b3c4...)
 Schedule is @dr format (e.g., ~h1 for 1 hour, ~m30 for 30 minutes)
 
 Examples:
-  tlon hooks add my-hook ./hook.hoon
+  tlon hooks init my-hook --type on-post
+  tlon hooks add my-hook ./my-hook.hoon
   tlon hooks config 0v1a.2b3c4 chat/~host/channel key1=value1 key2=value2
   tlon hooks cron 0v1a.2b3c4 ~h1 --nest chat/~host/channel
 `);

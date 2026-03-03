@@ -222,7 +222,8 @@ tlon hooks list                                          # List all hooks
 tlon hooks get 0v1a.2b3c4                                # Get hook details and source
 
 # Manage hooks
-tlon hooks add my-hook ./hook.hoon                       # Add a new hook from file
+tlon hooks init my-hook --type on-post                   # Create starter template (on-post|cron|moderation)
+tlon hooks add my-hook ./my-hook.hoon                    # Add a new hook from file
 tlon hooks edit 0v1a.2b3c4 --name "New Name"             # Rename a hook
 tlon hooks edit 0v1a.2b3c4 --src ./updated.hoon          # Update source
 tlon hooks delete 0v1a.2b3c4                             # Delete a hook
