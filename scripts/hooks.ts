@@ -19,6 +19,8 @@
 
 import * as fs from "fs";
 import { poke, scry, subscribe, unsubscribe } from "@tloncorp/api";
+import { Atom, jam } from "@urbit/nockjs";
+import { render } from "@urbit/aura";
 import { ensureClient } from "./api-client";
 
 // Types based on sur/hooks.hoon
@@ -268,11 +270,19 @@ async function configHook(
 ): Promise<void> {
   console.log(`Configuring hook ${id} for ${nest}...`);
   
+  // Convert config values to jammed @uw encoded nouns
+  const jammedConfig: Record<string, string> = {};
+  for (const [key, value] of Object.entries(config)) {
+    // Convert string value to cord (atom) and jam it
+    const cord = Atom.fromCord(value);
+    jammedConfig[key] = render('uw', jam(cord).number);
+  }
+  
   await pokeAndWaitForHooksUpdate("config", {
     config: {
       id,
       nest,
-      config,
+      config: jammedConfig,
     },
   });
   
