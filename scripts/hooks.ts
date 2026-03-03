@@ -61,26 +61,28 @@ function getHookTemplate(name: string, type: HookTemplateType): string {
   if (type === "cron") {
     return `:: ${safeName} (${type})
 :: Deletes posts older than configured delay on cron ticks
+:: Config: delay (default ~m30 = 30 minutes)
 |=  [=event:h bowl:h]
 ^-  outcome:h
-=-  &+[[[%allowed event] -] state.hook.bowl]
+=-  &+[[[%allowed event] -] state.hook]
 ?.  ?=(%cron -.event)  ~
 ^-  (list effect:h)
-=+  ;;(delay=@dr (~(gut by config.bowl) 'delay' ~m30))
-=/  cutoff  (sub now.bowl delay)
-?~  channel.bowl  ~
+=+  ;;(delay=@dr (~(gut by config) 'delay' ~m30))
+=/  cutoff  (sub now delay)
+?~  channel  ~
 %+  murn
-  (tap:on-v-posts:c (lot:on-v-posts:c posts.u.channel.bowl ~ \`cutoff))
+  (tap:on-v-posts:c (lot:on-v-posts:c posts.u.channel ~ \`cutoff))
 |=  [=id-post:c post=(may:c v-post:c)]
 ^-  (unit effect:h)
 ?:  ?=(%| -.post)  ~
-\`[%channels %channel nest.u.channel.bowl %post %del id-post]
+\`[%channels %channel nest.u.channel %post %del id-post]
 `;
   }
 
   if (type === "moderation") {
     return `:: ${safeName} (${type})
 :: Blocks posts containing configured words
+:: Config: blocked (comma-separated), reason
 |=  [=event:h =bowl:h]
 ^-  outcome:h
 =+  ;;(blocked=cord (~(gut by config.bowl) 'blocked' 'spam,scam'))
@@ -96,7 +98,7 @@ function getHookTemplate(name: string, type: HookTemplateType): string {
 =/  has-bad=?
   %+  lien  bad
   |=  w=tape
-  !=(~(find w text))
+  !=(~ (find w text))
 ?:  has-bad
   &+[[[%denied (some reason)] ~] state.hook.bowl]
 &+[[[%allowed event] ~] state.hook.bowl]
@@ -113,20 +115,21 @@ function getHookTemplate(name: string, type: HookTemplateType): string {
 
   return `:: ${safeName} (${type})
 :: Reacts to new posts with configurable emoji
+:: Config: emoji (default 👍)
 |=  [=event:h =bowl:h]
 ^-  outcome:h
-=+  ;;(emoji=cord (~(gut by config.bowl) 'emoji' ':thumbsup:'))
+=+  ;;(emoji=cord (~(gut by config.bowl) 'emoji' '👍'))
 ?.  ?=([%on-post %add *] event)
+  &+[[[%allowed event] ~] state.hook.bowl]
+?:  =(author.post.event our.bowl)
+  &+[[[%allowed event] ~] state.hook.bowl]
+?~  channel.bowl
   &+[[[%allowed event] ~] state.hook.bowl]
 =/  react-effect=effect:h
   :*  %channels
       %channel
       nest.u.channel.bowl
-      %post
-      %reply
-      id.post.event
-      %add
-      [our.bowl now.bowl (some emoji) ~ ~]
+      [%post [%add-react id.post.event our.bowl emoji]]
   ==
 &+[[[%allowed event] [react-effect ~]] state.hook.bowl]
 `;
