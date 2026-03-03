@@ -22,6 +22,7 @@ import { poke, scry, subscribe, unsubscribe } from "@tloncorp/api";
 import { Atom, jam } from "@urbit/nockjs";
 import { render } from "@urbit/aura";
 import { ensureClient } from "./api-client";
+import { getOption } from "./cli-utils";
 
 // Types based on sur/hooks.hoon
 interface Hook {
@@ -321,15 +322,6 @@ async function restHook(id: string, origin?: string): Promise<void> {
   });
   
   console.log(`✅ Cron stopped for hook ${id}`);
-}
-
-// Parse command line options
-function getOption(args: string[], name: string): string | undefined {
-  const idx = args.indexOf(`--${name}`);
-  if (idx !== -1 && args[idx + 1]) {
-    return args[idx + 1];
-  }
-  return undefined;
 }
 
 // Main CLI
