@@ -245,7 +245,6 @@ async function joinGroupById(groupId: string) {
 
 // Delete a group (must be host)
 async function deleteGroupById(groupId: string) {
-  await ensureClient();
   console.log(`Deleting group ${groupId}...`);
 
   await deleteGroup(groupId);
@@ -492,7 +491,7 @@ async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
 
-  await ensureClient();
+  await ensureClient(['groups', 'channels']);
 
   switch (command) {
     case "list":

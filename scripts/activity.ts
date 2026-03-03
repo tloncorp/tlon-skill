@@ -141,8 +141,6 @@ function formatEvent(event: ActivityEvent): string {
 }
 
 async function getActivity(bucket: 'all' | 'mentions' | 'replies', limit: number = 10) {
-  // Initialize client (validates env vars)
-  await ensureClient();
 
   const { events } = await getInitialActivity();
   const bucketEvents = events
@@ -167,8 +165,6 @@ async function getActivity(bucket: 'all' | 'mentions' | 'replies', limit: number
 }
 
 async function getUnreads() {
-  // Initialize client (validates env vars)
-  await ensureClient();
 
   const activity = await getGroupAndChannelUnreads();
 
@@ -216,6 +212,7 @@ async function getUnreads() {
 async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
+  await ensureClient();
   
   // Parse --limit flag
   let limit = 10;
