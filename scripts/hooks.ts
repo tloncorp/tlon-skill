@@ -430,7 +430,7 @@ async function main() {
     case "init": {
       const name = args[1];
       if (!name) {
-        console.error("Usage: hooks.ts init <name> [--type on-post|cron|moderation] [--out <file>] [--force]");
+        console.error("Usage: hooks.ts init <name> [--type on-post|cron|moderation|bare] [--out <file>] [--force]");
         process.exit(1);
       }
       const typeRaw = (getOption(args, "type") || "on-post") as HookTemplateType;
