@@ -106,7 +106,7 @@ Examples:
   console.log(`Title: ${title}`);
   if (image) console.log(`Image: ${image}`);
 
-  await ensureClient();
+  await ensureClient(['channels']);
   const result = await postToNotebook(nest, title, content, image);
 
   if (result.success) {

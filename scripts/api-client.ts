@@ -140,42 +140,51 @@ function loadConfigFile(filePath: string): UrbitConfig {
 
 /**
  * Set up subscriptions required for trackedPoke to receive acks.
- * These must match the paths used by trackedPoke calls in @tloncorp/api.
+ * Only subscribes to requested apps to minimize overhead.
  */
-async function setupSubscriptions(): Promise<void> {
+async function setupSubscriptions(subs: Array<'groups' | 'channels' | 'chat' | 'lanyard'>): Promise<void> {
   if (subscribed) return;
-  
-  // groups mutations (createGroup, deleteGroup, updateGroupMeta, etc.)
-  await subscribe(
-    { app: 'groups', path: '/v1/groups' },
-    () => {}
-  );
-  
-  // channel mutations (createChannel, updateChannel, deleteChannel, etc.)
-  await subscribe(
-    { app: 'channels', path: '/v2' },
-    () => {}
-  );
-  
-  // DM mutations (updateDMMeta)
-  await subscribe(
-    { app: 'chat', path: '/' },
-    () => {}
-  );
-  
-  // lanyard/attestation mutations (phone verify, twitter attestation, etc.)
-  await subscribe(
-    { app: 'lanyard', path: '/v1/records' },
-    () => {}
-  );
-  
+
+  if (subs.includes('groups')) {
+    // groups mutations (createGroup, deleteGroup, updateGroupMeta, etc.)
+    await subscribe(
+      { app: 'groups', path: '/v1/groups' },
+      () => {}
+    );
+  }
+
+  if (subs.includes('channels')) {
+    // channel mutations (createChannel, updateChannel, deleteChannel, etc.)
+    await subscribe(
+      { app: 'channels', path: '/v2' },
+      () => {}
+    );
+  }
+
+  if (subs.includes('chat')) {
+    // DM mutations (updateDMMeta)
+    await subscribe(
+      { app: 'chat', path: '/' },
+      () => {}
+    );
+  }
+
+  if (subs.includes('lanyard')) {
+    // lanyard/attestation mutations (phone verify, twitter attestation, etc.)
+    await subscribe(
+      { app: 'lanyard', path: '/v1/records' },
+      () => {}
+    );
+  }
+
   subscribed = true;
 }
 
 /**
  * Ensure @tloncorp/api client is configured, connected, and subscribed.
+ * Pass required subscription apps to minimize connection overhead.
  */
-export async function ensureClient(): Promise<UrbitConfig> {
+export async function ensureClient(subs: Array<'groups' | 'channels' | 'chat' | 'lanyard'> = []): Promise<UrbitConfig> {
   const cfg = getConfig();
   if (!initialized) {
     await configureClient({
@@ -183,7 +192,7 @@ export async function ensureClient(): Promise<UrbitConfig> {
       shipUrl: cfg.url,
       getCode: async () => cfg.code
     });
-    await setupSubscriptions();
+    await setupSubscriptions(subs);
     initialized = true;
   }
   return cfg;
@@ -193,7 +202,7 @@ export async function ensureClient(): Promise<UrbitConfig> {
  * Get current ship name (with ~)
  */
 export async function getCurrentShip(): Promise<string> {
-  const cfg = await ensureClient();
+  const cfg = await ensureClient([]);
   return preSig(cfg.ship);
 }
 

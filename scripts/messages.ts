@@ -130,7 +130,6 @@ async function fetchDmMessages(
   limit: number = 20,
   resolveCites: boolean = false
 ): Promise<void> {
-  await ensureClient();
   const normalizedShip = normalizeShip(ship);
 
   console.log(`Fetching DMs with: ${normalizedShip}`);
@@ -157,7 +156,6 @@ async function fetchMessages(
   limit: number = 20,
   resolveCites: boolean = false
 ): Promise<void> {
-  await ensureClient();
 
   console.log(`Fetching messages from: ${channel}`);
   console.log(`Limit: ${limit}${resolveCites ? " (resolving quotes)" : ""}\n`);
@@ -180,7 +178,6 @@ async function fetchMessages(
 
 // Search messages in a channel
 async function searchMessages(query: string, channel: string): Promise<void> {
-  await ensureClient();
 
   console.log(`Searching "${query}" in: ${channel}\n`);
 
@@ -206,6 +203,8 @@ async function searchMessages(query: string, channel: string): Promise<void> {
 async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
+
+  await ensureClient();
 
   // Parse --limit flag
   let limit = 20;

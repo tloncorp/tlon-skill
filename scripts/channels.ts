@@ -228,7 +228,6 @@ async function deleteChannelByNest(nest: string) {
 }
 
 async function getGroupsApi(): Promise<ApiGroup[]> {
-  await ensureClient();
   return getGroups();
 }
 
@@ -305,7 +304,7 @@ async function main() {
   const command = args[0];
 
   try {
-    await ensureClient();
+    await ensureClient(['channels']);
     switch (command) {
       case "dms": {
         const dms = await getDms();
