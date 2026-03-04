@@ -56,8 +56,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    # Only run on tags pushed directly to master, or manual workflow_dispatch
-    if: (startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push' && github.ref_name == 'master') || github.event.inputs.dry_run == 'false'
+    # Only run on version tags, or manual workflow_dispatch with dry_run=false
+    if: (startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push') || github.event.inputs.dry_run == 'false'
 
     steps:
       - uses: actions/checkout@v4
