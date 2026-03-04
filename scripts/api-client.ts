@@ -28,7 +28,12 @@ let initialized = false;
 let subscribed = false;
 let cachedConfig: UrbitConfig | null = null;
 
-const CACHE_DIR = path.join(os.homedir(), ".tlon", "cache");
+/**
+ * Get the cache directory, configurable via TLON_CACHE_DIR env var
+ */
+function getCacheDir(): string {
+  return process.env.TLON_CACHE_DIR || path.join(os.homedir(), ".tlon", "cache");
+}
 
 // Track if user provided explicit credentials (for helpful warnings)
 let userProvidedCode = false;
@@ -38,7 +43,7 @@ let userProvidedUrl = false;
  * Get path to cookie cache file for a ship
  */
 function getCachePath(ship: string): string {
-  return path.join(CACHE_DIR, `${ship.replace(/^~/, "")}.json`);
+  return path.join(getCacheDir(), `${ship.replace(/^~/, "")}.json`);
 }
 
 /**
@@ -46,9 +51,10 @@ function getCachePath(ship: string): string {
  */
 function getCachedShips(): CachedAuth[] {
   try {
-    if (!fs.existsSync(CACHE_DIR)) return [];
+    const cacheDir = getCacheDir();
+    if (!fs.existsSync(cacheDir)) return [];
     
-    const files = fs.readdirSync(CACHE_DIR).filter(f => f.endsWith(".json"));
+    const files = fs.readdirSync(cacheDir).filter(f => f.endsWith(".json"));
     const entries: CachedAuth[] = [];
     
     for (const file of files) {
@@ -110,7 +116,7 @@ function getCachedEntry(ship: string): CachedAuth | null {
  */
 function cacheCookie(url: string, ship: string, cookie: string): void {
   try {
-    fs.mkdirSync(CACHE_DIR, { recursive: true, mode: 0o700 });
+    fs.mkdirSync(getCacheDir(), { recursive: true, mode: 0o700 });
     const cachePath = getCachePath(ship);
     const data: CachedAuth = {
       url,
@@ -185,8 +191,8 @@ function getConfigFromOpenClaw(): UrbitConfig | null {
  * Priority:
  * 1. TLON_CONFIG_FILE env var (direct path to config file)
  * 2. Cookie-based auth (URL + COOKIE, ship derived from cookie)
- * 3. Code-based auth (URL + SHIP + CODE)
- * 4. Ship flag with cache lookup (SHIP only, uses cached url+cookie)
+ * 3. Cache lookup (if SHIP provided, checks TLON_CACHE_DIR or ~/.tlon/cache)
+ * 4. Code-based auth (URL + SHIP + CODE) - fallback if cache miss
  * 5. TLON_SHIP + TLON_SKILL_DIR (loads ships/<ship>.json)
  * 6. OpenClaw config (~/.openclaw/openclaw.yaml)
  * 7. Cached ships (if exactly one cached, use it)
@@ -218,19 +224,20 @@ export function getConfig(): UrbitConfig {
     }
   }
 
-  // Code-based auth (URL + SHIP + CODE)
-  if (url && shipEnv && code) {
-    cachedConfig = { url, ship: shipEnv.replace(/^~/, ""), code };
-    return cachedConfig;
-  }
-
-  // Ship-only with cache lookup (--ship ~foo uses cached entry)
-  if (shipEnv && !url && !code && !cookie) {
+  // Check cache first if ship is provided (before code-based auth)
+  // This allows passing URL/SHIP/CODE as fallback while preferring cached cookies
+  if (shipEnv) {
     const cached = getCachedEntry(shipEnv.replace(/^~/, ""));
     if (cached) {
       cachedConfig = { url: cached.url, ship: cached.ship, code: "", cookie: cached.cookie };
       return cachedConfig;
     }
+  }
+
+  // Code-based auth (URL + SHIP + CODE) - fallback if cache miss
+  if (url && shipEnv && code) {
+    cachedConfig = { url, ship: shipEnv.replace(/^~/, ""), code };
+    return cachedConfig;
   }
 
   // Ship + skill dir (loads ships/<ship>.json)
