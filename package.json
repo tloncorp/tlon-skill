@@ -27,7 +27,7 @@
     "@tloncorp/tlon-skill-linux-arm64": "0.2.0"
   },
   "devDependencies": {
-    "@tloncorp/api": "git+https://github.com/tloncorp/api-beta.git#main",
+    "@tloncorp/api": "git+https://github.com/tloncorp/api-beta.git#c5eb1720d94435b62503605acb294ef42a5440b3",
     "@urbit/aura": "^3.0.0",
     "@types/node": "^22.0.0",
     "typescript": "^5.9.3"
