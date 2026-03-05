@@ -59,7 +59,7 @@ function getCachedShips(): CachedAuth[] {
     
     for (const file of files) {
       try {
-        const data = JSON.parse(fs.readFileSync(path.join(CACHE_DIR, file), "utf-8"));
+        const data = JSON.parse(fs.readFileSync(path.join(cacheDir, file), "utf-8"));
         if (data.url && data.ship && data.cookie) {
           entries.push(data);
         }
@@ -229,7 +229,7 @@ export function getConfig(): UrbitConfig {
   if (shipEnv) {
     const cached = getCachedEntry(shipEnv.replace(/^~/, ""));
     if (cached) {
-      cachedConfig = { url: cached.url, ship: cached.ship, code: "", cookie: cached.cookie };
+      cachedConfig = { url: cached.url, ship: cached.ship, code: code || "", cookie: cached.cookie };
       return cachedConfig;
     }
   }
