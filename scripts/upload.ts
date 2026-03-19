@@ -69,13 +69,28 @@ function isUrl(input: string): boolean {
   return /^https?:\/\//i.test(input);
 }
 
-/** Read all of stdin into a Buffer */
+/** Read all of stdin into a Buffer (30s timeout) */
 async function readStdin(): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-  return Buffer.concat(chunks);
+  const TIMEOUT_MS = 30_000;
+  return new Promise<Buffer>((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    const timer = setTimeout(() => {
+      process.stdin.destroy();
+      reject(new Error("stdin read timed out after 30s — did you forget to pipe input?"));
+    }, TIMEOUT_MS);
+
+    process.stdin.on("data", (chunk) => {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    });
+    process.stdin.on("end", () => {
+      clearTimeout(timer);
+      resolve(Buffer.concat(chunks));
+    });
+    process.stdin.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
 }
 
 /** Upload a Blob and return the resulting URL */
