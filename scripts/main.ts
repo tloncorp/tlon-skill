@@ -11,7 +11,7 @@
  *   contacts     Contact/profile management
  *   dms          Direct message operations
  *   groups       Group management
- *   messages     Message history and search
+ *   messages     Message history and search (dm, channel, history, search, context, post)
  *   notebook     Post to diary/notebook channels
  *   posts        Post reactions, edits, deletes
  *   settings     OpenClaw settings management
@@ -35,7 +35,7 @@ Commands:
   expose       Manage public content exposure (list, show, hide, check, url)
   groups       Group management (list, create, info, invite, join, leave, delete, ...)
   hooks        Channel hooks management (list, add, edit, delete, order, config, cron, rest)
-  messages     Message history and search (dm, channel, history, search)
+  messages     Message history and search (dm, channel, history, search, context, post)
   notebook     Post to diary/notebook channels
   posts        Post reactions, edits, deletes (react, unreact, edit, delete)
   settings     OpenClaw settings management (get, set, delete, allow-dm, ...)

@@ -7,6 +7,8 @@
  *   npx ts-node scripts/messages.ts channel chat/~host/channel-slug [--limit N] [--resolve-cites]
  *   npx ts-node scripts/messages.ts history "chat/~host/channel-slug" [--limit N] [--resolve-cites]
  *   npx ts-node scripts/messages.ts search "query" --channel chat/~host/channel-slug
+ *   npx ts-node scripts/messages.ts context <channel|~ship> <postId> [--limit N] [--resolve-cites]
+ *   npx ts-node scripts/messages.ts post <channel|~ship> <postId> [--author ~ship] [--resolve-cites]
  *
  * Options:
  *   --resolve-cites, --quotes   Fetch and display quoted/cited message content
@@ -15,6 +17,7 @@
 import {
   getChannelPosts,
   getPostReference,
+  getPostWithReplies,
   getTextContent,
   searchChannel,
 } from "@tloncorp/api";
@@ -93,7 +96,7 @@ async function resolveCites(post: Post): Promise<string[]> {
   return citeTexts;
 }
 
-async function printPosts(posts: Post[], resolve: boolean) {
+async function printPosts(posts: Post[], resolve: boolean, highlightId?: string) {
   if (!posts.length) {
     console.log("No messages found.");
     return;
@@ -106,8 +109,9 @@ async function printPosts(posts: Post[], resolve: boolean) {
     const time = formatTime(post.sentAt);
     const text = extractText(post.content);
     const replySuffix = post.parentId ? ` (reply to ${post.parentId})` : "";
+    const marker = highlightId && post.id === highlightId ? " ◀ TARGET" : "";
 
-    console.log(`- ${author} @ ${time}${replySuffix}`);
+    console.log(`- ${author} @ ${time}${replySuffix}${marker}`);
     console.log(`  ID: ${post.id}`);
     if (text) {
       console.log(`  ${text}`);
@@ -199,6 +203,87 @@ async function searchMessages(query: string, channel: string): Promise<void> {
   }
 }
 
+// Fetch context around a specific post (messages before and after)
+// Uses the backend's native %around scry which fetches N posts in each
+// direction plus the target post itself in a single request.
+async function fetchContext(
+  channelId: string,
+  postId: string,
+  limit: number = 10,
+  resolve: boolean = false
+): Promise<void> {
+  console.log(`Fetching context around post ${postId} in ${channelId}`);
+  console.log(`Limit: ${limit} messages each direction${resolve ? " (resolving quotes)" : ""}\n`);
+
+  try {
+    // The backend supports %around mode which fetches N older + N newer + the
+    // target post in one scry. The JS API types only declare "older"|"newer"
+    // but the path builder is generic, so "around" just works at runtime.
+    const data = await getChannelPosts({
+      channelId,
+      cursor: postId,
+      mode: "around" as any,
+      count: limit,
+      includeReplies: true,
+    });
+
+    console.log(`=== Context around ${postId} (${data.posts.length} messages) ===\n`);
+
+    await printPosts(data.posts, resolve, postId);
+  } catch (error: any) {
+    console.error(`Error fetching context: ${error.message}`);
+  }
+}
+
+// Fetch a single post (with replies if it's a thread)
+async function fetchPost(
+  channelId: string,
+  postId: string,
+  authorId?: string,
+  resolve: boolean = false
+): Promise<void> {
+  console.log(`Fetching post ${postId} from ${channelId}\n`);
+
+  try {
+    const post = await getPostWithReplies({
+      channelId,
+      postId,
+      authorId,
+    });
+
+    if (!post) {
+      console.log("Post not found.");
+      return;
+    }
+
+    const author = post.authorId || "unknown";
+    const time = formatTime(post.sentAt);
+    const text = extractText(post.content);
+
+    console.log(`=== Post ${postId} ===\n`);
+    console.log(`Author: ${author}`);
+    console.log(`Time: ${time}`);
+    console.log(`ID: ${post.id}`);
+    if (text) {
+      console.log(`\n${text}`);
+    }
+
+    if (resolve) {
+      const cites = await resolveCites(post);
+      for (const cite of cites) {
+        console.log(`\n> ${cite}`);
+      }
+    }
+
+    if (post.replies && post.replies.length > 0) {
+      console.log(`\n--- Replies (${post.replies.length}) ---\n`);
+      await printPosts(post.replies, resolve);
+    }
+  } catch (error: any) {
+    console.error(`Error fetching post: ${error.message}`);
+  }
+}
+
 // CLI
 async function main() {
   const args = process.argv.slice(2);
@@ -273,19 +358,54 @@ async function main() {
         break;
       }
 
+      case "context": {
+        const target = args[1];
+        const postId = args[2];
+        if (!target || !postId) {
+          console.log(
+            "Usage: messages.ts context <channel|~ship> <postId> [--limit N] [--resolve-cites]"
+          );
+          process.exit(1);
+        }
+        await fetchContext(target, postId, limit, resolveCites);
+        break;
+      }
+
+      case "post": {
+        const target = args[1];
+        const postId = args[2];
+        if (!target || !postId) {
+          console.log(
+            "Usage: messages.ts post <channel|~ship> <postId> [--author ~ship] [--resolve-cites]"
+          );
+          process.exit(1);
+        }
+        let author: string | undefined;
+        const authorIdx = args.indexOf("--author");
+        if (authorIdx !== -1 && args[authorIdx + 1]) {
+          author = normalizeShip(args[authorIdx + 1]);
+        }
+        await fetchPost(target, postId, author, resolveCites);
+        break;
+      }
+
       default:
         console.log(`Usage: messages.ts <command>
 
 Commands:
-  dm ~ship                          Show DM history
-  channel <nest>                    Show channel messages
-  history <nest>                    Alias for channel
-  search "query" --channel <nest>   Search in channel
+  dm ~ship                                    Show DM history
+  channel <nest>                              Show channel messages
+  history <nest>                              Alias for channel
+  search "query" --channel <nest>             Search in channel
+  context <channel|~ship> <postId>            Show messages around a post
+  post <channel|~ship> <postId>               Fetch a single post with replies
 
 Examples:
   npx ts-node scripts/messages.ts dm ~sampel-palnet --limit 10
   npx ts-node scripts/messages.ts channel chat/~host/channel-slug --limit 20
   npx ts-node scripts/messages.ts search "hello" --channel chat/~host/slug
+  npx ts-node scripts/messages.ts context chat/~host/slug 170.141.184... --limit 5
+  npx ts-node scripts/messages.ts post chat/~host/slug 170.141.184...
 `);
         process.exit(1);
     }
