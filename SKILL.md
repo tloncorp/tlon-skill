@@ -276,6 +276,8 @@ For DMs, use the ship name as the channel: `tlon messages context ~sampel 170.14
 The `post` command fetches a single post with its replies/thread. For DM posts,
 pass `--author ~ship` (required for DM/club lookups).
 
+**Tip:** Use `search` to find a message, then `context` with its ID to see the surrounding conversation.
+
 ### DMs
 
 Manage direct messages.
