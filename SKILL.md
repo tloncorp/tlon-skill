@@ -263,9 +263,18 @@ Read and search message history. Authors are shown with nicknames when available
 tlon messages dm ~sampel --limit 20                      # DM history (max 50)
 tlon messages channel chat/~host/slug --limit 20         # Channel history (max 50)
 tlon messages search "query" --channel chat/~host/slug   # Search messages
+tlon messages context chat/~host/slug 170.141... --limit 5  # Messages around a post
+tlon messages post chat/~host/slug 170.141...            # Fetch single post with replies
 ```
 
 Options: `--limit N`, `--resolve-cites`
+
+The `context` command fetches N messages before and after a given post ID — useful for
+finding surrounding conversation when you have a post from search or activity.
+For DMs, use the ship name as the channel: `tlon messages context ~sampel 170.141...`
+
+The `post` command fetches a single post with its replies/thread. For DM posts,
+pass `--author ~ship` (required for DM/club lookups).
 
 ### DMs
 
