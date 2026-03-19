@@ -39,7 +39,7 @@ Commands:
   notebook     Post to diary/notebook channels
   posts        Post reactions, edits, deletes (react, unreact, edit, delete)
   settings     OpenClaw settings management (get, set, delete, allow-dm, ...)
-  upload       Upload an image from URL to Tlon storage
+  upload       Upload a file from URL, local path, or stdin
 
 Credential Options (override defaults):
   --config <file>   Path to JSON config file with url + cookie or url + ship + code

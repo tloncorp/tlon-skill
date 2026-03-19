@@ -24,6 +24,17 @@ import { render } from "@urbit/aura";
 import { ensureClient } from "./api-client";
 import { getOption, hasFlag } from "./cli-utils";
 
+// Helper to create a cord (UTF-8 string as little-endian atom) from a JS string
+// Atom.fromCord doesnt handle multi-byte UTF-8 (like emojis) correctly
+function cordFromUtf8(s: string): typeof Atom.prototype {
+  const bytes = Buffer.from(s, "utf8");
+  let num = 0n;
+  for (let i = 0; i < bytes.length; i++) {
+    num |= BigInt(bytes[i]) << BigInt(i * 8);
+  }
+  return Atom.fromInt(num);
+}
+
 // Types based on sur/hooks.hoon
 interface Hook {
   id: string;
@@ -370,7 +381,7 @@ async function configHook(
   const jammedConfig: Record<string, string> = {};
   for (const [key, value] of Object.entries(config)) {
     // Convert string value to cord (atom) and jam it
-    const cord = Atom.fromCord(value);
+    const cord = cordFromUtf8(value);
     jammedConfig[key] = render('uw', jam(cord).number);
   }
   

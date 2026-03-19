@@ -341,13 +341,21 @@ The `--content` file should be Story JSON format (array of verses with headers, 
 
 ### Upload
 
-Upload images to Tlon storage.
+Upload files to Tlon storage from a URL, local path, or stdin.
 
 ```bash
-tlon upload https://example.com/image.png    # Upload image from URL
+tlon upload https://example.com/image.png         # Upload from URL
+tlon upload ./photo.jpg                            # Upload local file
+tlon upload ~/Pictures/screenshot.png              # Upload with absolute path
+tlon upload ./mystery-file -t image/webp           # Override content type
+cat image.png | tlon upload --stdin -t image/png   # Upload from stdin
 ```
 
-Returns the uploaded image URL for use in posts, profiles, etc.
+Options: `-t`/`--type` (override MIME type), `--stdin` (read from stdin)
+
+Content type is auto-detected from file extension for local files. For stdin, `-t` is recommended (defaults to `application/octet-stream`).
+
+Returns the uploaded URL for use in posts, profiles, etc.
 
 ### Settings (OpenClaw)
 
