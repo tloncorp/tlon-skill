@@ -8,6 +8,7 @@
  *   npx ts-node scripts/messages.ts history "chat/~host/channel-slug" [--limit N] [--resolve-cites]
  *   npx ts-node scripts/messages.ts search "query" --channel chat/~host/channel-slug
  *   npx ts-node scripts/messages.ts context <channel|~ship> <postId> [--limit N] [--resolve-cites]
+ *   npx ts-node scripts/messages.ts post <channel|~ship> <postId> [--author ~ship] [--resolve-cites]
  *
  * Options:
  *   --resolve-cites, --quotes   Fetch and display quoted/cited message content
@@ -95,7 +96,7 @@ async function resolveCites(post: Post): Promise<string[]> {
   return citeTexts;
 }
 
-async function printPosts(posts: Post[], resolve: boolean) {
+async function printPosts(posts: Post[], resolve: boolean, highlightId?: string) {
   if (!posts.length) {
     console.log("No messages found.");
     return;
@@ -108,8 +109,9 @@ async function printPosts(posts: Post[], resolve: boolean) {
     const time = formatTime(post.sentAt);
     const text = extractText(post.content);
     const replySuffix = post.parentId ? ` (reply to ${post.parentId})` : "";
+    const marker = highlightId && post.id === highlightId ? " ◀ TARGET" : "";
 
-    console.log(`- ${author} @ ${time}${replySuffix}`);
+    console.log(`- ${author} @ ${time}${replySuffix}${marker}`);
     console.log(`  ID: ${post.id}`);
     if (text) {
       console.log(`  ${text}`);
@@ -225,32 +227,9 @@ async function fetchContext(
       includeReplies: true,
     });
 
-    const sorted = data.posts.sort((a, b) => a.sentAt - b.sentAt);
+    console.log(`=== Context around ${postId} (${data.posts.length} messages) ===\n`);
 
-    console.log(`=== Context around ${postId} (${sorted.length} messages) ===\n`);
-
-    for (const post of sorted) {
-      const author = post.authorId || "unknown";
-      const time = formatTime(post.sentAt);
-      const text = extractText(post.content);
-      const replySuffix = post.parentId ? ` (reply to ${post.parentId})` : "";
-      const marker = post.id === postId ? " ◀ TARGET" : "";
-
-      console.log(`- ${author} @ ${time}${replySuffix}${marker}`);
-      console.log(`  ID: ${post.id}`);
-      if (text) {
-        console.log(`  ${text}`);
-      }
-
-      if (resolve) {
-        const cites = await resolveCites(post);
-        for (const cite of cites) {
-          console.log(`  > ${cite}`);
-        }
-      }
-
-      console.log("");
-    }
+    await printPosts(data.posts, resolve, postId);
   } catch (error: any) {
     console.error(`Error fetching context: ${error.message}`);
   }
