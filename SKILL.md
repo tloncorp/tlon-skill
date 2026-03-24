@@ -206,6 +206,12 @@ tlon groups update-role ~host/slug role-id --title "..." # Update a role
 tlon groups assign-role ~host/slug role-id ~ship1        # Assign role
 tlon groups remove-role ~host/slug role-id ~ship1        # Remove role
 
+# Admin
+tlon groups promote ~host/slug ~ship1 [~ship2 ...]      # Promote member(s) to admin
+tlon groups demote ~host/slug ~ship1 [~ship2 ...]       # Demote member(s) from admin
+tlon groups set-admin ~host/slug role-id                 # Make a role an admin role
+tlon groups del-admin ~host/slug role-id                 # Remove admin from a role
+
 # Channels
 tlon groups add-channel ~host/slug "Name" [--kind chat|diary|heap]
 ```
