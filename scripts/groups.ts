@@ -24,8 +24,6 @@
  *   npx ts-node scripts/groups.ts reject-join <group-id> <ship> [<ship2> ...]
  *   npx ts-node scripts/groups.ts promote <group-id> <ship> [<ship2> ...]
  *   npx ts-node scripts/groups.ts demote <group-id> <ship> [<ship2> ...]
- *   npx ts-node scripts/groups.ts set-admin <group-id> <role-id>
- *   npx ts-node scripts/groups.ts del-admin <group-id> <role-id>
  *   npx ts-node scripts/groups.ts add-channel <group-id> "Channel Name" [--kind chat|diary|heap] [--description "..."]
  */
 
@@ -491,56 +489,6 @@ async function addChannel(
   return nest;
 }
 
-// Promote a role to admin
-async function promoteRoleToAdmin(groupId: string, roleId: string) {
-  console.log(`Promoting role "${roleId}" to admin in ${groupId}...`);
-
-  await poke({
-    app: "groups",
-    mark: "group-action-4",
-    json: {
-      group: {
-        flag: groupId,
-        "a-group": {
-          role: {
-            roles: [roleId],
-            "a-role": {
-              "set-admin": null,
-            },
-          },
-        },
-      },
-    },
-  });
-
-  console.log(`✅ Role "${roleId}" is now an admin role.`);
-}
-
-// Demote a role from admin
-async function demoteRoleFromAdmin(groupId: string, roleId: string) {
-  console.log(`Removing admin from role "${roleId}" in ${groupId}...`);
-
-  await poke({
-    app: "groups",
-    mark: "group-action-4",
-    json: {
-      group: {
-        flag: groupId,
-        "a-group": {
-          role: {
-            roles: [roleId],
-            "a-role": {
-              "del-admin": null,
-            },
-          },
-        },
-      },
-    },
-  });
-
-  console.log(`✅ Role "${roleId}" is no longer an admin role.`);
-}
-
 // Promote a member to admin by assigning them an admin role
 async function promoteMemberToAdmin(groupId: string, ships: string[]) {
   const normalizedShips = ships.map(normalizeShip);
@@ -864,28 +812,6 @@ async function main() {
       break;
     }
 
-    case "set-admin": {
-      const groupId = args[1];
-      const roleId = args[2];
-      if (!groupId || !roleId) {
-        console.error("Usage: groups.ts set-admin <group-id> <role-id>");
-        process.exit(1);
-      }
-      await promoteRoleToAdmin(groupId, roleId);
-      break;
-    }
-
-    case "del-admin": {
-      const groupId = args[1];
-      const roleId = args[2];
-      if (!groupId || !roleId) {
-        console.error("Usage: groups.ts del-admin <group-id> <role-id>");
-        process.exit(1);
-      }
-      await demoteRoleFromAdmin(groupId, roleId);
-      break;
-    }
-
     case "add-channel": {
       const groupId = args[1];
       const title = args[2];
@@ -926,8 +852,6 @@ Commands:
   reject-join
   promote
   demote
-  set-admin
-  del-admin
   add-channel
 `);
       process.exit(1);
