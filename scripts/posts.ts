@@ -15,7 +15,7 @@
  */
 
 import * as fs from "fs";
-import { addReaction, deletePost, editPost, getChannelPosts, getCurrentUserId, removeReaction } from "@tloncorp/api";
+import { addReaction, deletePost, editPost, getChannelPosts, getCurrentUserId, removeReaction, sendPost } from "@tloncorp/api";
 import type { Post } from "@tloncorp/api";
 import { ensureClient } from "./api-client";
 import { markdownToStory, type Story } from "./story";
@@ -291,6 +291,60 @@ async function main() {
         break;
       }
 
+      case "blob": {
+        const nestArg = args[1];
+        if (!nestArg) {
+          console.error("Usage: posts.ts blob <nest> --blob '<json>' | --blob-file <path> [--caption <text>]");
+          process.exit(1);
+        }
+
+        const blobIdx = args.indexOf("--blob");
+        const blobFileIdx = args.indexOf("--blob-file");
+        const captionIdx = args.indexOf("--caption");
+
+        let blobJson: string | undefined;
+        if (blobIdx !== -1) {
+          blobJson = args[blobIdx + 1];
+        } else if (blobFileIdx !== -1) {
+          const filePath = args[blobFileIdx + 1];
+          if (!filePath) {
+            console.error("--blob-file requires a path argument");
+            process.exit(1);
+          }
+          blobJson = fs.readFileSync(filePath, "utf-8").trim();
+        }
+
+        if (!blobJson) {
+          console.error("Either --blob '<json>' or --blob-file <path> is required");
+          process.exit(1);
+        }
+
+        let blobData: unknown[];
+        try {
+          blobData = JSON.parse(blobJson);
+          if (!Array.isArray(blobData)) throw new Error("Blob must be a JSON array");
+        } catch (e: any) {
+          console.error(`Invalid blob JSON: ${e.message}`);
+          process.exit(1);
+        }
+
+        const caption = captionIdx !== -1 ? args[captionIdx + 1] : undefined;
+        const our = getCurrentUserId();
+        const sentAt = Date.now();
+        const content = caption ? [{ inline: [caption] }] : [{ inline: [""] }];
+
+        await sendPost({
+          channelId: nestArg,
+          authorId: our,
+          sentAt,
+          content,
+          blob: JSON.stringify(blobData),
+        });
+
+        console.log("✓ Blob posted");
+        break;
+      }
+
       case "send":
         console.error("error: Channel post send is handled by the Tlon channel plugin.");
         console.error("Use the channel message tool with channel=tlon instead.");
@@ -313,6 +367,9 @@ Commands:
   unreact <channel> <post-id>           Remove your reaction from a post
   edit <channel> <post-id> <message>    Edit a post [--title <t>] [--image <url>] [--content <json>]
   delete <channel> <post-id>            Delete a post
+  blob <nest> --blob '<json>'           Post an A2UI blob
+           [--blob-file <path>]         Post blob from JSON file
+           [--caption <text>]           Optional caption text
 
 Edit options:
   --title <title>      Set/update notebook post title
