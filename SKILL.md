@@ -206,6 +206,19 @@ tlon groups update-role ~host/slug role-id --title "..." # Update a role
 tlon groups assign-role ~host/slug role-id ~ship1        # Assign role
 tlon groups remove-role ~host/slug role-id ~ship1        # Remove role
 
+# Admin
+tlon groups promote ~host/slug ~ship1 [~ship2 ...]      # Promote member(s) to admin
+tlon groups demote ~host/slug ~ship1 [~ship2 ...]       # Demote member(s) from admin
+
+Roles vs Admin:
+- Regular roles are for organizing members and controlling channel read/write permissions.
+- Admin is a special privilege on top of a role. Admins can manage group settings,
+  channels, members, and roles.
+- `promote` creates an "admin" role (if one doesn't exist), grants it admin privileges,
+  and assigns it to the specified members. `demote` removes that role from them.
+- To grant admin to members who already share a role, use `set-admin` on that role
+  via the backend directly (not yet exposed in the Tlon app UI).
+
 # Channels
 tlon groups add-channel ~host/slug "Name" [--kind chat|diary|heap]
 ```

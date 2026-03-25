@@ -22,6 +22,8 @@
  *   npx ts-node scripts/groups.ts set-privacy <group-id> <public|private|secret>
  *   npx ts-node scripts/groups.ts accept-join <group-id> <ship> [<ship2> ...]
  *   npx ts-node scripts/groups.ts reject-join <group-id> <ship> [<ship2> ...]
+ *   npx ts-node scripts/groups.ts promote <group-id> <ship> [<ship2> ...]
+ *   npx ts-node scripts/groups.ts demote <group-id> <ship> [<ship2> ...]
  *   npx ts-node scripts/groups.ts add-channel <group-id> "Channel Name" [--kind chat|diary|heap] [--description "..."]
  */
 
@@ -41,6 +43,7 @@ import {
   inviteGroupMembers,
   kickUsersFromGroup,
   leaveGroup,
+  poke,
   rejectGroupJoin,
   removeMembersFromRole,
   requestGroupInvitation,
@@ -486,6 +489,82 @@ async function addChannel(
   return nest;
 }
 
+// Promote a member to admin by assigning them an admin role
+async function promoteMemberToAdmin(groupId: string, ships: string[]) {
+  const normalizedShips = ships.map(normalizeShip);
+  const group = await getGroup(groupId);
+
+  // Find or create an admin role
+  const adminRole = (group.roles || []).find((r) => r.id === "admin");
+
+  if (!adminRole) {
+    // Create an "admin" role and make it admin
+    console.log(`Creating "admin" role in ${groupId}...`);
+    await addGroupRole({
+      groupId,
+      roleId: "admin",
+      meta: { title: "Admin", description: "Group administrator" },
+    });
+    await poke({
+      app: "groups",
+      mark: "group-action-4",
+      json: {
+        group: {
+          flag: groupId,
+          "a-group": {
+            role: {
+              roles: ["admin"],
+              "a-role": {
+                "set-admin": null,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  console.log(`Promoting ${normalizedShips.join(", ")} to admin in ${groupId}...`);
+
+  await addMembersToRole({
+    groupId,
+    roleId: "admin",
+    ships: normalizedShips,
+  });
+
+  console.log(`✅ Members promoted to admin.`);
+}
+
+// Demote a member from admin by removing them from admin roles
+async function demoteMemberFromAdmin(groupId: string, ships: string[]) {
+  const normalizedShips = ships.map(normalizeShip);
+  const group = await getGroup(groupId);
+
+  // Find all admin roles this member might have
+  // For now, check the "admin" role
+  const adminRoles = (group.roles || []).filter((r) => {
+    // We can't easily tell which roles are admin from the group info alone,
+    // so we target the "admin" role specifically
+    return r.id === "admin";
+  });
+
+  if (adminRoles.length === 0) {
+    console.error(`No "admin" role found in ${groupId}.`);
+    process.exit(1);
+  }
+
+  for (const role of adminRoles) {
+    console.log(`Removing "${role.id}" role from ${normalizedShips.join(", ")}...`);
+    await removeMembersFromRole({
+      groupId,
+      roleId: role.id,
+      ships: normalizedShips,
+    });
+  }
+
+  console.log(`✅ Members demoted from admin.`);
+}
+
 // Main
 async function main() {
   const args = process.argv.slice(2);
@@ -711,6 +790,28 @@ async function main() {
       break;
     }
 
+    case "promote": {
+      const groupId = args[1];
+      const ships = args.slice(2);
+      if (!groupId || ships.length === 0) {
+        console.error("Usage: groups.ts promote <group-id> <ship> [<ship2> ...]");
+        process.exit(1);
+      }
+      await promoteMemberToAdmin(groupId, ships);
+      break;
+    }
+
+    case "demote": {
+      const groupId = args[1];
+      const ships = args.slice(2);
+      if (!groupId || ships.length === 0) {
+        console.error("Usage: groups.ts demote <group-id> <ship> [<ship2> ...]");
+        process.exit(1);
+      }
+      await demoteMemberFromAdmin(groupId, ships);
+      break;
+    }
+
     case "add-channel": {
       const groupId = args[1];
       const title = args[2];
@@ -749,6 +850,8 @@ Commands:
   set-privacy
   accept-join
   reject-join
+  promote
+  demote
   add-channel
 `);
       process.exit(1);
