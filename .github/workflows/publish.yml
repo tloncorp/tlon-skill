@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_call: {}
   workflow_dispatch:
     inputs:
       dry_run:
@@ -56,8 +57,11 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    # Only run on version tags, or manual workflow_dispatch with dry_run=false
-    if: (startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push') || github.event.inputs.dry_run == 'false'
+    # Run on: version tag push, workflow_call from bump, or manual dispatch with dry_run=false
+    if: >-
+      (startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push') ||
+      github.event_name == 'workflow_call' ||
+      github.event.inputs.dry_run == 'false'
 
     steps:
       - uses: actions/checkout@v4

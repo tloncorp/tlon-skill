@@ -34,3 +34,7 @@ jobs:
           git tag "v${{ inputs.version }}"
           git push
           git push --tags
+
+  publish:
+    needs: bump
+    uses: ./.github/workflows/publish.yml
