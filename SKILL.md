@@ -134,11 +134,10 @@ tlon activity unreads               # Unread counts per channel
 
 ### Channels
 
-List and manage channels. DMs and group DMs show nicknames when available.
+List and manage channels. DMs show nicknames when available.
 
 ```bash
 tlon channels dms                                          # List DM contacts (with nicknames)
-tlon channels group-dms                                    # List group DMs (clubs, with nicknames)
 tlon channels groups                                       # List subscribed groups
 tlon channels all                                          # List everything
 tlon channels info chat/~host/slug                         # Get channel details
@@ -287,7 +286,7 @@ finding surrounding conversation when you have a post from search or activity.
 For DMs, use the ship name as the channel: `tlon messages context ~sampel 170.141...`
 
 The `post` command fetches a single post with its replies/thread. For DM posts,
-pass `--author ~ship` (required for DM/club lookups).
+pass `--author ~ship` (required for DM lookups).
 
 **Tip:** Use `search` to find a message, then `context` with its ID to see the surrounding conversation.
 
@@ -296,10 +295,6 @@ pass `--author ~ship` (required for DM/club lookups).
 Manage direct messages.
 
 ```bash
-# Group DMs (clubs)
-tlon dms send <club-id> "hello"                          # Send to group DM
-tlon dms reply <club-id> ~author/170.141... "reply"      # Reply in group DM
-
 # Management
 tlon dms react ~sampel ~author/170.141... "👍"           # React to a DM
 tlon dms unreact ~sampel ~author/170.141...              # Remove reaction
