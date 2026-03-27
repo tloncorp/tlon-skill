@@ -1,11 +1,15 @@
 ---
 name: tlon
-description: Interact with Tlon/Urbit API. Use for contacts (get/update profiles), listing channels/groups, fetching message history, posting to channels, sending DMs, group management, and exposing content to the clearweb.
+description: Interact with Tlon/Urbit API. Use for reading activity, message history, contacts, channels, and groups. Also for group/channel administration, profile management, and exposing content to the clearweb.
 ---
 
 # Tlon Skill
 
-Use the `tlon` command for all Tlon operations.
+Use the `tlon` command for reading data, managing channels/groups/contacts, and administration.
+
+## OpenClaw
+
+When running as an OpenClaw skill, use the built-in `message` tool for sending outbound messages (DMs and channel posts). The `tlon` command is for reading data, administration, and management — not for sending messages. The `message` tool routes through the proper delivery infrastructure (threading, bot profile, rate limiting).
 
 ## Installation
 
@@ -293,19 +297,19 @@ pass `--author ~ship` (required for DM/club lookups).
 
 ### DMs
 
-Manage direct messages.
+Manage direct messages — reactions, invites, and deletions.
 
 ```bash
-# Group DMs (clubs)
-tlon dms send <club-id> "hello"                          # Send to group DM
-tlon dms reply <club-id> ~author/170.141... "reply"      # Reply in group DM
-
 # Management
 tlon dms react ~sampel ~author/170.141... "👍"           # React to a DM
 tlon dms unreact ~sampel ~author/170.141...              # Remove reaction
 tlon dms delete ~sampel ~author/170.141...               # Delete a DM
 tlon dms accept ~sampel                                  # Accept DM invite
 tlon dms decline ~sampel                                 # Decline DM invite
+
+# Legacy: group DMs (clubs — deprecated, no longer in Tlon app UI)
+tlon dms send <club-id> "hello"                          # Send to group DM
+tlon dms reply <club-id> ~author/170.141... "reply"      # Reply in group DM
 ```
 
 ### Expose
