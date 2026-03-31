@@ -24,6 +24,38 @@ import {
 import type { ContentReference, Post } from "@tloncorp/api";
 import { ensureClient, normalizeShip } from "./api-client";
 
+// Blob attachment types from @tloncorp/api/blob
+type BlobAttachment =
+  | BlobFileAttachment
+  | BlobVoiceMemoAttachment
+  | BlobVideoAttachment
+  | BlobImageAttachment;
+
+interface BlobFileAttachment {
+  type: "file";
+  name?: string;
+  mimeType?: string;
+  size?: number;
+  fileUri?: string;
+}
+
+interface BlobVoiceMemoAttachment {
+  type: "voicememo";
+  duration?: number;
+  transcription?: string;
+}
+
+interface BlobVideoAttachment {
+  type: "video";
+  name?: string;
+  mimeType?: string;
+}
+
+interface BlobImageAttachment {
+  type: "image";
+  // Additional image fields could be added here
+}
+
 // Extract text content from a Story
 function extractText(content: any): string {
   if (!content) return "";
@@ -118,9 +150,9 @@ async function printPosts(posts: Post[], resolve: boolean, highlightId?: string)
     }
 
     // Show blob/attachment info (PDFs, files, voice memos)
-    if ((post as any).blob) {
+    if (post.blob) {
       try {
-        const blobData = JSON.parse((post as any).blob);
+        const blobData: BlobAttachment[] = JSON.parse(post.blob);
         if (Array.isArray(blobData)) {
           for (const entry of blobData) {
             if (entry.type === "file") {
@@ -136,7 +168,7 @@ async function printPosts(posts: Post[], resolve: boolean, highlightId?: string)
           }
         }
       } catch {
-        console.log(`  [blob: ${(post as any).blob.slice(0, 100)}...]`);
+        console.log(`  [blob: ${post.blob.slice(0, 100)}...]`);
       }
     }
 
