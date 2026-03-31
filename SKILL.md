@@ -143,7 +143,7 @@ tlon activity unreads               # Unread counts per channel
 
 ### Channels
 
-List and manage channels. DMs and group DMs show nicknames when available.
+List and manage channels. DMs show nicknames when available.
 
 ```bash
 tlon channels dms                                          # List DM contacts (with nicknames)
