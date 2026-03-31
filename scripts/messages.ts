@@ -22,39 +22,9 @@ import {
   searchChannel,
 } from "@tloncorp/api";
 import type { ContentReference, Post } from "@tloncorp/api";
+import { parsePostBlob } from "@tloncorp/api/lib/content-helpers";
+import type { PostBlobDataEntry } from "@tloncorp/api/lib/content-helpers";
 import { ensureClient, normalizeShip } from "./api-client";
-
-// Blob attachment types from @tloncorp/api/blob
-type BlobAttachment =
-  | BlobFileAttachment
-  | BlobVoiceMemoAttachment
-  | BlobVideoAttachment
-  | BlobImageAttachment;
-
-interface BlobFileAttachment {
-  type: "file";
-  name?: string;
-  mimeType?: string;
-  size?: number;
-  fileUri?: string;
-}
-
-interface BlobVoiceMemoAttachment {
-  type: "voicememo";
-  duration?: number;
-  transcription?: string;
-}
-
-interface BlobVideoAttachment {
-  type: "video";
-  name?: string;
-  mimeType?: string;
-}
-
-interface BlobImageAttachment {
-  type: "image";
-  // Additional image fields could be added here
-}
 
 // Extract text content from a Story
 function extractText(content: any): string {
@@ -152,19 +122,17 @@ async function printPosts(posts: Post[], resolve: boolean, highlightId?: string)
     // Show blob/attachment info (PDFs, files, voice memos)
     if (post.blob) {
       try {
-        const blobData: BlobAttachment[] = JSON.parse(post.blob);
-        if (Array.isArray(blobData)) {
-          for (const entry of blobData) {
-            if (entry.type === "file") {
-              console.log(`  📎 [${entry.name || "file"}] (${entry.mimeType || "unknown"}, ${entry.size ? Math.round(entry.size / 1024) + "KB" : "?"})`);
-              if (entry.fileUri) console.log(`     ${entry.fileUri}`);
-            } else if (entry.type === "voicememo") {
-              const dur = entry.duration ? `${Math.round(entry.duration)}s` : "?";
-              console.log(`  🎙️ [voice memo] (${dur})`);
-              if (entry.transcription) console.log(`     "${entry.transcription}"`);
-            } else if (entry.type === "video") {
-              console.log(`  🎬 [${entry.name || "video"}] (${entry.mimeType || "video"})`);
-            }
+        const blobData: PostBlobDataEntry[] = parsePostBlob(post.blob);
+        for (const entry of blobData) {
+          if (entry.type === "file") {
+            console.log(`  📎 [${entry.name || "file"}] (${entry.mimeType || "unknown"}, ${entry.size ? Math.round(entry.size / 1024) + "KB" : "?"})`);
+            if (entry.fileUri) console.log(`     ${entry.fileUri}`);
+          } else if (entry.type === "voicememo") {
+            const dur = entry.duration ? `${Math.round(entry.duration)}s` : "?";
+            console.log(`  🎙️ [voice memo] (${dur})`);
+            if (entry.transcription) console.log(`     "${entry.transcription}"`);
+          } else if (entry.type === "video") {
+            console.log(`  🎬 [${entry.name || "video"}] (${entry.mimeType || "video"})`);
           }
         }
       } catch {
