@@ -117,6 +117,29 @@ async function printPosts(posts: Post[], resolve: boolean, highlightId?: string)
       console.log(`  ${text}`);
     }
 
+    // Show blob/attachment info (PDFs, files, voice memos)
+    if ((post as any).blob) {
+      try {
+        const blobData = JSON.parse((post as any).blob);
+        if (Array.isArray(blobData)) {
+          for (const entry of blobData) {
+            if (entry.type === "file") {
+              console.log(`  📎 [${entry.name || "file"}] (${entry.mimeType || "unknown"}, ${entry.size ? Math.round(entry.size / 1024) + "KB" : "?"})`);
+              if (entry.fileUri) console.log(`     ${entry.fileUri}`);
+            } else if (entry.type === "voicememo") {
+              const dur = entry.duration ? `${Math.round(entry.duration)}s` : "?";
+              console.log(`  🎙️ [voice memo] (${dur})`);
+              if (entry.transcription) console.log(`     "${entry.transcription}"`);
+            } else if (entry.type === "video") {
+              console.log(`  🎬 [${entry.name || "video"}] (${entry.mimeType || "video"})`);
+            }
+          }
+        }
+      } catch {
+        console.log(`  [blob: ${(post as any).blob.slice(0, 100)}...]`);
+      }
+    }
+
     if (resolve) {
       const cites = await resolveCites(post);
       for (const cite of cites) {
