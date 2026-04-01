@@ -27,7 +27,7 @@
     "@tloncorp/tlon-skill-linux-arm64": "0.3.2"
   },
   "devDependencies": {
-    "@tloncorp/api": "^0.0.3",
+    "@tloncorp/api": "^0.0.4",
     "@urbit/aura": "^3.0.0",
     "@types/node": "^22.0.0",
     "typescript": "^5.9.3"
