@@ -6,7 +6,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { configureClient, preSig, subscribe, Urbit, client } from "@tloncorp/api";
+import { configureClient, preSig, subscribe, Urbit, client, scry } from "@tloncorp/api";
 
 export interface UrbitConfig {
   url: string;
@@ -367,14 +367,49 @@ export async function ensureClient(subs: Array<'groups' | 'channels' | 'chat' | 
         client: urbit,
         getCode: cfg.code ? async () => cfg.code : undefined,
       });
-      
-      // Warn if user passed credentials that weren't needed
-      if (usedCachedCookie && userProvidedCode) {
-        const cachedShips = getCachedShips();
-        if (cachedShips.length === 1) {
-          console.error(`Note: Using cached credentials for ~${cfg.ship}. You can just run: tlon <command>`);
+
+      // Validate the cached cookie with a lightweight probe.
+      // If it returns 401, the cookie has expired — re-authenticate using the
+      // access code when available, so callers never see the failure.
+      let cookieValid = true;
+      try {
+        await scry({ app: "hood", path: "/kiln/pikes" });
+      } catch (err: any) {
+        const is401 =
+          err?.status === 401 ||
+          (typeof err?.message === "string" && err.message.includes("401"));
+        if (is401) {
+          cookieValid = false;
         } else {
-          console.error(`Note: Using cached credentials for ~${cfg.ship}. You can just run: tlon --ship ~${cfg.ship} <command>`);
+          // Non-auth error (network, app not running, etc.) — treat cookie as
+          // valid and let the actual command surface the real error.
+        }
+      }
+
+      if (!cookieValid) {
+        if (!cfg.code) {
+          throw new Error(
+            `Cached cookie for ~${cfg.ship} has expired and no access code is available to re-authenticate. ` +
+            `Provide --code or set URBIT_CODE.`
+          );
+        }
+
+        // Re-authenticate with the access code
+        await configureClient({
+          shipName: cfg.ship,
+          shipUrl: cfg.url,
+          getCode: async () => cfg.code,
+        });
+        didFreshAuth = true;
+      } else {
+        // Warn if user passed credentials that weren't needed
+        if (usedCachedCookie && userProvidedCode) {
+          const cachedShips = getCachedShips();
+          if (cachedShips.length === 1) {
+            console.error(`Note: Using cached credentials for ~${cfg.ship}. You can just run: tlon <command>`);
+          } else {
+            console.error(`Note: Using cached credentials for ~${cfg.ship}. You can just run: tlon --ship ~${cfg.ship} <command>`);
+          }
         }
       }
     } else if (cfg.code) {
