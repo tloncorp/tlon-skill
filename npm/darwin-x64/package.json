@@ -1,6 +1,6 @@
 {
   "name": "@tloncorp/tlon-skill-darwin-x64",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Tlon skill binary for macOS x64",
   "os": [
     "darwin"
