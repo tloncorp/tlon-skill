@@ -28,6 +28,16 @@ let initialized = false;
 let subscribed = false;
 let cachedConfig: UrbitConfig | null = null;
 
+function isVerbose(): boolean {
+  const value = process.env.TLON_VERBOSE?.trim().toLowerCase();
+  return value === "1" || value === "true" || value === "yes" || value === "on";
+}
+
+function logSubscriptionUpdate(label: string, event: unknown): void {
+  if (!isVerbose()) return;
+  console.log(`${label} update:`, event);
+}
+
 /**
  * Get the cache directory, configurable via TLON_CACHE_DIR env var
  */
@@ -53,10 +63,10 @@ function getCachedShips(): CachedAuth[] {
   try {
     const cacheDir = getCacheDir();
     if (!fs.existsSync(cacheDir)) return [];
-    
+
     const files = fs.readdirSync(cacheDir).filter(f => f.endsWith(".json"));
     const entries: CachedAuth[] = [];
-    
+
     for (const file of files) {
       try {
         const data = JSON.parse(fs.readFileSync(path.join(cacheDir, file), "utf-8"));
@@ -67,7 +77,7 @@ function getCachedShips(): CachedAuth[] {
         // Skip invalid cache files
       }
     }
-    
+
     return entries;
   } catch {
     return [];
@@ -81,12 +91,12 @@ function getCachedCookie(url: string, ship: string): string | null {
   try {
     const cachePath = getCachePath(ship);
     if (!fs.existsSync(cachePath)) return null;
-    
+
     const data: CachedAuth = JSON.parse(fs.readFileSync(cachePath, "utf-8"));
-    
+
     // Verify URL matches (don't use cookie meant for different host)
     if (data.url !== url) return null;
-    
+
     return data.cookie || null;
   } catch {
     return null;
@@ -100,7 +110,7 @@ function getCachedEntry(ship: string): CachedAuth | null {
   try {
     const cachePath = getCachePath(ship);
     if (!fs.existsSync(cachePath)) return null;
-    
+
     const data: CachedAuth = JSON.parse(fs.readFileSync(cachePath, "utf-8"));
     if (data.url && data.ship && data.cookie) {
       return data;
@@ -324,19 +334,19 @@ async function setupSubscriptions(subs: Array<'groups' | 'channels' | 'chat' | '
   if (subscribed) return;
 
   if (subs.includes('groups')) {
-    await subscribe({ app: 'groups', path: '/v1/groups' }, () => {});
+    await subscribe({ app: 'groups', path: '/v1/groups' }, (e) => logSubscriptionUpdate("groups", e));
   }
 
   if (subs.includes('channels')) {
-    await subscribe({ app: 'channels', path: '/v2' }, () => {});
+    await subscribe({ app: 'channels', path: '/v4' }, (e) => logSubscriptionUpdate("channels", e));
   }
 
   if (subs.includes('chat')) {
-    await subscribe({ app: 'chat', path: '/' }, () => {});
+    await subscribe({ app: 'chat', path: '/v4' }, (e) => logSubscriptionUpdate("chat", e));
   }
 
   if (subs.includes('lanyard')) {
-    await subscribe({ app: 'lanyard', path: '/v1/records' }, () => {});
+    await subscribe({ app: 'lanyard', path: '/v1/records' }, (e) => logSubscriptionUpdate("lanyard", e));
   }
 
   subscribed = true;
@@ -348,19 +358,19 @@ async function setupSubscriptions(subs: Array<'groups' | 'channels' | 'chat' | '
  */
 export async function ensureClient(subs: Array<'groups' | 'channels' | 'chat' | 'lanyard'> = []): Promise<UrbitConfig> {
   const cfg = getConfig();
-  
+
   if (!initialized) {
     // Determine cookie to use: explicit > cached > none (use code)
     let cookieToUse = cfg.cookie || getCachedCookie(cfg.url, cfg.ship);
     let usedCachedCookie = !cfg.cookie && !!cookieToUse;
     let didFreshAuth = false;
-    
+
     if (cookieToUse) {
       // Cookie-based auth
       const urbit = new Urbit(cfg.url);
       urbit.cookie = cookieToUse;
       urbit.nodeId = preSig(cfg.ship);
-      
+
       await configureClient({
         shipName: cfg.ship,
         shipUrl: cfg.url,
@@ -423,11 +433,11 @@ export async function ensureClient(subs: Array<'groups' | 'channels' | 'chat' | 
     } else {
       throw new Error("No cookie or code available for authentication");
     }
-    
+
     // Cache the cookie for future invocations
     if (client.cookie) {
       cacheCookie(cfg.url, cfg.ship, client.cookie);
-      
+
       // Notify on first auth that credentials are now cached
       if (didFreshAuth) {
         const cachedShips = getCachedShips();
@@ -438,11 +448,11 @@ export async function ensureClient(subs: Array<'groups' | 'channels' | 'chat' | 
         }
       }
     }
-    
+
     await setupSubscriptions(subs);
     initialized = true;
   }
-  
+
   return cfg;
 }
 

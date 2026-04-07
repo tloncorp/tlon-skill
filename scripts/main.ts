@@ -49,6 +49,7 @@ Credential Options (override defaults):
   --cookie <cookie> Pre-authenticated cookie (ship is parsed from cookie name)
 
 Other Options:
+  --verbose      Enable verbose subscription logging
   --help, -h     Show this help
   --version, -v  Show version
 
@@ -82,6 +83,7 @@ async function main() {
   let codeOverride: string | null = null;
   let cookieOverride: string | null = null;
   let configOverride: string | null = null;
+  let verbose = false;
   const args: string[] = [];
 
   for (let i = 0; i < rawArgs.length; i += 1) {
@@ -142,7 +144,17 @@ async function main() {
       continue;
     }
 
+    // --verbose
+    if (arg === "--verbose") {
+      verbose = true;
+      continue;
+    }
+
     args.push(arg);
+  }
+
+  if (verbose) {
+    process.env.TLON_VERBOSE = "1";
   }
 
   // Apply credential overrides
