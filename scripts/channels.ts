@@ -8,6 +8,8 @@
  *   npx ts-node channels.ts groups     # List subscribed groups
  *   npx ts-node channels.ts all        # List all channels
  *   npx ts-node channels.ts info <nest>   # Get channel info
+ *   npx ts-node channels.ts create <group-id> "Channel Name" [--kind chat|diary|heap] [--description "..."]
+ *   npx ts-node channels.ts rename <nest> "New Title"
  *   npx ts-node channels.ts update <nest> --title "..." [--description "..."]
  *   npx ts-node channels.ts delete <nest> # Delete a channel (must be group admin)
  *   npx ts-node channels.ts add-writers <nest> <role1> [role2...]
@@ -18,6 +20,7 @@
 
 import {
   addChannelWriters as apiAddWriters,
+  createChannel,
   deleteChannel,
   getGroups,
   getInitData,
@@ -27,6 +30,58 @@ import {
 } from "@tloncorp/api";
 import type { Channel as ApiChannel, Group as ApiGroup } from "@tloncorp/api";
 import { ensureClient, getCurrentShip } from "./api-client";
+import { getOption, looksLikePositionalChannelKind, wantsHelp } from "./cli-utils";
+
+function generateChannelSlug(): string {
+  const chars = "abcdefghijklmnopqrstuvwxyz";
+  const alphanumeric = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let slug = chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 7; i++) {
+    slug += alphanumeric[Math.floor(Math.random() * alphanumeric.length)];
+  }
+  return slug;
+}
+
+const CHANNELS_HELP = `Usage: channels.ts <command>
+
+Commands:
+  dms
+  group-dms
+  groups
+  all
+  info <nest>
+  create <group-id> "Channel Name" [--kind chat|diary|heap] [--description "..."]
+  update <nest> --title "..." [--description "..."]
+  rename <nest> "New Title"
+  delete <nest>
+  add-writers <nest> <role1> [role2...]
+  del-writers <nest> <role1> [role2...]
+  add-readers <group-flag> <nest> <role1> [role2...]
+  del-readers <group-flag> <nest> <role1> [role2...]
+
+Examples:
+  channels.ts create ~host/group-slug "Projects" --kind chat
+  channels.ts rename chat/~host/project-updates "Team Updates"`;
+
+const CHANNELS_COMMAND_HELP: Record<string, string> = {
+  dms: `Usage: channels.ts dms`,
+  "group-dms": `Usage: channels.ts group-dms`,
+  groups: `Usage: channels.ts groups`,
+  all: `Usage: channels.ts all`,
+  info: `Usage: channels.ts info <nest>\nExample: channels.ts info chat/~host/slug`,
+  create: `Usage: channels.ts create <group-id> "Channel Name" [--kind chat|diary|heap] [--description "..."]\nExample: channels.ts create ~host/group-slug "Projects" --kind chat`,
+  update: `Usage: channels.ts update <nest> --title "..." [--description "..."]\nExample: channels.ts update chat/~host/slug --title "New Title"`,
+  rename: `Usage: channels.ts rename <nest> "New Title"\nExample: channels.ts rename chat/~host/slug "Project Updates"`,
+  delete: `Usage: channels.ts delete <nest>\nExample: channels.ts delete chat/~host/slug`,
+  "add-writers": `Usage: channels.ts add-writers <nest> <role1> [role2...]\nExample: channels.ts add-writers chat/~host/slug admin`,
+  "del-writers": `Usage: channels.ts del-writers <nest> <role1> [role2...]\nExample: channels.ts del-writers chat/~host/slug member`,
+  "add-readers": `Usage: channels.ts add-readers <group-flag> <nest> <role1> [role2...]\nExample: channels.ts add-readers ~host/group-slug chat/~host/slug admin`,
+  "del-readers": `Usage: channels.ts del-readers <group-flag> <nest> <role1> [role2...]\nExample: channels.ts del-readers ~host/group-slug chat/~host/slug admin`,
+};
+
+function printChannelsHelp(command?: string) {
+  console.log(command ? CHANNELS_COMMAND_HELP[command] ?? CHANNELS_HELP : CHANNELS_HELP);
+}
 
 // Get DMs
 async function getDms() {
@@ -163,6 +218,37 @@ async function getChannelInfo(nest: string) {
     zone: findChannelSectionId(group, channel.id),
     readers: readerRoles,
   };
+}
+
+async function createChannelInGroup(
+  groupId: string,
+  title: string,
+  kind: "chat" | "diary" | "heap" = "chat",
+  description = ""
+) {
+  const ship = await getCurrentShip();
+  const name = generateChannelSlug();
+  const nest = `${kind}/${ship}/${name}`;
+
+  console.log(`Adding channel "${title}" to group ${groupId}...`);
+
+  await createChannel({
+    id: nest,
+    kind,
+    group: groupId,
+    name,
+    title,
+    description,
+    meta: null,
+    readers: [],
+    writers: [],
+  });
+
+  console.log(`✅ Channel created!`);
+  console.log(`   Nest: ${nest}`);
+  console.log(`   Title: ${title}`);
+  console.log(`   Group: ${groupId}`);
+  return nest;
 }
 
 // Update channel metadata
@@ -303,8 +389,18 @@ async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
 
+  if (!command || command === "--help" || command === "-h") {
+    printChannelsHelp();
+    process.exit(0);
+  }
+
+  if (wantsHelp(args.slice(1))) {
+    printChannelsHelp(command);
+    process.exit(0);
+  }
+
   try {
-    await ensureClient(['channels']);
+    await ensureClient(["channels"]);
     switch (command) {
       case "dms": {
         const dms = await getDms();
@@ -333,30 +429,44 @@ async function main() {
       case "info": {
         const nest = args[1];
         if (!nest) {
-          console.error("Usage: channels.ts info <nest>");
-          console.error("Example: channels.ts info chat/~ship/channel-name");
+          console.error(CHANNELS_COMMAND_HELP.info);
           process.exit(1);
         }
         await getChannelInfo(nest);
         break;
       }
 
+      case "create": {
+        const groupId = args[1];
+        const title = args[2];
+        if (!groupId || !title) {
+          console.error(CHANNELS_COMMAND_HELP.create);
+          process.exit(1);
+        }
+        if (looksLikePositionalChannelKind(args, 2)) {
+          console.error("Error: channel kind must be passed with --kind, not as a positional argument.");
+          console.error(CHANNELS_COMMAND_HELP.create);
+          process.exit(1);
+        }
+        const kind = (getOption(args, "kind") as "chat" | "diary" | "heap") || "chat";
+        const description = getOption(args, "description") || "";
+        await createChannelInGroup(groupId, title, kind, description);
+        break;
+      }
+
       case "update": {
         const nest = args[1];
         if (!nest) {
-          console.error("Usage: channels.ts update <nest> --title \"...\" [--description \"...\"]");
-          console.error("Example: channels.ts update chat/~ship/channel-name --title \"New Title\"");
+          console.error(CHANNELS_COMMAND_HELP.update);
           process.exit(1);
         }
 
-        // Parse options
-        const titleIdx = args.indexOf("--title");
-        const descriptionIdx = args.indexOf("--description");
-        const title = titleIdx !== -1 ? args[titleIdx + 1] : undefined;
-        const description = descriptionIdx !== -1 ? args[descriptionIdx + 1] : undefined;
+        const title = getOption(args, "title");
+        const description = getOption(args, "description");
 
         if (!title && !description) {
           console.error("Error: At least one of --title or --description is required");
+          console.error(CHANNELS_COMMAND_HELP.update);
           process.exit(1);
         }
 
@@ -364,11 +474,21 @@ async function main() {
         break;
       }
 
+      case "rename": {
+        const nest = args[1];
+        const title = args[2];
+        if (!nest || !title) {
+          console.error(CHANNELS_COMMAND_HELP.rename);
+          process.exit(1);
+        }
+        await updateChannelMeta(nest, { title });
+        break;
+      }
+
       case "delete": {
         const nest = args[1];
         if (!nest) {
-          console.error("Usage: channels.ts delete <nest>");
-          console.error("Example: channels.ts delete chat/~ship/channel-name");
+          console.error(CHANNELS_COMMAND_HELP.delete);
           process.exit(1);
         }
         await deleteChannelByNest(nest);
@@ -379,8 +499,7 @@ async function main() {
         const nest = args[1];
         const roles = args.slice(2);
         if (!nest || roles.length === 0) {
-          console.error("Usage: channels.ts add-writers <nest> <role1> [role2...]");
-          console.error("Example: channels.ts add-writers chat/~host/slug admin");
+          console.error(CHANNELS_COMMAND_HELP["add-writers"]);
           process.exit(1);
         }
         await addWriters(nest, roles);
@@ -391,8 +510,7 @@ async function main() {
         const nest = args[1];
         const roles = args.slice(2);
         if (!nest || roles.length === 0) {
-          console.error("Usage: channels.ts del-writers <nest> <role1> [role2...]");
-          console.error("Example: channels.ts del-writers chat/~host/slug member");
+          console.error(CHANNELS_COMMAND_HELP["del-writers"]);
           process.exit(1);
         }
         await removeWriters(nest, roles);
@@ -404,8 +522,7 @@ async function main() {
         const nest = args[2];
         const roles = args.slice(3);
         if (!groupFlag || !nest || roles.length === 0) {
-          console.error("Usage: channels.ts add-readers <group-flag> <nest> <role1> [role2...]");
-          console.error("Example: channels.ts add-readers ~host/group chat/~host/slug admin");
+          console.error(CHANNELS_COMMAND_HELP["add-readers"]);
           process.exit(1);
         }
         await addReaders(groupFlag, nest, roles);
@@ -417,8 +534,7 @@ async function main() {
         const nest = args[2];
         const roles = args.slice(3);
         if (!groupFlag || !nest || roles.length === 0) {
-          console.error("Usage: channels.ts del-readers <group-flag> <nest> <role1> [role2...]");
-          console.error("Example: channels.ts del-readers ~host/group chat/~host/slug admin");
+          console.error(CHANNELS_COMMAND_HELP["del-readers"]);
           process.exit(1);
         }
         await removeReaders(groupFlag, nest, roles);
@@ -426,23 +542,7 @@ async function main() {
       }
 
       default:
-        console.log(`Usage: channels.ts <command>
-
-Commands:
-  dms                List DMs
-  group-dms          List group DMs (clubs)
-  groups             List subscribed groups with their channels
-  all                List all channels
-  info <nest>        Get channel info
-  update <nest>      Update channel --title "..." [--description "..."]
-  delete <nest>      Delete a channel (must be group admin)
-
-Permissions:
-  add-writers <nest> <role1> [role2...]                     Add write access
-  del-writers <nest> <role1> [role2...]                     Remove write access
-  add-readers <group-flag> <nest> <role1> [role2...]        Restrict viewing
-  del-readers <group-flag> <nest> <role1> [role2...]        Open viewing
-`);
+        printChannelsHelp();
         process.exit(1);
     }
     process.exit(0);

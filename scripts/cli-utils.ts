@@ -25,3 +25,31 @@ export function getOption(args: string[], name: string): string | undefined {
 export function hasFlag(args: string[], name: string): boolean {
   return args.includes(`--${name}`);
 }
+
+/**
+ * Check if help was requested for a command/subcommand
+ */
+export function wantsHelp(args: string[]): boolean {
+  return args.includes("--help") || args.includes("-h");
+}
+
+export const CHANNEL_KINDS = ["chat", "diary", "heap"] as const;
+
+/**
+ * Detect the common mistake of passing channel kind positionally instead of via --kind.
+ * Example: groups add-channel <group> chat "Title"
+ */
+export function looksLikePositionalChannelKind(
+  args: string[],
+  titleIndex: number,
+  kindOptionName = "kind"
+): boolean {
+  const title = args[titleIndex];
+  const nextPositional = args[titleIndex + 1];
+  return (
+    !!title &&
+    CHANNEL_KINDS.includes(title as (typeof CHANNEL_KINDS)[number]) &&
+    !!nextPositional &&
+    !getOption(args, kindOptionName)
+  );
+}

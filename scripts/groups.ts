@@ -54,7 +54,7 @@ import {
 } from "@tloncorp/api";
 import type { Group } from "@tloncorp/api";
 import { ensureClient, getCurrentShip, normalizeShip } from "./api-client";
-import { getOption } from "./cli-utils";
+import { getOption, looksLikePositionalChannelKind, wantsHelp } from "./cli-utils";
 
 // Generate a random short ID for the group
 function generateGroupSlug(): string {
@@ -66,6 +66,65 @@ function generateGroupSlug(): string {
     slug += alphanumeric[Math.floor(Math.random() * alphanumeric.length)];
   }
   return slug;
+}
+
+const GROUPS_HELP = `Usage: groups.ts <command>
+
+Commands:
+  list
+  create "Group Name" [--description "..."]
+  invite <group-id> <ship> [<ship2> ...]
+  info <group-id>
+  leave <group-id>
+  join <group-id>
+  delete <group-id>
+  update <group-id> --title "..." [--description "..."] [--image "..."] [--cover "..."]
+  kick <group-id> <ship> [<ship2> ...]
+  ban <group-id> <ship> [<ship2> ...]
+  unban <group-id> <ship> [<ship2> ...]
+  add-role <group-id> <role-id> --title "..." [--description "..."]
+  delete-role <group-id> <role-id>
+  update-role <group-id> <role-id> --title "..." [--description "..."]
+  assign-role <group-id> <role-id> <ship> [<ship2> ...]
+  remove-role <group-id> <role-id> <ship> [<ship2> ...]
+  set-privacy <group-id> <public|private|secret>
+  accept-join <group-id> <ship> [<ship2> ...]
+  reject-join <group-id> <ship> [<ship2> ...]
+  promote <group-id> <ship> [<ship2> ...]
+  demote <group-id> <ship> [<ship2> ...]
+  add-channel <group-id> "Channel Name" [--kind chat|diary|heap] [--description "..."]
+
+Examples:
+  groups.ts info ~host/group-slug
+  groups.ts add-channel ~host/group-slug "Projects" --kind chat`;
+
+const GROUPS_COMMAND_HELP: Record<string, string> = {
+  list: `Usage: groups.ts list`,
+  create: `Usage: groups.ts create "Group Name" [--description "..."]\nExample: groups.ts create "Projects" --description "Shared work"`,
+  invite: `Usage: groups.ts invite <group-id> <ship> [<ship2> ...]\nExample: groups.ts invite ~host/group-slug ~nec ~bud`,
+  info: `Usage: groups.ts info <group-id>\nExample: groups.ts info ~host/group-slug`,
+  leave: `Usage: groups.ts leave <group-id>\nExample: groups.ts leave ~host/group-slug`,
+  join: `Usage: groups.ts join <group-id>\nExample: groups.ts join ~host/group-slug`,
+  delete: `Usage: groups.ts delete <group-id>\nExample: groups.ts delete ~host/group-slug`,
+  update: `Usage: groups.ts update <group-id> --title "..." [--description "..."] [--image "..."] [--cover "..."]\nExample: groups.ts update ~host/group-slug --title "New Title"`,
+  kick: `Usage: groups.ts kick <group-id> <ship> [<ship2> ...]\nExample: groups.ts kick ~host/group-slug ~nec`,
+  ban: `Usage: groups.ts ban <group-id> <ship> [<ship2> ...]\nExample: groups.ts ban ~host/group-slug ~nec`,
+  unban: `Usage: groups.ts unban <group-id> <ship> [<ship2> ...]\nExample: groups.ts unban ~host/group-slug ~nec`,
+  "add-role": `Usage: groups.ts add-role <group-id> <role-id> --title "..." [--description "..."]\nExample: groups.ts add-role ~host/group-slug editors --title "Editors"`,
+  "delete-role": `Usage: groups.ts delete-role <group-id> <role-id>\nExample: groups.ts delete-role ~host/group-slug editors`,
+  "update-role": `Usage: groups.ts update-role <group-id> <role-id> --title "..." [--description "..."]\nExample: groups.ts update-role ~host/group-slug editors --title "Writers"`,
+  "assign-role": `Usage: groups.ts assign-role <group-id> <role-id> <ship> [<ship2> ...]\nExample: groups.ts assign-role ~host/group-slug editors ~nec`,
+  "remove-role": `Usage: groups.ts remove-role <group-id> <role-id> <ship> [<ship2> ...]\nExample: groups.ts remove-role ~host/group-slug editors ~nec`,
+  "set-privacy": `Usage: groups.ts set-privacy <group-id> <public|private|secret>\nExample: groups.ts set-privacy ~host/group-slug private`,
+  "accept-join": `Usage: groups.ts accept-join <group-id> <ship> [<ship2> ...]\nExample: groups.ts accept-join ~host/group-slug ~nec`,
+  "reject-join": `Usage: groups.ts reject-join <group-id> <ship> [<ship2> ...]\nExample: groups.ts reject-join ~host/group-slug ~nec`,
+  promote: `Usage: groups.ts promote <group-id> <ship> [<ship2> ...]\nExample: groups.ts promote ~host/group-slug ~nec`,
+  demote: `Usage: groups.ts demote <group-id> <ship> [<ship2> ...]\nExample: groups.ts demote ~host/group-slug ~nec`,
+  "add-channel": `Usage: groups.ts add-channel <group-id> "Channel Name" [--kind chat|diary|heap] [--description "..."]\nExample: groups.ts add-channel ~host/group-slug "Projects" --kind chat`,
+};
+
+function printGroupsHelp(command?: string) {
+  console.log(command ? GROUPS_COMMAND_HELP[command] ?? GROUPS_HELP : GROUPS_HELP);
 }
 
 // List all groups
@@ -570,6 +629,16 @@ async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
 
+  if (!command || command === "--help" || command === "-h") {
+    printGroupsHelp();
+    process.exit(0);
+  }
+
+  if (wantsHelp(args.slice(1))) {
+    printGroupsHelp(command);
+    process.exit(0);
+  }
+
   await ensureClient(['groups', 'channels']);
 
   switch (command) {
@@ -816,9 +885,12 @@ async function main() {
       const groupId = args[1];
       const title = args[2];
       if (!groupId || !title) {
-        console.error(
-          'Usage: groups.ts add-channel <group-id> "Channel Name" [--kind chat|diary|heap] [--description "..."]'
-        );
+        console.error(GROUPS_COMMAND_HELP["add-channel"]);
+        process.exit(1);
+      }
+      if (looksLikePositionalChannelKind(args, 2)) {
+        console.error("Error: channel kind must be passed with --kind, not as a positional argument.");
+        console.error(GROUPS_COMMAND_HELP["add-channel"]);
         process.exit(1);
       }
       const kind = (getOption(args, "kind") as "chat" | "diary" | "heap") || "chat";
@@ -828,32 +900,7 @@ async function main() {
     }
 
     default:
-      console.log(`Usage: groups.ts <command>
-
-Commands:
-  list
-  create
-  invite
-  info
-  leave
-  join
-  delete
-  update
-  kick
-  ban
-  unban
-  add-role
-  delete-role
-  update-role
-  assign-role
-  remove-role
-  set-privacy
-  accept-join
-  reject-join
-  promote
-  demote
-  add-channel
-`);
+      printGroupsHelp();
       process.exit(1);
   }
   process.exit(0);
