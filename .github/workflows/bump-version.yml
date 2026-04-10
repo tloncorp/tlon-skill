@@ -10,7 +10,7 @@ on:
 
 permissions:
   contents: write
-  id-token: write
+  pull-requests: write
 
 jobs:
   bump:
@@ -26,16 +26,18 @@ jobs:
       - name: Bump version
         run: node scripts/bump-version.js ${{ inputs.version }}
 
-      - name: Commit and tag
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "v${{ inputs.version }}"
-          git tag "v${{ inputs.version }}"
-          git push
-          git push --tags
+      - name: Create bump PR
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: release/bump-v${{ inputs.version }}
+          delete-branch: true
+          commit-message: v${{ inputs.version }}
+          title: v${{ inputs.version }}
+          body: |
+            Automated version bump to `${{ inputs.version }}`.
 
-  publish:
-    needs: bump
-    uses: ./.github/workflows/publish.yml
+            This workflow opens a PR instead of pushing directly to `master`, so it plays nicely with branch protection.
+
+            After merging, run the Publish workflow (or create/push the `v${{ inputs.version }}` tag) from `master`.
+          committer: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
+          author: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
