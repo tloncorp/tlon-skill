@@ -4,15 +4,16 @@
  * Post to a Tlon notebook (diary channel)
  *
  * Usage:
- *   npx ts-node scripts/notebook-post.ts <nest> <title> [--image <url>] [--content <json-file>]
+ *   npx ts-node scripts/notebook-post.ts <nest> <title> [--image <url>] [--content <json-file>] [--stdin]
  *
  * Examples:
  *   npx ts-node scripts/notebook-post.ts diary/~host/channel "My Post Title"
  *   npx ts-node scripts/notebook-post.ts diary/~host/channel "My Post" --image https://example.com/cover.png
  *   npx ts-node scripts/notebook-post.ts diary/~host/channel "My Post" --content article.json
  *
- * If no explicit content is provided, creates a title-only post. Use --stdin to read JSON
- * from stdin. --content and --stdin accept Story JSON or recognized rich-text JSON.
+ * If no explicit content is provided, creates a post with a title and empty body.
+ * Use --stdin to read JSON from stdin. --content and --stdin accept Story JSON
+ * or recognized rich-text JSON.
  */
 
 import * as fs from "fs";
@@ -69,10 +70,10 @@ Arguments:
 
 Options:
   --image <url>     Cover image URL
-  --content <file>  JSON file with Story content (array of verses)
-  --stdin           Read content from stdin as JSON
+  --content <file>  JSON file with Story JSON or recognized rich-text JSON
+  --stdin           Read Story JSON or recognized rich-text JSON from stdin
 
-If no content is provided, creates a simple post with the title only.
+If no content is provided, creates a post with a title and empty body.
 
 Examples:
   npx ts-node scripts/notebook-post.ts diary/~host/notes "Hello World"
@@ -86,7 +87,7 @@ Examples:
   const title = args[1];
 
   let image: string | undefined;
-  let content: Story = [{ inline: [title] }]; // Default content is just the title
+  let content: Story = [];
 
   for (let i = 2; i < args.length; i++) {
     if (args[i] === "--image" && args[i + 1]) {
