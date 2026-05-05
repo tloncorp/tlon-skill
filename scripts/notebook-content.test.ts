@@ -36,6 +36,65 @@ describe("normalizeNotebookContent", () => {
     ).toEqual([{ block: { header: { tag: "h2", content: ["Title"] } } }]);
   });
 
+  it("preserves rich-text marks on text nodes", () => {
+    expect(
+      normalizeNotebookContent({
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              { text: "Bold", marks: [{ type: "bold" }] },
+              { text: " " },
+              { text: "Italic", marks: [{ type: "italic" }] },
+              { text: " " },
+              { text: "Strike", marks: [{ type: "strike" }] },
+              { text: " " },
+              { text: "Code", marks: [{ type: "code" }] },
+              { text: " " },
+              { text: "Link", marks: [{ type: "link", attrs: { href: "https://example.com" } }] },
+            ],
+          },
+        ],
+      })
+    ).toEqual([
+      {
+        inline: [
+          { bold: ["Bold"] },
+          " ",
+          { italics: ["Italic"] },
+          " ",
+          { strike: ["Strike"] },
+          " ",
+          { "inline-code": "Code" },
+          " ",
+          { link: { href: "https://example.com", content: "Link" } },
+        ],
+      },
+    ]);
+  });
+
+  it("preserves links when text nodes also have style marks", () => {
+    expect(
+      normalizeNotebookContent({
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                text: "Styled link",
+                marks: [{ type: "link", attrs: { href: "https://example.com" } }, { type: "bold" }],
+              },
+            ],
+          },
+        ],
+      })
+    ).toEqual([
+      {
+        inline: [{ bold: [{ link: { href: "https://example.com", content: "Styled link" } }] }],
+      },
+    ]);
+  });
+
   it("fails invalid Story-shaped content", () => {
     expect(() => normalizeNotebookContent([{ block: {} }])).toThrow(
       "Unsupported notebook content JSON"

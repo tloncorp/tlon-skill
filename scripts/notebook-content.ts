@@ -114,13 +114,54 @@ function mergeAdjacentStrings(inlines: StoryInline[]): StoryInline[] {
   return result;
 }
 
+function normalizedMarkType(mark: any): string {
+  if (!isPlainObject(mark) || typeof mark.type !== "string") return "";
+  return mark.type.toLowerCase().replace(/[-_]/g, "");
+}
+
+function hasRichMark(marks: any[], types: string[]): boolean {
+  return marks.some((mark) => types.includes(normalizedMarkType(mark)));
+}
+
+function findRichLinkHref(marks: any[]): string | undefined {
+  const linkMark = marks.find((mark) => normalizedMarkType(mark) === "link");
+  if (!isPlainObject(linkMark) || !isPlainObject(linkMark.attrs)) return undefined;
+
+  if (typeof linkMark.attrs.href === "string") return linkMark.attrs.href;
+  if (typeof linkMark.attrs.url === "string") return linkMark.attrs.url;
+  return undefined;
+}
+
+function applyRichTextMarks(text: string, marks: any): StoryInline[] {
+  const markList = Array.isArray(marks) ? marks : [];
+  const linkHref = findRichLinkHref(markList);
+
+  let inlines: StoryInline[] = linkHref
+    ? [{ link: { href: linkHref, content: text } }]
+    : hasRichMark(markList, ["code", "inlinecode"])
+      ? [{ "inline-code": text }]
+      : [text];
+
+  if (hasRichMark(markList, ["strike", "strikethrough", "s"])) {
+    inlines = [{ strike: inlines }];
+  }
+  if (hasRichMark(markList, ["italic", "italics", "em"])) {
+    inlines = [{ italics: inlines }];
+  }
+  if (hasRichMark(markList, ["bold", "strong"])) {
+    inlines = [{ bold: inlines }];
+  }
+
+  return inlines;
+}
+
 function extractRichInlines(node: any): StoryInline[] {
   if (node == null) return [];
   if (typeof node === "string") return [node];
   if (Array.isArray(node)) return mergeAdjacentStrings(node.flatMap(extractRichInlines));
   if (typeof node !== "object") return [];
 
-  if (typeof node.text === "string") return [node.text];
+  if (typeof node.text === "string") return applyRichTextMarks(node.text, node.marks);
   if (node.type === "hardBreak") return [{ break: null }];
 
   const children = Array.isArray(node.children)
@@ -176,11 +217,12 @@ function richJsonToStory(input: any): Story {
     if (type === "header" || type === "heading") {
       const levelRaw = Number(node.level ?? node.attrs?.level ?? 1);
       const level = Number.isFinite(levelRaw) ? Math.min(6, Math.max(1, levelRaw)) : 1;
+      const content = trimInlineText(extractRichInlines(node));
       story.push({
         block: {
           header: {
             tag: `h${level}` as "h1" | "h2" | "h3" | "h4" | "h5" | "h6",
-            content: [text],
+            content,
           },
         },
       });

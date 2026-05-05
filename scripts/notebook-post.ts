@@ -11,7 +11,8 @@
  *   npx ts-node scripts/notebook-post.ts diary/~host/channel "My Post" --image https://example.com/cover.png
  *   npx ts-node scripts/notebook-post.ts diary/~host/channel "My Post" --content article.json
  *
- * If no --content is provided, reads from stdin (expects JSON array of Story verses).
+ * If no explicit content is provided, creates a title-only post. Use --stdin to read JSON
+ * from stdin. --content and --stdin accept Story JSON or recognized rich-text JSON.
  */
 
 import * as fs from "fs";
