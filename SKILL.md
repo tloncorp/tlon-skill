@@ -30,7 +30,7 @@ Working pattern:
 ```
 
 Important details:
-- Use the dotted `@da` post id format when available.
+- Use the dotted `@ud` post id format when available.
 - `messageId` should be the parent notebook post/thread id.
 - After sending, verify with `tlon messages post <diary-nest> <parent-post-id>` when correctness matters.
 - If the tool reports success but the reply is not visible under the parent post, treat it as a delivery/plugin issue and do not claim success until verified.

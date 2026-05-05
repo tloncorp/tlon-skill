@@ -1,9 +1,82 @@
-import { markdownToStory, type Story } from "./story";
+import type { Story, StoryBlock, StoryInline, StoryVerse } from "./story";
 
-function isStoryVerse(value: any): boolean {
+function isPlainObject(value: any): value is Record<string, any> {
   if (!value || typeof value !== "object") return false;
-  if ("inline" in value && Array.isArray(value.inline)) return true;
-  if ("block" in value && value.block && typeof value.block === "object") return true;
+  return !Array.isArray(value);
+}
+
+function hasOnlyKey(value: Record<string, any>, key: string): boolean {
+  const keys = Object.keys(value);
+  return keys.length === 1 && keys[0] === key;
+}
+
+function isStoryInline(value: any): value is StoryInline {
+  if (typeof value === "string") return true;
+  if (!isPlainObject(value)) return false;
+
+  if (hasOnlyKey(value, "bold")) return isStoryInlineArray(value.bold);
+  if (hasOnlyKey(value, "italics")) return isStoryInlineArray(value.italics);
+  if (hasOnlyKey(value, "strike")) return isStoryInlineArray(value.strike);
+  if (hasOnlyKey(value, "blockquote")) return isStoryInlineArray(value.blockquote);
+  if (hasOnlyKey(value, "inline-code")) return typeof value["inline-code"] === "string";
+  if (hasOnlyKey(value, "code")) return typeof value.code === "string";
+  if (hasOnlyKey(value, "ship")) return typeof value.ship === "string";
+  if (hasOnlyKey(value, "tag")) return typeof value.tag === "string";
+  if (hasOnlyKey(value, "break")) return value.break === null;
+  if (hasOnlyKey(value, "link")) {
+    return (
+      isPlainObject(value.link) &&
+      typeof value.link.href === "string" &&
+      typeof value.link.content === "string"
+    );
+  }
+
+  return false;
+}
+
+function isStoryInlineArray(value: any): value is StoryInline[] {
+  return Array.isArray(value) && value.every(isStoryInline);
+}
+
+function isHeaderBlock(value: any): boolean {
+  return (
+    isPlainObject(value) &&
+    ["h1", "h2", "h3", "h4", "h5", "h6"].includes(value.tag) &&
+    isStoryInlineArray(value.content)
+  );
+}
+
+function isCodeBlock(value: any): boolean {
+  return isPlainObject(value) && typeof value.code === "string" && typeof value.lang === "string";
+}
+
+function isImageBlock(value: any): boolean {
+  return (
+    isPlainObject(value) &&
+    typeof value.src === "string" &&
+    typeof value.height === "number" &&
+    typeof value.width === "number" &&
+    typeof value.alt === "string"
+  );
+}
+
+function isStoryBlock(value: any): value is StoryBlock {
+  if (!isPlainObject(value)) return false;
+
+  if (hasOnlyKey(value, "header")) return isHeaderBlock(value.header);
+  if (hasOnlyKey(value, "code")) return isCodeBlock(value.code);
+  if (hasOnlyKey(value, "image")) return isImageBlock(value.image);
+  if (hasOnlyKey(value, "rule")) return value.rule === null;
+
+  return false;
+}
+
+function isStoryVerse(value: any): value is StoryVerse {
+  if (!isPlainObject(value)) return false;
+
+  if (hasOnlyKey(value, "inline")) return isStoryInlineArray(value.inline);
+  if (hasOnlyKey(value, "block")) return isStoryBlock(value.block);
+
   return false;
 }
 
@@ -29,16 +102,71 @@ function extractRichText(node: any): string {
   return children.map(extractRichText).join("");
 }
 
-function richJsonToMarkdown(input: any): string {
+function mergeAdjacentStrings(inlines: StoryInline[]): StoryInline[] {
+  const result: StoryInline[] = [];
+  for (const inline of inlines) {
+    if (typeof inline === "string" && typeof result[result.length - 1] === "string") {
+      result[result.length - 1] = (result[result.length - 1] as string) + inline;
+    } else {
+      result.push(inline);
+    }
+  }
+  return result;
+}
+
+function extractRichInlines(node: any): StoryInline[] {
+  if (node == null) return [];
+  if (typeof node === "string") return [node];
+  if (Array.isArray(node)) return mergeAdjacentStrings(node.flatMap(extractRichInlines));
+  if (typeof node !== "object") return [];
+
+  if (typeof node.text === "string") return [node.text];
+  if (node.type === "hardBreak") return [{ break: null }];
+
+  const children = Array.isArray(node.children)
+    ? node.children
+    : Array.isArray(node.content)
+      ? node.content
+      : [];
+
+  return mergeAdjacentStrings(children.flatMap(extractRichInlines));
+}
+
+function trimInlineText(inlines: StoryInline[]): StoryInline[] {
+  const result = inlines.slice();
+
+  while (typeof result[0] === "string" && result[0].trim() === "") {
+    result.shift();
+  }
+  while (
+    result.length > 0 &&
+    typeof result[result.length - 1] === "string" &&
+    (result[result.length - 1] as string).trim() === ""
+  ) {
+    result.pop();
+  }
+
+  if (typeof result[0] === "string") {
+    result[0] = result[0].trimStart();
+  }
+
+  if (typeof result[result.length - 1] === "string") {
+    result[result.length - 1] = (result[result.length - 1] as string).trimEnd();
+  }
+
+  return mergeAdjacentStrings(result.filter((inline) => inline !== ""));
+}
+
+function richJsonToStory(input: any): Story {
   const nodes = Array.isArray(input)
     ? input
     : input && typeof input === "object" && Array.isArray(input.content)
       ? input.content
       : [];
 
-  if (!Array.isArray(nodes) || nodes.length === 0) return "";
+  if (!Array.isArray(nodes) || nodes.length === 0) return [];
 
-  const blocks: string[] = [];
+  const story: Story = [];
   for (const node of nodes) {
     if (!node || typeof node !== "object") continue;
     const type = typeof node.type === "string" ? node.type : "";
@@ -48,24 +176,31 @@ function richJsonToMarkdown(input: any): string {
     if (type === "header" || type === "heading") {
       const levelRaw = Number(node.level ?? node.attrs?.level ?? 1);
       const level = Number.isFinite(levelRaw) ? Math.min(6, Math.max(1, levelRaw)) : 1;
-      blocks.push(`${"#".repeat(level)} ${text}`);
+      story.push({
+        block: {
+          header: {
+            tag: `h${level}` as "h1" | "h2" | "h3" | "h4" | "h5" | "h6",
+            content: [text],
+          },
+        },
+      });
       continue;
     }
 
-    blocks.push(text);
+    const inlines = trimInlineText(extractRichInlines(node));
+    if (inlines.length > 0) {
+      story.push({ inline: inlines });
+    }
   }
 
-  return blocks.join("\n\n");
+  return story;
 }
 
 export function normalizeNotebookContent(raw: any): Story {
   if (isStory(raw)) return raw;
 
-  const markdown = richJsonToMarkdown(raw);
-  if (markdown.trim().length > 0) {
-    const story = markdownToStory(markdown);
-    if (story.length > 0) return story;
-  }
+  const story = richJsonToStory(raw);
+  if (story.length > 0) return story;
 
   throw new Error(
     "Unsupported notebook content JSON: expected a Story array or recognized rich-text content"
