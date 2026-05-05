@@ -11,6 +11,30 @@ Use the `tlon` command for reading data, managing channels/groups/contacts, and 
 
 When running as an OpenClaw skill, use the built-in `message` tool for sending outbound messages (DMs and channel posts). The `tlon` command is for reading data, administration, and management — not for sending messages. The `message` tool routes through the proper delivery infrastructure (threading, bot profile, rate limiting).
 
+### Diary / Notebook Thread Replies
+
+Tlon diary/notebook channels are special: a channel-level `send` creates a **new notebook post/note**. Do **not** use `message` with `action: "send"` in a diary channel unless you intentionally want to create a new notebook post.
+
+For normal conversation inside an existing diary/notebook post, use the `message` tool with `action: "reply"` and reply to the **parent diary post id**, not the newest reply id.
+
+Working pattern:
+
+```json
+{
+  "action": "reply",
+  "channel": "tlon",
+  "target": "diary/~host/slug",
+  "messageId": "170.141.184.507.950.303.933.087.606.997.052.817.408",
+  "message": "Reply text here"
+}
+```
+
+Important details:
+- Use the dotted `@da` post id format when available.
+- `messageId` should be the parent notebook post/thread id.
+- After sending, verify with `tlon messages post <diary-nest> <parent-post-id>` when correctness matters.
+- If the tool reports success but the reply is not visible under the parent post, treat it as a delivery/plugin issue and do not claim success until verified.
+
 ## Installation
 
 **npm (Node.js):**
@@ -382,7 +406,30 @@ tlon notebook diary/~host/slug "Title" --content rich.json  # Post with Story JS
 tlon notebook diary/~host/slug "Title" --image <url>     # Post with cover image
 ```
 
-The `--content` file should be Story JSON format (array of verses with headers, code blocks, formatting). See the [Story types in tlon-apps](https://github.com/tloncorp/tlon-apps/blob/develop/packages/shared/src/urbit/content.ts).
+The `--content` file should be **Urbit Story JSON**: an array of verses accepted by the ship's `story-json` decoder.
+
+Working examples:
+
+```json
+[{"inline": ["Hello world"]}]
+```
+
+```json
+[{"block": {"header": {"tag": "h1", "content": ["Title"]}}}]
+```
+
+```json
+[{"inline": ["Use ", {"inline-code": "ha-q"}, " for entity queries."]}]
+```
+
+Important gotcha:
+- Do **not** assume newer block-editor JSON shapes or arbitrary markdown-export JSON will work.
+- If posting fails with a `channel-action-2` cast error mentioning `content -> add -> post -> action -> channel`, the first thing to check is whether the content file matches the ship's Story JSON shape.
+- When debugging, post a minimal one-verse story first so you do not create duplicate full notebook posts.
+
+See the ship-side decoder and types here:
+- `tlon-apps/desk/lib/story-json.hoon`
+- [Story types in tlon-apps](https://github.com/tloncorp/tlon-apps/blob/develop/packages/shared/src/urbit/content.ts)
 
 ### Upload
 
