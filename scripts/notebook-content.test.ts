@@ -82,7 +82,10 @@ describe("normalizeNotebookContent", () => {
             content: [
               {
                 text: "Styled link",
-                marks: [{ type: "link", attrs: { href: "https://example.com" } }, { type: "bold" }],
+                marks: [
+                  { type: "link", attrs: { href: "https://example.com" } },
+                  { type: "bold" },
+                ],
               },
             ],
           },
@@ -112,6 +115,24 @@ describe("normalizeNotebookContent", () => {
           code: {
             code: "const value = 1;\n  console.log(value);",
             lang: "ts",
+          },
+        },
+      },
+    ]);
+  });
+
+  it("preserves empty rich-text code blocks", () => {
+    expect(
+      normalizeNotebookContent({
+        content: [{ type: "paragraph", content: [{ text: "Before" }] }, { type: "codeBlock" }],
+      })
+    ).toEqual([
+      { inline: ["Before"] },
+      {
+        block: {
+          code: {
+            code: "",
+            lang: "plaintext",
           },
         },
       },
@@ -153,6 +174,118 @@ describe("normalizeNotebookContent", () => {
               {
                 type: "listItem",
                 content: [{ type: "paragraph", content: [{ text: "A" }] }],
+              },
+            ],
+          },
+        ],
+      })
+    ).toThrow("Unsupported notebook content JSON");
+  });
+
+  it("fails unsupported non-text rich blocks instead of dropping them", () => {
+    expect(() =>
+      normalizeNotebookContent({
+        content: [
+          { type: "paragraph", content: [{ text: "Keep me" }] },
+          { type: "image", attrs: { src: "https://example.com/image.png" } },
+        ],
+      })
+    ).toThrow("Unsupported notebook content JSON");
+
+    expect(() =>
+      normalizeNotebookContent({
+        content: [{ type: "paragraph", content: [{ text: "Keep me" }] }, { type: "bulletList" }],
+      })
+    ).toThrow("Unsupported notebook content JSON");
+  });
+
+  it("fails ambiguous rich-text child containers", () => {
+    expect(() =>
+      normalizeNotebookContent({
+        content: [
+          {
+            type: "paragraph",
+            children: [{ text: "Child" }],
+            content: [{ text: "Content" }],
+          },
+        ],
+      })
+    ).toThrow("Unsupported notebook content JSON");
+
+    expect(() =>
+      normalizeNotebookContent({
+        content: [
+          {
+            type: "paragraph",
+            content: [{ text: "Text", content: [{ text: "Nested" }] }],
+          },
+        ],
+      })
+    ).toThrow("Unsupported notebook content JSON");
+  });
+
+  it("fails unsupported nested rich-text nodes", () => {
+    expect(() =>
+      normalizeNotebookContent({
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              { text: "Before" },
+              { type: "image", attrs: { src: "https://example.com/image.png" } },
+            ],
+          },
+        ],
+      })
+    ).toThrow("Unsupported notebook content JSON");
+
+    expect(() =>
+      normalizeNotebookContent({
+        content: [
+          {
+            type: "blockquote",
+            content: [{ type: "codeBlock", content: [{ text: "const value = 1;" }] }],
+          },
+        ],
+      })
+    ).toThrow("Unsupported notebook content JSON");
+  });
+
+  it("fails unsupported or lossy rich-text marks", () => {
+    expect(() =>
+      normalizeNotebookContent({
+        content: [
+          {
+            type: "paragraph",
+            content: [{ text: "Underlined", marks: [{ type: "underline" }] }],
+          },
+        ],
+      })
+    ).toThrow("Unsupported notebook content JSON");
+
+    expect(() =>
+      normalizeNotebookContent({
+        content: [
+          {
+            type: "paragraph",
+            content: [{ text: "Broken link", marks: [{ type: "link", attrs: {} }] }],
+          },
+        ],
+      })
+    ).toThrow("Unsupported notebook content JSON");
+
+    expect(() =>
+      normalizeNotebookContent({
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                text: "Linked code",
+                marks: [
+                  { type: "link", attrs: { href: "https://example.com" } },
+                  { type: "code" },
+                ],
               },
             ],
           },

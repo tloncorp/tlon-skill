@@ -138,6 +138,179 @@ function isRichParagraphType(type: string): boolean {
   return type === "paragraph" || type === "p";
 }
 
+function isSupportedRichNodeType(type: string): boolean {
+  return (
+    isRichParagraphType(type) ||
+    type === "header" ||
+    type === "heading" ||
+    type === "codeblock" ||
+    type === "blockquote" ||
+    type === "horizontalrule" ||
+    type === "rule" ||
+    type === "hr"
+  );
+}
+
+function hasRichChildrenKey(node: Record<string, any>): boolean {
+  return "children" in node || "content" in node;
+}
+
+function validateRichChildrenShape(node: Record<string, any>): void {
+  if ("children" in node && "content" in node) {
+    throw new Error(UNSUPPORTED_CONTENT_ERROR);
+  }
+  if ("children" in node && !Array.isArray(node.children)) {
+    throw new Error(UNSUPPORTED_CONTENT_ERROR);
+  }
+  if ("content" in node && !Array.isArray(node.content)) {
+    throw new Error(UNSUPPORTED_CONTENT_ERROR);
+  }
+}
+
+function isSupportedRichMarkType(type: string): boolean {
+  return [
+    "bold",
+    "strong",
+    "italic",
+    "italics",
+    "em",
+    "strike",
+    "strikethrough",
+    "s",
+    "code",
+    "inlinecode",
+    "link",
+  ].includes(type);
+}
+
+function validateRichMarks(marks: any): void {
+  if (marks == null) return;
+  if (!Array.isArray(marks)) throw new Error(UNSUPPORTED_CONTENT_ERROR);
+
+  let linkCount = 0;
+  let hasCode = false;
+  for (const mark of marks) {
+    if (!isPlainObject(mark)) throw new Error(UNSUPPORTED_CONTENT_ERROR);
+    const type = normalizedMarkType(mark);
+    if (!isSupportedRichMarkType(type)) throw new Error(UNSUPPORTED_CONTENT_ERROR);
+
+    if (type === "link") {
+      linkCount++;
+      if (
+        !isPlainObject(mark.attrs) ||
+        (typeof mark.attrs.href !== "string" && typeof mark.attrs.url !== "string")
+      ) {
+        throw new Error(UNSUPPORTED_CONTENT_ERROR);
+      }
+    }
+    if (type === "code" || type === "inlinecode") {
+      hasCode = true;
+    }
+  }
+
+  if (linkCount > 1 || (linkCount > 0 && hasCode)) {
+    throw new Error(UNSUPPORTED_CONTENT_ERROR);
+  }
+}
+
+function isRichTextNode(node: any): boolean {
+  return isPlainObject(node) && typeof node.text === "string";
+}
+
+function validateRichInlineNode(node: any): void {
+  if (typeof node === "string") return;
+  if (!isPlainObject(node)) throw new Error(UNSUPPORTED_CONTENT_ERROR);
+
+  const type = normalizedNodeType(node);
+  if (isRichTextNode(node)) {
+    if (type && type !== "text") throw new Error(UNSUPPORTED_CONTENT_ERROR);
+    if (hasRichChildrenKey(node)) throw new Error(UNSUPPORTED_CONTENT_ERROR);
+    validateRichMarks(node.marks);
+    return;
+  }
+
+  if (type === "hardbreak") {
+    validateRichChildrenShape(node);
+    return;
+  }
+
+  throw new Error(UNSUPPORTED_CONTENT_ERROR);
+}
+
+function validateRichInlineChildren(node: Record<string, any>): void {
+  validateRichChildrenShape(node);
+  for (const child of richChildren(node)) {
+    validateRichInlineNode(child);
+  }
+}
+
+function validateRichCodeBlock(node: Record<string, any>): void {
+  validateRichChildrenShape(node);
+  for (const child of richChildren(node)) {
+    if (typeof child === "string") continue;
+    if (!isPlainObject(child)) throw new Error(UNSUPPORTED_CONTENT_ERROR);
+
+    const type = normalizedNodeType(child);
+    if (isRichTextNode(child)) {
+      if (type && type !== "text") throw new Error(UNSUPPORTED_CONTENT_ERROR);
+      if (hasRichChildrenKey(child)) throw new Error(UNSUPPORTED_CONTENT_ERROR);
+      if (child.marks != null && (!Array.isArray(child.marks) || child.marks.length > 0)) {
+        throw new Error(UNSUPPORTED_CONTENT_ERROR);
+      }
+      continue;
+    }
+
+    if (type === "hardbreak") continue;
+    throw new Error(UNSUPPORTED_CONTENT_ERROR);
+  }
+}
+
+function validateRichBlockquote(node: Record<string, any>): void {
+  validateRichChildrenShape(node);
+  for (const child of richChildren(node)) {
+    if (typeof child === "string" || isRichTextNode(child)) {
+      validateRichInlineNode(child);
+      continue;
+    }
+    if (!isPlainObject(child)) throw new Error(UNSUPPORTED_CONTENT_ERROR);
+
+    const type = normalizedNodeType(child);
+    if (!isRichParagraphType(type)) throw new Error(UNSUPPORTED_CONTENT_ERROR);
+    validateRichInlineChildren(child);
+  }
+}
+
+function validateRichRule(node: Record<string, any>): void {
+  validateRichChildrenShape(node);
+  if (richChildren(node).length > 0) throw new Error(UNSUPPORTED_CONTENT_ERROR);
+}
+
+function validateTopLevelRichNode(node: any): void {
+  if (!isPlainObject(node)) throw new Error(UNSUPPORTED_CONTENT_ERROR);
+
+  const type = normalizedNodeType(node);
+  if (!isSupportedRichNodeType(type)) throw new Error(UNSUPPORTED_CONTENT_ERROR);
+
+  if (isRichParagraphType(type) || type === "header" || type === "heading") {
+    validateRichInlineChildren(node);
+    return;
+  }
+  if (type === "codeblock") {
+    validateRichCodeBlock(node);
+    return;
+  }
+  if (type === "blockquote") {
+    validateRichBlockquote(node);
+    return;
+  }
+  if (type === "horizontalrule" || type === "rule" || type === "hr") {
+    validateRichRule(node);
+    return;
+  }
+
+  throw new Error(UNSUPPORTED_CONTENT_ERROR);
+}
+
 function hasRichMark(marks: any[], types: string[]): boolean {
   return marks.some((mark) => types.includes(normalizedMarkType(mark)));
 }
@@ -241,32 +414,18 @@ function richJsonToStory(input: any): Story {
 
   if (!Array.isArray(nodes) || nodes.length === 0) return [];
 
+  nodes.forEach(validateTopLevelRichNode);
+
   const story: Story = [];
   for (const node of nodes) {
-    if (!node || typeof node !== "object") continue;
+    if (!isPlainObject(node)) continue;
     const type = normalizedNodeType(node);
+
     const richText = extractRichText(node);
     const text = richText.trim();
 
     if (type === "horizontalrule" || type === "rule" || type === "hr") {
       story.push({ block: { rule: null } });
-      continue;
-    }
-
-    if (!text) continue;
-
-    if (type === "header" || type === "heading") {
-      const levelRaw = Number(node.level ?? node.attrs?.level ?? 1);
-      const level = Number.isFinite(levelRaw) ? Math.min(6, Math.max(1, levelRaw)) : 1;
-      const content = trimInlineText(extractRichInlines(node));
-      story.push({
-        block: {
-          header: {
-            tag: `h${level}` as "h1" | "h2" | "h3" | "h4" | "h5" | "h6",
-            content,
-          },
-        },
-      });
       continue;
     }
 
@@ -292,16 +451,29 @@ function richJsonToStory(input: any): Story {
       continue;
     }
 
+    if (!text) continue;
+
+    if (type === "header" || type === "heading") {
+      const levelRaw = Number(node.level ?? node.attrs?.level ?? 1);
+      const level = Number.isFinite(levelRaw) ? Math.min(6, Math.max(1, levelRaw)) : 1;
+      const content = trimInlineText(extractRichInlines(node));
+      story.push({
+        block: {
+          header: {
+            tag: `h${level}` as "h1" | "h2" | "h3" | "h4" | "h5" | "h6",
+            content,
+          },
+        },
+      });
+      continue;
+    }
+
     if (type === "blockquote") {
       const inlines = extractRichBlockInlines(node);
       if (inlines.length > 0) {
         story.push({ inline: [{ blockquote: inlines }] });
       }
       continue;
-    }
-
-    if (!isRichParagraphType(type)) {
-      throw new Error(UNSUPPORTED_CONTENT_ERROR);
     }
 
     const inlines = trimInlineText(extractRichInlines(node));
