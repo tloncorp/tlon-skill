@@ -95,6 +95,71 @@ describe("normalizeNotebookContent", () => {
     ]);
   });
 
+  it("preserves rich-text code blocks", () => {
+    expect(
+      normalizeNotebookContent({
+        content: [
+          {
+            type: "codeBlock",
+            attrs: { language: "ts" },
+            content: [{ text: "const value = 1;\n  console.log(value);" }],
+          },
+        ],
+      })
+    ).toEqual([
+      {
+        block: {
+          code: {
+            code: "const value = 1;\n  console.log(value);",
+            lang: "ts",
+          },
+        },
+      },
+    ]);
+  });
+
+  it("preserves rich-text blockquotes", () => {
+    expect(
+      normalizeNotebookContent({
+        content: [
+          {
+            type: "blockquote",
+            content: [
+              { type: "paragraph", content: [{ text: "Quoted" }] },
+              { type: "paragraph", content: [{ text: "Again" }] },
+            ],
+          },
+        ],
+      })
+    ).toEqual([{ inline: [{ blockquote: ["Quoted", { break: null }, "Again"] }] }]);
+  });
+
+  it("preserves rich-text horizontal rules", () => {
+    expect(
+      normalizeNotebookContent({
+        content: [{ type: "horizontalRule" }],
+      })
+    ).toEqual([{ block: { rule: null } }]);
+  });
+
+  it("fails unsupported rich-text blocks instead of flattening them", () => {
+    expect(() =>
+      normalizeNotebookContent({
+        content: [
+          {
+            type: "bulletList",
+            content: [
+              {
+                type: "listItem",
+                content: [{ type: "paragraph", content: [{ text: "A" }] }],
+              },
+            ],
+          },
+        ],
+      })
+    ).toThrow("Unsupported notebook content JSON");
+  });
+
   it("fails invalid Story-shaped content", () => {
     expect(() => normalizeNotebookContent([{ block: {} }])).toThrow(
       "Unsupported notebook content JSON"

@@ -102,6 +102,13 @@ function extractRichText(node: any): string {
   return children.map(extractRichText).join("");
 }
 
+function richChildren(node: any): any[] {
+  if (!node || typeof node !== "object") return [];
+  if (Array.isArray(node.children)) return node.children;
+  if (Array.isArray(node.content)) return node.content;
+  return [];
+}
+
 function mergeAdjacentStrings(inlines: StoryInline[]): StoryInline[] {
   const result: StoryInline[] = [];
   for (const inline of inlines) {
@@ -117,6 +124,15 @@ function mergeAdjacentStrings(inlines: StoryInline[]): StoryInline[] {
 function normalizedMarkType(mark: any): string {
   if (!isPlainObject(mark) || typeof mark.type !== "string") return "";
   return mark.type.toLowerCase().replace(/[-_]/g, "");
+}
+
+function normalizedNodeType(node: any): string {
+  if (!isPlainObject(node) || typeof node.type !== "string") return "";
+  return node.type.toLowerCase().replace(/[-_]/g, "");
+}
+
+function isRichParagraphType(type: string): boolean {
+  return type === "paragraph" || type === "p";
 }
 
 function hasRichMark(marks: any[], types: string[]): boolean {
@@ -173,6 +189,21 @@ function extractRichInlines(node: any): StoryInline[] {
   return mergeAdjacentStrings(children.flatMap(extractRichInlines));
 }
 
+function extractRichBlockInlines(node: any): StoryInline[] {
+  const groups = richChildren(node)
+    .map((child) => trimInlineText(extractRichInlines(child)))
+    .filter((group) => group.length > 0);
+
+  if (groups.length === 0) return trimInlineText(extractRichInlines(node));
+
+  const inlines: StoryInline[] = [];
+  groups.forEach((group, index) => {
+    if (index > 0) inlines.push({ break: null });
+    inlines.push(...group);
+  });
+  return mergeAdjacentStrings(inlines);
+}
+
 function trimInlineText(inlines: StoryInline[]): StoryInline[] {
   const result = inlines.slice();
 
@@ -210,8 +241,15 @@ function richJsonToStory(input: any): Story {
   const story: Story = [];
   for (const node of nodes) {
     if (!node || typeof node !== "object") continue;
-    const type = typeof node.type === "string" ? node.type : "";
-    const text = extractRichText(node).trim();
+    const type = normalizedNodeType(node);
+    const richText = extractRichText(node);
+    const text = richText.trim();
+
+    if (type === "horizontalrule" || type === "rule" || type === "hr") {
+      story.push({ block: { rule: null } });
+      continue;
+    }
+
     if (!text) continue;
 
     if (type === "header" || type === "heading") {
@@ -228,6 +266,38 @@ function richJsonToStory(input: any): Story {
       });
       continue;
     }
+
+    if (type === "codeblock") {
+      const lang =
+        typeof node.attrs?.language === "string"
+          ? node.attrs.language
+          : typeof node.attrs?.lang === "string"
+            ? node.attrs.lang
+            : typeof node.language === "string"
+              ? node.language
+              : typeof node.lang === "string"
+                ? node.lang
+                : "plaintext";
+      story.push({
+        block: {
+          code: {
+            code: richText.replace(/^\n+|\n+$/g, ""),
+            lang,
+          },
+        },
+      });
+      continue;
+    }
+
+    if (type === "blockquote") {
+      const inlines = extractRichBlockInlines(node);
+      if (inlines.length > 0) {
+        story.push({ inline: [{ blockquote: inlines }] });
+      }
+      continue;
+    }
+
+    if (!isRichParagraphType(type)) continue;
 
     const inlines = trimInlineText(extractRichInlines(node));
     if (inlines.length > 0) {
