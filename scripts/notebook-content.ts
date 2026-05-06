@@ -1,5 +1,8 @@
 import type { Story, StoryBlock, StoryInline, StoryVerse } from "./story";
 
+const UNSUPPORTED_CONTENT_ERROR =
+  "Unsupported notebook content JSON: expected a Story array or recognized rich-text content";
+
 function isPlainObject(value: any): value is Record<string, any> {
   if (!value || typeof value !== "object") return false;
   return !Array.isArray(value);
@@ -297,7 +300,9 @@ function richJsonToStory(input: any): Story {
       continue;
     }
 
-    if (!isRichParagraphType(type)) continue;
+    if (!isRichParagraphType(type)) {
+      throw new Error(UNSUPPORTED_CONTENT_ERROR);
+    }
 
     const inlines = trimInlineText(extractRichInlines(node));
     if (inlines.length > 0) {
@@ -314,7 +319,5 @@ export function normalizeNotebookContent(raw: any): Story {
   const story = richJsonToStory(raw);
   if (story.length > 0) return story;
 
-  throw new Error(
-    "Unsupported notebook content JSON: expected a Story array or recognized rich-text content"
-  );
+  throw new Error(UNSUPPORTED_CONTENT_ERROR);
 }

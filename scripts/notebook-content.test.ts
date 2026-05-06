@@ -146,6 +146,7 @@ describe("normalizeNotebookContent", () => {
     expect(() =>
       normalizeNotebookContent({
         content: [
+          { type: "paragraph", content: [{ text: "Keep me" }] },
           {
             type: "bulletList",
             content: [
