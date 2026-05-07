@@ -122,6 +122,14 @@ tlon contacts update-profile --nickname "My Name"
 
 # Create a group
 tlon groups create "My Group" --description "A cool group"
+
+# Join a public or invited group; private groups without an invite request one
+tlon groups join ~host/group-slug
+
+# Manage group invite flow explicitly
+tlon groups request-invite ~host/group-slug
+tlon groups accept-invite ~host/group-slug
+tlon groups reject-invite ~host/group-slug
 ```
 
 ## Features
@@ -129,7 +137,7 @@ tlon groups create "My Group" --description "A cool group"
 - **Activity**: Mentions, replies, unreads (with nicknames)
 - **Channels**: List DMs, group DMs, subscribed groups (nicknames shown), reader/writer permissions
 - **Contacts**: List, get, update profiles
-- **Groups**: Create, join, invite, roles, privacy (member nicknames shown)
+- **Groups**: Create, join, invite/request flows, roles, privacy (member nicknames shown)
 - **Hooks**: Manage channel hooks (add, edit, delete, order, config, cron)
 - **Messages**: History, search (author nicknames shown)
 - **DMs**: Send, react, accept/decline
