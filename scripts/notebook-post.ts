@@ -4,19 +4,25 @@
  * Post to a Tlon notebook (diary channel)
  *
  * Usage:
- *   npx ts-node scripts/notebook-post.ts <nest> <title> [--image <url>] [--content <json-file>]
+ *   npx ts-node scripts/notebook-post.ts <nest> <title> [--image <url>] [--content <json-file>] [--stdin] [--markdown <file>] [--markdown-stdin]
  *
  * Examples:
  *   npx ts-node scripts/notebook-post.ts diary/~host/channel "My Post Title"
  *   npx ts-node scripts/notebook-post.ts diary/~host/channel "My Post" --image https://example.com/cover.png
- *   npx ts-node scripts/notebook-post.ts diary/~host/channel "My Post" --content article.json
+ *   npx ts-node scripts/notebook-post.ts diary/~host/channel "My Post" --content story.json
+ *   npx ts-node scripts/notebook-post.ts diary/~host/channel "My Post" --markdown article.md
  *
- * If no --content is provided, reads from stdin (expects JSON array of Story verses).
+ * If no explicit content is provided, creates a post with a title and empty body.
+ * --content and --stdin accept Story JSON. Use --markdown or --markdown-stdin
+ * for Markdown input.
  */
 
 import * as fs from "fs";
 import { getCurrentUserId, sendPost } from "@tloncorp/api";
 import { ensureClient } from "./api-client";
+import { getRequiredOptionValue } from "./cli-utils";
+import { normalizeNotebookContent, type NotebookStory } from "./notebook-content";
+import { markdownToStory } from "./story";
 
 interface PostResult {
   success: boolean;
@@ -27,7 +33,7 @@ interface PostResult {
 export async function postToNotebook(
   nest: string,
   title: string,
-  content: any[],
+  content: NotebookStory,
   image?: string
 ): Promise<PostResult> {
   const authorId = getCurrentUserId();
@@ -66,15 +72,18 @@ Arguments:
 
 Options:
   --image <url>     Cover image URL
-  --content <file>  JSON file with Story content (array of verses)
-  --stdin           Read content from stdin as JSON
+  --content <file>  JSON file with Story JSON
+  --stdin           Read Story JSON from stdin
+  --markdown <file> Markdown file to convert to Story
+  --markdown-stdin  Read Markdown from stdin
 
-If no content is provided, creates a simple post with the title only.
+If no content is provided, creates a post with a title and empty body.
 
 Examples:
   npx ts-node scripts/notebook-post.ts diary/~host/notes "Hello World"
   npx ts-node scripts/notebook-post.ts diary/~host/notes "My Post" --image https://example.com/img.png
   echo '[{"inline":["Hello!"]}]' | npx ts-node scripts/notebook-post.ts diary/~host/notes "Test" --stdin
+  npx ts-node scripts/notebook-post.ts diary/~host/notes "Markdown Post" --markdown post.md
 `);
     process.exit(args.includes("--help") || args.includes("-h") ? 0 : 1);
   }
@@ -83,22 +92,50 @@ Examples:
   const title = args[1];
 
   let image: string | undefined;
-  let content: any[] = [{ inline: [title] }]; // Default content is just the title
+  let content: NotebookStory = [];
+  let contentSource: string | undefined;
+
+  const claimContentSource = (source: string) => {
+    if (contentSource) {
+      throw new Error(`Only one content source can be provided (${contentSource} and ${source})`);
+    }
+    contentSource = source;
+  };
+
+  const readStdin = async (): Promise<string> => {
+    const chunks: Buffer[] = [];
+    for await (const chunk of process.stdin) {
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks).toString("utf-8");
+  };
 
   for (let i = 2; i < args.length; i++) {
-    if (args[i] === "--image" && args[i + 1]) {
-      image = args[++i];
-    } else if (args[i] === "--content" && args[i + 1]) {
-      const file = args[++i];
+    if (args[i] === "--image") {
+      image = getRequiredOptionValue(args, i);
+      i++;
+    } else if (args[i] === "--content") {
+      claimContentSource("--content");
+      const file = getRequiredOptionValue(args, i);
       const data = fs.readFileSync(file, "utf-8");
-      content = JSON.parse(data);
+      content = normalizeNotebookContent(JSON.parse(data));
+      i++;
     } else if (args[i] === "--stdin") {
-      const chunks: Buffer[] = [];
-      for await (const chunk of process.stdin) {
-        chunks.push(chunk);
-      }
-      const data = Buffer.concat(chunks).toString("utf-8");
-      content = JSON.parse(data);
+      claimContentSource("--stdin");
+      const data = await readStdin();
+      content = normalizeNotebookContent(JSON.parse(data));
+    } else if (args[i] === "--markdown") {
+      claimContentSource("--markdown");
+      const file = getRequiredOptionValue(args, i);
+      const data = fs.readFileSync(file, "utf-8");
+      content = markdownToStory(data);
+      i++;
+    } else if (args[i] === "--markdown-stdin") {
+      claimContentSource("--markdown-stdin");
+      const data = await readStdin();
+      content = markdownToStory(data);
+    } else {
+      throw new Error(`Unknown option: ${args[i]}`);
     }
   }
 

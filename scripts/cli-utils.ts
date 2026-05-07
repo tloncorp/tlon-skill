@@ -27,6 +27,17 @@ export function hasFlag(args: string[], name: string): boolean {
 }
 
 /**
+ * Read the value after an option that requires one.
+ */
+export function getRequiredOptionValue(args: string[], index: number, flag = args[index]): string {
+  const value = args[index + 1];
+  if (!value || value.startsWith("--")) {
+    throw new Error(`${flag} requires a value`);
+  }
+  return value;
+}
+
+/**
  * Check if help was requested for a command/subcommand
  */
 export function wantsHelp(args: string[]): boolean {

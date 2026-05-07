@@ -139,6 +139,7 @@ export function markdownToStory(markdown: string): Story {
   const story: Story = [];
   const lines = markdown.split("\n");
   let i = 0;
+  const isHeaderLine = (line: string) => /^(#{1,6})\s+(.+)$/.test(line);
 
   while (i < lines.length) {
     const line = lines[i];
@@ -213,7 +214,7 @@ export function markdownToStory(markdown: string): Story {
     while (
       i < lines.length &&
       lines[i].trim() !== "" &&
-      !lines[i].startsWith("#") &&
+      !isHeaderLine(lines[i]) &&
       !lines[i].startsWith("```") &&
       !lines[i].startsWith("> ") &&
       !/^(-{3,}|\*{3,})$/.test(lines[i].trim())
