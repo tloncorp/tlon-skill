@@ -94,7 +94,7 @@ function extractRichText(node: any): string {
   if (typeof node !== "object") return "";
 
   if (typeof node.text === "string") return node.text;
-  if (node.type === "hardBreak") return "\n";
+  if (normalizedNodeType(node) === "hardbreak") return "\n";
 
   const children = Array.isArray(node.children)
     ? node.children
@@ -354,7 +354,7 @@ function extractRichInlines(node: any): StoryInline[] {
   if (typeof node !== "object") return [];
 
   if (typeof node.text === "string") return applyRichTextMarks(node.text, node.marks);
-  if (node.type === "hardBreak") return [{ break: null }];
+  if (normalizedNodeType(node) === "hardbreak") return [{ break: null }];
 
   const children = Array.isArray(node.children)
     ? node.children

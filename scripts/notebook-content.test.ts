@@ -28,6 +28,26 @@ describe("normalizeNotebookContent", () => {
     ).toEqual([{ inline: ["# todo"] }, { inline: ["> quote"] }, { inline: ["```js"] }]);
   });
 
+  it("normalizes hard-break node spellings in rich-text paragraphs", () => {
+    expect(
+      normalizeNotebookContent({
+        content: [
+          {
+            type: "paragraph",
+            content: [{ text: "One" }, { type: "hard-break" }, { text: "Two" }],
+          },
+          {
+            type: "paragraph",
+            content: [{ text: "Three" }, { type: "hard_break" }, { text: "Four" }],
+          },
+        ],
+      })
+    ).toEqual([
+      { inline: ["One", { break: null }, "Two"] },
+      { inline: ["Three", { break: null }, "Four"] },
+    ]);
+  });
+
   it("converts rich-text headings to Story headers", () => {
     expect(
       normalizeNotebookContent({
@@ -115,6 +135,28 @@ describe("normalizeNotebookContent", () => {
           code: {
             code: "const value = 1;\n  console.log(value);",
             lang: "ts",
+          },
+        },
+      },
+    ]);
+  });
+
+  it("normalizes hard-break node spellings in rich-text code blocks", () => {
+    expect(
+      normalizeNotebookContent({
+        content: [
+          {
+            type: "codeBlock",
+            content: [{ text: "const a = 1;" }, { type: "hard_break" }, { text: "return a;" }],
+          },
+        ],
+      })
+    ).toEqual([
+      {
+        block: {
+          code: {
+            code: "const a = 1;\nreturn a;",
+            lang: "plaintext",
           },
         },
       },
