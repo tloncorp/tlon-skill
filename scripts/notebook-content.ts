@@ -2,6 +2,7 @@ import type { Story, StoryBlock, StoryInline, StoryVerse } from "./story";
 
 const UNSUPPORTED_CONTENT_ERROR =
   "Unsupported notebook content JSON: expected a Story array or recognized rich-text content";
+type StoryHeaderTag = "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
 
 function isPlainObject(value: any): value is Record<string, any> {
   if (!value || typeof value !== "object") return false;
@@ -136,6 +137,15 @@ function normalizedNodeType(node: any): string {
 
 function isRichParagraphType(type: string): boolean {
   return type === "paragraph" || type === "p";
+}
+
+function richHeadingTag(node: Record<string, any>): StoryHeaderTag {
+  const levelRaw = node.level ?? node.attrs?.level ?? 1;
+  const level = Number(levelRaw);
+  if (!Number.isInteger(level) || level < 1 || level > 6) {
+    throw new Error(UNSUPPORTED_CONTENT_ERROR);
+  }
+  return `h${level}` as StoryHeaderTag;
 }
 
 function isSupportedRichNodeType(type: string): boolean {
@@ -291,7 +301,12 @@ function validateTopLevelRichNode(node: any): void {
   const type = normalizedNodeType(node);
   if (!isSupportedRichNodeType(type)) throw new Error(UNSUPPORTED_CONTENT_ERROR);
 
-  if (isRichParagraphType(type) || type === "header" || type === "heading") {
+  if (isRichParagraphType(type)) {
+    validateRichInlineChildren(node);
+    return;
+  }
+  if (type === "header" || type === "heading") {
+    richHeadingTag(node);
     validateRichInlineChildren(node);
     return;
   }
@@ -454,13 +469,11 @@ function richJsonToStory(input: any): Story {
     if (!text) continue;
 
     if (type === "header" || type === "heading") {
-      const levelRaw = Number(node.level ?? node.attrs?.level ?? 1);
-      const level = Number.isFinite(levelRaw) ? Math.min(6, Math.max(1, levelRaw)) : 1;
       const content = trimInlineText(extractRichInlines(node));
       story.push({
         block: {
           header: {
-            tag: `h${level}` as "h1" | "h2" | "h3" | "h4" | "h5" | "h6",
+            tag: richHeadingTag(node),
             content,
           },
         },

@@ -56,6 +56,20 @@ describe("normalizeNotebookContent", () => {
     ).toEqual([{ block: { header: { tag: "h2", content: ["Title"] } } }]);
   });
 
+  it("fails invalid rich-text heading levels", () => {
+    expect(() =>
+      normalizeNotebookContent({
+        content: [{ type: "heading", attrs: { level: 2.5 }, content: [{ text: "Title" }] }],
+      })
+    ).toThrow("Unsupported notebook content JSON");
+
+    expect(() =>
+      normalizeNotebookContent({
+        content: [{ type: "heading", attrs: { level: 7 }, content: [{ text: "Title" }] }],
+      })
+    ).toThrow("Unsupported notebook content JSON");
+  });
+
   it("preserves rich-text marks on text nodes", () => {
     expect(
       normalizeNotebookContent({
