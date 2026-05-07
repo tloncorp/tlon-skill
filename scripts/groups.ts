@@ -9,6 +9,12 @@
  *   npx ts-node scripts/groups.ts info <group-id>
  *   npx ts-node scripts/groups.ts leave <group-id>
  *   npx ts-node scripts/groups.ts join <group-id>
+ *   npx ts-node scripts/groups.ts request-invite <group-id>
+ *   npx ts-node scripts/groups.ts accept-invite <group-id>
+ *   npx ts-node scripts/groups.ts reject-invite <group-id>
+ *   npx ts-node scripts/groups.ts cancel-join <group-id>
+ *   npx ts-node scripts/groups.ts rescind-request <group-id>
+ *   npx ts-node scripts/groups.ts revoke-invite <group-id> <ship> [<ship2> ...]
  *   npx ts-node scripts/groups.ts delete <group-id>
  *   npx ts-node scripts/groups.ts update <group-id> --title "..." [--description "..."] [--image "..."]
  *   npx ts-node scripts/groups.ts kick <group-id> <ship> [<ship2> ...]
@@ -32,6 +38,7 @@ import {
   addGroupRole,
   addMembersToRole,
   banUsersFromGroup,
+  cancelGroupJoin as apiCancelGroupJoin,
   createChannel,
   createGroup,
   deleteGroup,
@@ -39,14 +46,21 @@ import {
   getContacts,
   getCurrentUserId,
   getGroup,
+  getGroupPreview,
   getGroups,
   inviteGroupMembers,
+  joinGroup as apiJoinGroup,
   kickUsersFromGroup,
   leaveGroup,
   poke,
+  rejectGroupInvitation,
   rejectGroupJoin,
   removeMembersFromRole,
   requestGroupInvitation,
+  rescindGroupInvitationRequest,
+  revokeGroupMemberInvites,
+  scry,
+  toClientGroupsFromForeigns,
   unbanUsersFromGroup,
   updateGroupMeta,
   updateGroupPrivacy,
@@ -77,6 +91,12 @@ Commands:
   info <group-id>
   leave <group-id>
   join <group-id>
+  request-invite <group-id>
+  accept-invite <group-id>
+  reject-invite <group-id>
+  cancel-join <group-id>
+  rescind-request <group-id>
+  revoke-invite <group-id> <ship> [<ship2> ...]
   delete <group-id>
   update <group-id> --title "..." [--description "..."] [--image "..."] [--cover "..."]
   kick <group-id> <ship> [<ship2> ...]
@@ -104,7 +124,13 @@ const GROUPS_COMMAND_HELP: Record<string, string> = {
   invite: `Usage: groups.ts invite <group-id> <ship> [<ship2> ...]\nExample: groups.ts invite ~host/group-slug ~nec ~bud`,
   info: `Usage: groups.ts info <group-id>\nExample: groups.ts info ~host/group-slug`,
   leave: `Usage: groups.ts leave <group-id>\nExample: groups.ts leave ~host/group-slug`,
-  join: `Usage: groups.ts join <group-id>\nExample: groups.ts join ~host/group-slug`,
+  join: `Usage: groups.ts join <group-id>\nJoins public or invited groups. For private groups without an invite, requests an invite.\nExample: groups.ts join ~host/group-slug`,
+  "request-invite": `Usage: groups.ts request-invite <group-id>\nExample: groups.ts request-invite ~host/group-slug`,
+  "accept-invite": `Usage: groups.ts accept-invite <group-id>\nExample: groups.ts accept-invite ~host/group-slug`,
+  "reject-invite": `Usage: groups.ts reject-invite <group-id>\nExample: groups.ts reject-invite ~host/group-slug`,
+  "cancel-join": `Usage: groups.ts cancel-join <group-id>\nExample: groups.ts cancel-join ~host/group-slug`,
+  "rescind-request": `Usage: groups.ts rescind-request <group-id>\nExample: groups.ts rescind-request ~host/group-slug`,
+  "revoke-invite": `Usage: groups.ts revoke-invite <group-id> <ship> [<ship2> ...]\nExample: groups.ts revoke-invite ~host/group-slug ~nec`,
   delete: `Usage: groups.ts delete <group-id>\nExample: groups.ts delete ~host/group-slug`,
   update: `Usage: groups.ts update <group-id> --title "..." [--description "..."] [--image "..."] [--cover "..."]\nExample: groups.ts update ~host/group-slug --title "New Title"`,
   kick: `Usage: groups.ts kick <group-id> <ship> [<ship2> ...]\nExample: groups.ts kick ~host/group-slug ~nec`,
@@ -190,7 +216,7 @@ async function getGroupInfo(groupId: string) {
 
   console.log("\n--- Members ---");
   for (const member of group.members || []) {
-    const roles = (member.roles || []).map((r) => r.roleId);
+    const roles = (member.roles || []).map((r: { roleId: string }) => r.roleId);
     const roleList = roles.length > 0 ? ` [${roles.join(", ")}]` : "";
     const displayName = formatShipWithNickname(member.contactId, nicknameMap);
     console.log(`  ${displayName}${roleList}`);
@@ -298,11 +324,124 @@ async function leaveGroupById(groupId: string) {
 
 // Join a group
 async function joinGroupById(groupId: string) {
+  const joinedGroup = await getJoinedGroupState(groupId);
+  if (joinedGroup?.currentUserIsMember) {
+    console.log(`Already a member of ${groupId}.`);
+    return;
+  }
+
+  const foreignGroup = await getForeignGroupState(groupId);
+  if (foreignGroup?.haveInvite) {
+    await acceptInvite(groupId);
+    return;
+  }
+
+  if (foreignGroup?.haveRequestedInvite) {
+    console.log(`Invite already requested for ${groupId}.`);
+    return;
+  }
+
+  const group = foreignGroup ?? (await getGroupPreviewState(groupId));
+
+  if (group?.privacy === "public") {
+    await joinNow(groupId);
+    return;
+  }
+
+  if (group?.privacy === "private") {
+    await requestInvite(groupId);
+    return;
+  }
+
+  if (group?.privacy === "secret") {
+    throw new Error(`Cannot join secret group ${groupId} without an invite.`);
+  }
+
+  console.log(`Group privacy unknown for ${groupId}; attempting join...`);
+  await joinNow(groupId);
+}
+
+async function getJoinedGroupState(groupId: string): Promise<Group | null> {
+  try {
+    return await getGroup(groupId);
+  } catch {
+    return null;
+  }
+}
+
+async function getForeignGroupState(groupId: string): Promise<Group | null> {
+  try {
+    const foreigns = await scry<Record<string, unknown>>({
+      app: "groups",
+      path: "/v1/foreigns",
+    });
+    const groups = toClientGroupsFromForeigns(foreigns as any);
+    return groups.find((group: Group) => group.id === groupId) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function getGroupPreviewState(groupId: string): Promise<Group | null> {
+  try {
+    return await getGroupPreview(groupId);
+  } catch {
+    try {
+      const groups = await getGroups();
+      return groups.find((group) => group.id === groupId) ?? null;
+    } catch {
+      return null;
+    }
+  }
+}
+
+async function joinNow(groupId: string) {
   console.log(`Joining group ${groupId}...`);
+  await apiJoinGroup(groupId);
+  console.log(`✅ Join requested. Sync may take a moment to show membership.`);
+}
 
+async function requestInvite(groupId: string) {
+  console.log(`Requesting invite to ${groupId}...`);
   await requestGroupInvitation(groupId);
+  console.log(`✅ Invite requested.`);
+}
 
-  console.log(`✅ Join request sent! (May need approval if group is private)`);
+async function acceptInvite(groupId: string) {
+  console.log(`Accepting invite to ${groupId}...`);
+  await apiJoinGroup(groupId);
+  console.log(`✅ Invite accepted, joining group. Sync may take a moment to show membership.`);
+}
+
+async function rejectInvite(groupId: string) {
+  console.log(`Rejecting invite to ${groupId}...`);
+  await rejectGroupInvitation(groupId);
+  console.log(`✅ Invite rejected.`);
+}
+
+async function cancelJoin(groupId: string) {
+  console.log(`Canceling join for ${groupId}...`);
+  await apiCancelGroupJoin(groupId);
+  console.log(`✅ Join canceled.`);
+}
+
+async function rescindInviteRequest(groupId: string) {
+  console.log(`Rescinding invite request for ${groupId}...`);
+  await rescindGroupInvitationRequest(groupId);
+  console.log(`✅ Invite request rescinded.`);
+}
+
+async function revokeInvites(groupId: string, ships: string[]) {
+  const normalizedShips = ships.map(normalizeShip);
+
+  console.log(`Revoking invites for ${normalizedShips.join(", ")} from ${groupId}...`);
+
+  await revokeGroupMemberInvites({
+    groupId,
+    contactIds: normalizedShips,
+  });
+
+  console.log(`✅ Invites revoked.`);
 }
 
 // Delete a group (must be host)
@@ -691,10 +830,71 @@ async function main() {
     case "join": {
       const groupId = args[1];
       if (!groupId) {
-        console.error("Usage: groups.ts join <group-id>");
+        console.error(GROUPS_COMMAND_HELP.join);
         process.exit(1);
       }
       await joinGroupById(groupId);
+      break;
+    }
+
+    case "request-invite": {
+      const groupId = args[1];
+      if (!groupId) {
+        console.error(GROUPS_COMMAND_HELP["request-invite"]);
+        process.exit(1);
+      }
+      await requestInvite(groupId);
+      break;
+    }
+
+    case "accept-invite": {
+      const groupId = args[1];
+      if (!groupId) {
+        console.error(GROUPS_COMMAND_HELP["accept-invite"]);
+        process.exit(1);
+      }
+      await acceptInvite(groupId);
+      break;
+    }
+
+    case "reject-invite": {
+      const groupId = args[1];
+      if (!groupId) {
+        console.error(GROUPS_COMMAND_HELP["reject-invite"]);
+        process.exit(1);
+      }
+      await rejectInvite(groupId);
+      break;
+    }
+
+    case "cancel-join": {
+      const groupId = args[1];
+      if (!groupId) {
+        console.error(GROUPS_COMMAND_HELP["cancel-join"]);
+        process.exit(1);
+      }
+      await cancelJoin(groupId);
+      break;
+    }
+
+    case "rescind-request": {
+      const groupId = args[1];
+      if (!groupId) {
+        console.error(GROUPS_COMMAND_HELP["rescind-request"]);
+        process.exit(1);
+      }
+      await rescindInviteRequest(groupId);
+      break;
+    }
+
+    case "revoke-invite": {
+      const groupId = args[1];
+      const ships = args.slice(2);
+      if (!groupId || ships.length === 0) {
+        console.error(GROUPS_COMMAND_HELP["revoke-invite"]);
+        process.exit(1);
+      }
+      await revokeInvites(groupId, ships);
       break;
     }
 

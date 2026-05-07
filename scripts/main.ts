@@ -33,7 +33,7 @@ Commands:
   contacts     Contact/profile management (list, get, self, sync, add, remove, update-profile)
   dms          Direct message operations (send, reply, react, unreact, delete, accept, decline)
   expose       Manage public content exposure (list, show, hide, check, url)
-  groups       Group management (list, create, info, invite, join, leave, delete, ...)
+  groups       Group management (list, create, info, join, request/accept invites, leave, delete, ...)
   hooks        Channel hooks management (list, add, edit, delete, order, config, cron, rest)
   messages     Message history and search (dm, channel, history, search, context, post)
   notebook     Post to diary/notebook channels
@@ -67,6 +67,7 @@ Examples:
   tlon contacts list
   tlon messages dm ~sampel-palnet --limit 10
   tlon groups create "My Group" --description "A cool group"
+  tlon groups join ~host/group-slug
   tlon posts react chat/~host/channel 170.141.184... 👍
   tlon --config ~/ships/zod.json contacts self
   tlon --url https://zod.tlon.network --cookie "urbauth-~zod=0v..." contacts self

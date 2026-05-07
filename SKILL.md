@@ -204,18 +204,24 @@ Full group management.
 tlon groups list                                         # List your groups
 tlon groups info ~host/slug                              # Get group details
 tlon groups create "Name" [--description "..."]          # Create a group
-tlon groups join ~host/slug                              # Join a group
+tlon groups join ~host/slug                              # Join public/invited group, or request invite if private
+tlon groups request-invite ~host/slug                    # Request invite to a private group
+tlon groups accept-invite ~host/slug                     # Accept an existing group invite
+tlon groups reject-invite ~host/slug                     # Reject an existing group invite
+tlon groups cancel-join ~host/slug                       # Cancel a pending join
+tlon groups rescind-request ~host/slug                   # Cancel an invite request
 tlon groups leave ~host/slug                             # Leave a group
 tlon groups delete ~host/slug                            # Delete (host only)
 tlon groups update ~host/slug --title "..." [--description "..."]
 
 # Members (shown with nicknames when available)
 tlon groups invite ~host/slug ~ship1 ~ship2              # Invite members
+tlon groups revoke-invite ~host/slug ~ship1              # Revoke pending member invite
 tlon groups kick ~host/slug ~ship1                       # Kick members
 tlon groups ban ~host/slug ~ship1                        # Ban members
 tlon groups unban ~host/slug ~ship1                      # Unban members
-tlon groups accept-join ~host/slug ~ship1                # Accept join request
-tlon groups reject-join ~host/slug ~ship1                # Reject join request
+tlon groups accept-join ~host/slug ~ship1                # Approve a member join request
+tlon groups reject-join ~host/slug ~ship1                # Deny a member join request
 tlon groups set-privacy ~host/slug public|private|secret # Set privacy
 
 # Roles
@@ -256,6 +262,12 @@ tlon groups add-channel --help
 ```
 
 Group format: `~host-ship/group-slug`
+
+Join behavior:
+- `join` first checks whether you are already a member, then checks foreign/unjoined group state for a valid invite.
+- Invited groups and public groups use the backend join action.
+- Private groups without an invite use the invite-request action.
+- Secret groups require an invite.
 
 ### Hooks
 
