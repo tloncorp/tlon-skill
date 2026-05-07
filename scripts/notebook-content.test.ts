@@ -53,6 +53,12 @@ describe("normalizeNotebookContent", () => {
     expect(() => normalizeNotebookContent([{ inline: [], block: { rule: null } }])).toThrow(
       "Unsupported notebook content JSON"
     );
+    expect(() => normalizeNotebookContent([{ inline: ["ok"], foo: 1 }])).toThrow(
+      "Unsupported notebook content JSON"
+    );
+    expect(() => normalizeNotebookContent([{ block: { rule: null }, foo: 1 }])).toThrow(
+      "Unsupported notebook content JSON"
+    );
   });
 
   it("rejects ProseMirror-style rich-text JSON instead of guessing", () => {

@@ -6,19 +6,17 @@ function isPlainObject(value: any): value is Record<string, any> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
-function hasOwn(value: Record<string, any>, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(value, key);
-}
-
 function isStoryVerseEnvelope(value: any): boolean {
   if (!isPlainObject(value)) return false;
 
-  const hasInline = hasOwn(value, "inline");
-  const hasBlock = hasOwn(value, "block");
-  if (hasInline === hasBlock) return false;
+  const keys = Object.keys(value);
+  if (keys.length !== 1) return false;
 
-  if (hasInline) return Array.isArray(value.inline);
-  return isPlainObject(value.block) && Object.keys(value.block).length === 1;
+  if (keys[0] === "inline") return Array.isArray(value.inline);
+  if (keys[0] === "block") {
+    return isPlainObject(value.block) && Object.keys(value.block).length === 1;
+  }
+  return false;
 }
 
 export function normalizeNotebookContent(raw: any): Story {
