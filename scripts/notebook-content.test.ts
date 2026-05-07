@@ -41,6 +41,20 @@ describe("normalizeNotebookContent", () => {
     expect(normalizeNotebookContent(story)).toEqual(story);
   });
 
+  it("rejects arrays that are not Story verse arrays", () => {
+    expect(() => normalizeNotebookContent([1, 2])).toThrow("Unsupported notebook content JSON");
+    expect(() => normalizeNotebookContent([{}])).toThrow("Unsupported notebook content JSON");
+    expect(() => normalizeNotebookContent([{ inline: "Body" }])).toThrow(
+      "Unsupported notebook content JSON"
+    );
+    expect(() => normalizeNotebookContent([{ block: {} }])).toThrow(
+      "Unsupported notebook content JSON"
+    );
+    expect(() => normalizeNotebookContent([{ inline: [], block: { rule: null } }])).toThrow(
+      "Unsupported notebook content JSON"
+    );
+  });
+
   it("rejects ProseMirror-style rich-text JSON instead of guessing", () => {
     expect(() =>
       normalizeNotebookContent({
