@@ -4,23 +4,24 @@
  * Post to a Tlon notebook (diary channel)
  *
  * Usage:
- *   npx ts-node scripts/notebook-post.ts <nest> <title> [--image <url>] [--content <json-file>] [--stdin]
+ *   npx ts-node scripts/notebook-post.ts <nest> <title> [--image <url>] [--content <json-file>] [--stdin] [--markdown <file>] [--markdown-stdin]
  *
  * Examples:
  *   npx ts-node scripts/notebook-post.ts diary/~host/channel "My Post Title"
  *   npx ts-node scripts/notebook-post.ts diary/~host/channel "My Post" --image https://example.com/cover.png
- *   npx ts-node scripts/notebook-post.ts diary/~host/channel "My Post" --content article.json
+ *   npx ts-node scripts/notebook-post.ts diary/~host/channel "My Post" --content story.json
+ *   npx ts-node scripts/notebook-post.ts diary/~host/channel "My Post" --markdown article.md
  *
  * If no explicit content is provided, creates a post with a title and empty body.
- * Use --stdin to read JSON from stdin. --content and --stdin accept Story JSON
- * or recognized rich-text JSON.
+ * --content and --stdin accept Story JSON. Use --markdown or --markdown-stdin
+ * for Markdown input.
  */
 
 import * as fs from "fs";
 import { getCurrentUserId, sendPost } from "@tloncorp/api";
 import { ensureClient } from "./api-client";
 import { normalizeNotebookContent } from "./notebook-content";
-import type { Story } from "./story";
+import { markdownToStory, type Story } from "./story";
 
 interface PostResult {
   success: boolean;
@@ -70,8 +71,10 @@ Arguments:
 
 Options:
   --image <url>     Cover image URL
-  --content <file>  JSON file with Story JSON or recognized rich-text JSON
-  --stdin           Read Story JSON or recognized rich-text JSON from stdin
+  --content <file>  JSON file with Story JSON
+  --stdin           Read Story JSON from stdin
+  --markdown <file> Markdown file to convert to Story
+  --markdown-stdin  Read Markdown from stdin
 
 If no content is provided, creates a post with a title and empty body.
 
@@ -79,6 +82,7 @@ Examples:
   npx ts-node scripts/notebook-post.ts diary/~host/notes "Hello World"
   npx ts-node scripts/notebook-post.ts diary/~host/notes "My Post" --image https://example.com/img.png
   echo '[{"inline":["Hello!"]}]' | npx ts-node scripts/notebook-post.ts diary/~host/notes "Test" --stdin
+  npx ts-node scripts/notebook-post.ts diary/~host/notes "Markdown Post" --markdown post.md
 `);
     process.exit(args.includes("--help") || args.includes("-h") ? 0 : 1);
   }
@@ -88,21 +92,44 @@ Examples:
 
   let image: string | undefined;
   let content: Story = [];
+  let contentSource: string | undefined;
+
+  const claimContentSource = (source: string) => {
+    if (contentSource) {
+      throw new Error(`Only one content source can be provided (${contentSource} and ${source})`);
+    }
+    contentSource = source;
+  };
+
+  const readStdin = async (): Promise<string> => {
+    const chunks: Buffer[] = [];
+    for await (const chunk of process.stdin) {
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks).toString("utf-8");
+  };
 
   for (let i = 2; i < args.length; i++) {
     if (args[i] === "--image" && args[i + 1]) {
       image = args[++i];
     } else if (args[i] === "--content" && args[i + 1]) {
+      claimContentSource("--content");
       const file = args[++i];
       const data = fs.readFileSync(file, "utf-8");
       content = normalizeNotebookContent(JSON.parse(data));
     } else if (args[i] === "--stdin") {
-      const chunks: Buffer[] = [];
-      for await (const chunk of process.stdin) {
-        chunks.push(chunk);
-      }
-      const data = Buffer.concat(chunks).toString("utf-8");
+      claimContentSource("--stdin");
+      const data = await readStdin();
       content = normalizeNotebookContent(JSON.parse(data));
+    } else if (args[i] === "--markdown" && args[i + 1]) {
+      claimContentSource("--markdown");
+      const file = args[++i];
+      const data = fs.readFileSync(file, "utf-8");
+      content = markdownToStory(data);
+    } else if (args[i] === "--markdown-stdin") {
+      claimContentSource("--markdown-stdin");
+      const data = await readStdin();
+      content = markdownToStory(data);
     }
   }
 

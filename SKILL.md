@@ -390,7 +390,7 @@ Manage channel posts (reactions, edits, deletes).
 tlon posts react chat/~host/slug 170.141... "👍"         # React to a post
 tlon posts unreact chat/~host/slug 170.141...            # Remove reaction
 tlon posts edit chat/~host/slug 170.141... "New text"    # Edit with plain text
-tlon posts edit diary/~host/slug 170.141... --title "T" --image <url> --content rich.json  # Edit notebook
+tlon posts edit diary/~host/slug 170.141... --title "T" --image <url> --content story.json # Edit notebook
 tlon posts delete chat/~host/slug 170.141...             # Delete a post
 ```
 
@@ -402,11 +402,13 @@ Post to diary/notebook channels.
 
 ```bash
 tlon notebook diary/~host/slug "Title"                   # Post with no body
-tlon notebook diary/~host/slug "Title" --content rich.json  # Post with Story JSON
+tlon notebook diary/~host/slug "Title" --content story.json # Post with Story JSON
+tlon notebook diary/~host/slug "Title" --markdown post.md   # Post with Markdown
+cat post.md | tlon notebook diary/~host/slug "Title" --markdown-stdin
 tlon notebook diary/~host/slug "Title" --image <url>     # Post with cover image
 ```
 
-The `--content` file should be **Urbit Story JSON**: an array of verses accepted by the ship's `story-json` decoder.
+The `--content` file should be **Urbit Story JSON**: an array of verses accepted by the ship's `story-json` decoder. Use `--markdown` for Markdown files instead of passing Markdown or editor-export JSON through `--content`.
 
 Working examples:
 
