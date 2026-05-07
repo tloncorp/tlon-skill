@@ -21,8 +21,8 @@ import * as fs from "fs";
 import { getCurrentUserId, sendPost } from "@tloncorp/api";
 import { ensureClient } from "./api-client";
 import { getRequiredOptionValue } from "./cli-utils";
-import { normalizeNotebookContent } from "./notebook-content";
-import { markdownToStory, type Story } from "./story";
+import { normalizeNotebookContent, type NotebookStory } from "./notebook-content";
+import { markdownToStory } from "./story";
 
 interface PostResult {
   success: boolean;
@@ -33,7 +33,7 @@ interface PostResult {
 export async function postToNotebook(
   nest: string,
   title: string,
-  content: Story,
+  content: NotebookStory,
   image?: string
 ): Promise<PostResult> {
   const authorId = getCurrentUserId();
@@ -92,7 +92,7 @@ Examples:
   const title = args[1];
 
   let image: string | undefined;
-  let content: Story = [];
+  let content: NotebookStory = [];
   let contentSource: string | undefined;
 
   const claimContentSource = (source: string) => {
