@@ -12,7 +12,7 @@ describe("normalizeNotebookContent", () => {
     expect(normalizeNotebookContent([])).toEqual([]);
   });
 
-  it("accepts supported Story block and inline shapes", () => {
+  it("accepts common Story block and inline shapes", () => {
     const story = [
       { inline: ["Use ", { "inline-code": "ha-q" }, " here"] },
       { block: { header: { tag: "h2", content: [{ bold: ["Title"] }] } } },
@@ -28,6 +28,19 @@ describe("normalizeNotebookContent", () => {
     expect(normalizeNotebookContent(story)).toEqual(story);
   });
 
+  it("passes through ship-supported Story shapes that are not locally modeled", () => {
+    const story = [
+      { block: { listing: [{ inline: ["Item"] }] } },
+      { block: { link: { href: "https://example.com", content: [{ inline: ["Example"] }] } } },
+      { inline: [{ cite: { chan: { nest: "chat/~host/slug", where: "170.141" } } }] },
+      { inline: [{ task: { checked: false, content: ["Todo"] } }] },
+      { inline: [{ sect: "Section" }] },
+      { inline: [{ block: { rule: null } }] },
+    ];
+
+    expect(normalizeNotebookContent(story)).toEqual(story);
+  });
+
   it("rejects ProseMirror-style rich-text JSON instead of guessing", () => {
     expect(() =>
       normalizeNotebookContent({
@@ -35,16 +48,6 @@ describe("normalizeNotebookContent", () => {
         content: [{ type: "paragraph", content: [{ text: "Body" }] }],
       })
     ).toThrow("Unsupported notebook content JSON");
-  });
-
-  it("rejects invalid Story-shaped content", () => {
-    expect(() => normalizeNotebookContent([{ block: {} }])).toThrow(
-      "Unsupported notebook content JSON"
-    );
-
-    expect(() => normalizeNotebookContent([{ inline: [{ unknown: "Body" }] }])).toThrow(
-      "Unsupported notebook content JSON"
-    );
   });
 
   it("rejects unsupported explicit content instead of returning title-only content", () => {

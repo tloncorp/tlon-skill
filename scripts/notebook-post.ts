@@ -20,6 +20,7 @@
 import * as fs from "fs";
 import { getCurrentUserId, sendPost } from "@tloncorp/api";
 import { ensureClient } from "./api-client";
+import { getRequiredOptionValue } from "./cli-utils";
 import { normalizeNotebookContent } from "./notebook-content";
 import { markdownToStory, type Story } from "./story";
 
@@ -110,26 +111,31 @@ Examples:
   };
 
   for (let i = 2; i < args.length; i++) {
-    if (args[i] === "--image" && args[i + 1]) {
-      image = args[++i];
-    } else if (args[i] === "--content" && args[i + 1]) {
+    if (args[i] === "--image") {
+      image = getRequiredOptionValue(args, i);
+      i++;
+    } else if (args[i] === "--content") {
       claimContentSource("--content");
-      const file = args[++i];
+      const file = getRequiredOptionValue(args, i);
       const data = fs.readFileSync(file, "utf-8");
       content = normalizeNotebookContent(JSON.parse(data));
+      i++;
     } else if (args[i] === "--stdin") {
       claimContentSource("--stdin");
       const data = await readStdin();
       content = normalizeNotebookContent(JSON.parse(data));
-    } else if (args[i] === "--markdown" && args[i + 1]) {
+    } else if (args[i] === "--markdown") {
       claimContentSource("--markdown");
-      const file = args[++i];
+      const file = getRequiredOptionValue(args, i);
       const data = fs.readFileSync(file, "utf-8");
       content = markdownToStory(data);
+      i++;
     } else if (args[i] === "--markdown-stdin") {
       claimContentSource("--markdown-stdin");
       const data = await readStdin();
       content = markdownToStory(data);
+    } else {
+      throw new Error(`Unknown option: ${args[i]}`);
     }
   }
 

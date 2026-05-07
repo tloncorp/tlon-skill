@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { getOption, looksLikePositionalChannelKind, wantsHelp } from "./cli-utils";
+import {
+  getOption,
+  getRequiredOptionValue,
+  looksLikePositionalChannelKind,
+  wantsHelp,
+} from "./cli-utils";
 
 describe("cli-utils", () => {
   describe("wantsHelp", () => {
@@ -31,6 +36,24 @@ describe("cli-utils", () => {
     it("does not flag ordinary titles", () => {
       const args = ["add-channel", "~zod/test", "Projects"];
       expect(looksLikePositionalChannelKind(args, 2)).toBe(false);
+    });
+  });
+
+  describe("getRequiredOptionValue", () => {
+    it("returns the following option value", () => {
+      expect(getRequiredOptionValue(["--content", "story.json"], 0)).toBe("story.json");
+    });
+
+    it("fails when the option value is missing", () => {
+      expect(() => getRequiredOptionValue(["--content"], 0)).toThrow(
+        "--content requires a value"
+      );
+    });
+
+    it("fails when the next token is another option", () => {
+      expect(() => getRequiredOptionValue(["--content", "--markdown", "post.md"], 0)).toThrow(
+        "--content requires a value"
+      );
     });
   });
 });
