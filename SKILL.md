@@ -498,3 +498,23 @@ tlon settings deauthorize-ship ~ship                     # Remove from auth
 
 - Activity: max 25 items
 - Messages: max 50 items
+
+## A2UI Blobs
+
+Post interactive UI components (charts, tables, decision cards, buttons) to Tlon channels as structured blobs. The Tlon client renders these as native Ochre-styled cards inline in chat.
+
+**Trigger phrases:** "post a chart", "send a decision card", "create an interactive blob", "post a table/graph/visualization to Tlon"
+
+```bash
+tlon posts blob <nest> --blob '<json>' [--caption "text"]
+tlon posts blob <nest> --blob-file ./blob.json [--caption "text"]
+```
+
+**Full schema and design rules:** See `references/a2ui-components.md` and `references/a2ui-design-rules.md`.
+
+**Quick example — bar chart:**
+```bash
+tlon posts blob chat/~host/channel-name \
+  --caption "Weekly PRs" \
+  --blob '[{"type":"a2ui","version":1,"root":"root","title":"Weekly PRs","icon":"📊","components":[{"id":"root","component":{"Column":{"children":["chart"],"gap":"xs"}}},{"id":"chart","component":{"Chart":{"chartType":"bar","series":[{"label":"Alice","values":[5,8,3],"color":"#4E91F5"},{"label":"Bob","values":[2,4,7],"color":"#3FB950"}],"xLabels":["W1","W2","W3"],"yLabel":"PRs","height":180}}}]}]'
+```
