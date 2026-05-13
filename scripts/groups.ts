@@ -208,6 +208,10 @@ type CreatedGroup = {
   channelId: string;
 };
 
+type CreateGroupWithChannelOptions = {
+  memberIds?: string[];
+};
+
 type OwnerAdminVerification =
   | { status: "verified" }
   | { status: "missing"; reason: string };
@@ -220,8 +224,6 @@ type RawGroupForAdminVerification = {
     invited?: Record<string, unknown>;
   };
 };
-
-type PendingInviteRoleAction = "add" | "edit";
 
 const VERIFY_ATTEMPTS = 5;
 const VERIFY_DELAY_MS = 500;
@@ -247,18 +249,6 @@ function getShipRecordValue<T>(record: Record<string, T> | undefined, ship: stri
   return Object.entries(record).find(([key]) => normalizeShip(key) === ship)?.[1];
 }
 
-function mergeRoleIds(roleIds: string[] | undefined, roleId: string): string[] {
-  return Array.from(new Set([...(roleIds ?? []), roleId]));
-}
-
-function hasOwnerAdmission(rawGroup: RawGroupForAdminVerification, ownerShip: string): boolean {
-  return (
-    getShipRecordValue(rawGroup.seats, ownerShip) !== undefined ||
-    getShipRecordValue(rawGroup.admissions?.pending, ownerShip) !== undefined ||
-    getShipRecordValue(rawGroup.admissions?.invited, ownerShip) !== undefined
-  );
-}
-
 async function getRawGroupForAdminVerification(
   groupId: string
 ): Promise<RawGroupForAdminVerification> {
@@ -268,7 +258,11 @@ async function getRawGroupForAdminVerification(
   });
 }
 
-async function getRawGroupWithOwnerAdmission(
+function hasOwnerSeat(rawGroup: RawGroupForAdminVerification, ownerShip: string): boolean {
+  return getShipRecordValue(rawGroup.seats, ownerShip) !== undefined;
+}
+
+async function getRawGroupWithOwnerSeat(
   groupId: string,
   ownerShip: string
 ): Promise<RawGroupForAdminVerification> {
@@ -277,7 +271,7 @@ async function getRawGroupWithOwnerAdmission(
   for (let attempt = 1; attempt <= VERIFY_ATTEMPTS; attempt += 1) {
     try {
       const rawGroup = await getRawGroupForAdminVerification(groupId);
-      if (hasOwnerAdmission(rawGroup, ownerShip)) {
+      if (hasOwnerSeat(rawGroup, ownerShip)) {
         return rawGroup;
       }
     } catch (err) {
@@ -289,8 +283,9 @@ async function getRawGroupWithOwnerAdmission(
     }
   }
 
+  const suffix = lastError ? `: ${lastError}` : "";
   throw new Error(
-    `Owner ${ownerShip} was not found in members or pending invites for ${groupId}: ${lastError}`
+    `Owner ${ownerShip} was not created as an invited member seat in ${groupId}${suffix}`
   );
 }
 
@@ -322,7 +317,10 @@ async function getRawOwnerAdminVerification(
   const pendingRoles = getShipRecordValue(rawGroup.admissions?.pending, ownerShip);
   if (pendingRoles) {
     if (pendingRoles.includes(ADMIN_ROLE_ID)) {
-      return { status: "verified" };
+      return {
+        status: "missing",
+        reason: `Owner ${ownerShip} has a pending invite for ${groupId} with the "${ADMIN_ROLE_ID}" role, but is not a group member seat yet.`,
+      };
     }
 
     return {
@@ -345,56 +343,22 @@ async function getRawOwnerAdminVerification(
   };
 }
 
-async function setPendingInviteRoles(
-  groupId: string,
-  ships: string[],
-  roleIds: string[],
-  action: PendingInviteRoleAction
-) {
-  const pendingAction =
-    action === "add" ? { add: roleIds } : { edit: roleIds };
-
-  await poke({
-    app: "groups",
-    mark: "group-action-4",
-    json: {
-      group: {
-        flag: groupId,
-        "a-group": {
-          entry: {
-            pending: {
-              ships,
-              "a-pending": pendingAction,
-            },
-          },
-        },
-      },
-    },
-  });
-}
-
 async function assignOwnerAdminRole(groupId: string, ownerShip: string) {
-  const rawGroup = await getRawGroupWithOwnerAdmission(groupId, ownerShip);
+  const rawGroup = await getRawGroupWithOwnerSeat(groupId, ownerShip);
   const ownerSeat = getShipRecordValue(rawGroup.seats, ownerShip);
 
-  if (ownerSeat) {
-    console.log(`Assigning owner ${ownerShip} to "${ADMIN_ROLE_ID}" role...`);
-    await addMembersToRole({
-      groupId,
-      roleId: ADMIN_ROLE_ID,
-      ships: [ownerShip],
-    });
-    console.log(`✅ Owner assigned to "${ADMIN_ROLE_ID}" role.`);
+  if (ownerSeat?.roles?.includes(ADMIN_ROLE_ID)) {
+    console.log(`✅ Owner already has "${ADMIN_ROLE_ID}" role.`);
     return;
   }
 
-  const pendingRoles = getShipRecordValue(rawGroup.admissions?.pending, ownerShip);
-  const roleIds = mergeRoleIds(pendingRoles, ADMIN_ROLE_ID);
-  const action = pendingRoles === undefined ? "add" : "edit";
-
-  console.log(`Assigning owner ${ownerShip} to pending "${ADMIN_ROLE_ID}" role...`);
-  await setPendingInviteRoles(groupId, [ownerShip], roleIds, action);
-  console.log(`✅ Owner pending invite assigned to "${ADMIN_ROLE_ID}" role.`);
+  console.log(`Assigning owner ${ownerShip} to "${ADMIN_ROLE_ID}" role...`);
+  await addMembersToRole({
+    groupId,
+    roleId: ADMIN_ROLE_ID,
+    ships: [ownerShip],
+  });
+  console.log(`✅ Owner assigned to "${ADMIN_ROLE_ID}" role.`);
 }
 
 async function getGroupWithRetry(groupId: string): Promise<Group> {
@@ -553,7 +517,11 @@ async function getGroupInfo(groupId: string) {
 }
 
 // Create a new group
-async function createGroupWithChannel(title: string, description: string = ""): Promise<CreatedGroup> {
+async function createGroupWithChannel(
+  title: string,
+  description: string = "",
+  options: CreateGroupWithChannelOptions = {}
+): Promise<CreatedGroup> {
   const ship = await getCurrentShip();
   const slug = generateGroupSlug();
   const groupId = `${ship}/${slug}`;
@@ -582,6 +550,7 @@ async function createGroupWithChannel(title: string, description: string = ""): 
 
   await createGroup({
     group,
+    memberIds: options.memberIds,
   });
 
   if (description) {
@@ -608,18 +577,12 @@ async function createGroupWithChannel(title: string, description: string = ""): 
 
 async function createOwnedGroup(title: string, owner: string, description: string = "") {
   const ownerShip = normalizeShip(owner);
-  const { groupId, channelId } = await createGroupWithChannel(title, description);
+  const { groupId, channelId } = await createGroupWithChannel(title, description, {
+    memberIds: [ownerShip],
+  });
   const createdGroup = await verifyGroupCreated(groupId);
 
   await ensureAdminRole(groupId, createdGroup);
-
-  console.log(`Inviting owner ${ownerShip} to ${groupId}...`);
-  await inviteGroupMembers({
-    groupId,
-    contactIds: [ownerShip],
-  });
-  console.log(`✅ Owner invited.`);
-
   await assignOwnerAdminRole(groupId, ownerShip);
   await verifyOwnerAdmin(groupId, ownerShip);
 
