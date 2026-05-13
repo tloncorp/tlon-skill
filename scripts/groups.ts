@@ -420,9 +420,9 @@ async function ensureAdminRole(groupId: string, group?: Group) {
       roleId: ADMIN_ROLE_ID,
       meta: { title: "Admin", description: "Group administrator" },
     });
-  }
 
-  await setAdminRole(groupId, ADMIN_ROLE_ID);
+    await setAdminRole(groupId, ADMIN_ROLE_ID);
+  }
 }
 
 async function verifyOwnerAdmin(groupId: string, ownerShip: string): Promise<void> {
