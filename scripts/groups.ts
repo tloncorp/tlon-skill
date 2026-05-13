@@ -5,6 +5,7 @@
  * Usage:
  *   npx ts-node scripts/groups.ts list
  *   npx ts-node scripts/groups.ts create "Group Name" [--description "..."]
+ *   npx ts-node scripts/groups.ts create-owned "Group Name" --owner <ship> [--description "..."]
  *   npx ts-node scripts/groups.ts invite <group-id> <ship> [<ship2> ...]
  *   npx ts-node scripts/groups.ts info <group-id>
  *   npx ts-node scripts/groups.ts leave <group-id>
@@ -70,6 +71,8 @@ import type { Group } from "@tloncorp/api";
 import { ensureClient, getCurrentShip, normalizeShip } from "./api-client";
 import { getOption, looksLikePositionalChannelKind, wantsHelp } from "./cli-utils";
 
+const ADMIN_ROLE_ID = "admin";
+
 // Generate a random short ID for the group
 function generateGroupSlug(): string {
   // Must be valid @tas: lowercase letters, numbers, hyphens, must start with letter
@@ -87,6 +90,7 @@ const GROUPS_HELP = `Usage: groups.ts <command>
 Commands:
   list
   create "Group Name" [--description "..."]
+  create-owned "Group Name" --owner <ship> [--description "..."]
   invite <group-id> <ship> [<ship2> ...]
   info <group-id>
   leave <group-id>
@@ -121,6 +125,7 @@ Examples:
 const GROUPS_COMMAND_HELP: Record<string, string> = {
   list: `Usage: groups.ts list`,
   create: `Usage: groups.ts create "Group Name" [--description "..."]\nExample: groups.ts create "Projects" --description "Shared work"`,
+  "create-owned": `Usage: groups.ts create-owned "Group Name" --owner <ship> [--description "..."]\nExample: groups.ts create-owned "Projects" --owner ~nec --description "Shared work"`,
   invite: `Usage: groups.ts invite <group-id> <ship> [<ship2> ...]\nExample: groups.ts invite ~host/group-slug ~nec ~bud`,
   info: `Usage: groups.ts info <group-id>\nExample: groups.ts info ~host/group-slug`,
   leave: `Usage: groups.ts leave <group-id>\nExample: groups.ts leave ~host/group-slug`,
@@ -198,6 +203,259 @@ function formatShipWithNickname(ship: string, nicknameMap: Map<string, string>):
   return nickname ? `${ship} (${nickname})` : ship;
 }
 
+type CreatedGroup = {
+  groupId: string;
+  channelId: string;
+  group: Group;
+};
+
+type CreateGroupWithChannelOptions = {
+  memberIds?: string[];
+};
+
+type OwnerAdminVerification =
+  | { status: "verified" }
+  | { status: "missing"; reason: string };
+
+type RawGroupForAdminVerification = {
+  admins?: string[];
+  seats?: Record<string, { roles?: string[] }>;
+  admissions?: {
+    pending?: Record<string, string[]>;
+    invited?: Record<string, unknown>;
+  };
+};
+
+const VERIFY_ATTEMPTS = 5;
+const VERIFY_DELAY_MS = 500;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function groupHasRole(group: Group, roleId: string): boolean {
+  return (group.roles || []).some((role) => role.id === roleId);
+}
+
+function getShipRecordValue<T>(record: Record<string, T> | undefined, ship: string): T | undefined {
+  if (!record) {
+    return undefined;
+  }
+
+  const direct = record[ship];
+  if (direct !== undefined) {
+    return direct;
+  }
+
+  return Object.entries(record).find(([key]) => normalizeShip(key) === ship)?.[1];
+}
+
+async function getRawGroupForAdminVerification(
+  groupId: string
+): Promise<RawGroupForAdminVerification> {
+  return scry<RawGroupForAdminVerification>({
+    app: "groups",
+    path: `/v2/ui/groups/${groupId}`,
+  });
+}
+
+function hasOwnerSeat(rawGroup: RawGroupForAdminVerification, ownerShip: string): boolean {
+  return getShipRecordValue(rawGroup.seats, ownerShip) !== undefined;
+}
+
+async function getRawGroupWithOwnerSeat(
+  groupId: string,
+  ownerShip: string
+): Promise<RawGroupForAdminVerification> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= VERIFY_ATTEMPTS; attempt += 1) {
+    try {
+      const rawGroup = await getRawGroupForAdminVerification(groupId);
+      if (hasOwnerSeat(rawGroup, ownerShip)) {
+        return rawGroup;
+      }
+    } catch (err) {
+      lastError = err;
+    }
+
+    if (attempt < VERIFY_ATTEMPTS) {
+      await sleep(VERIFY_DELAY_MS);
+    }
+  }
+
+  const suffix = lastError ? `: ${lastError}` : "";
+  throw new Error(
+    `Owner ${ownerShip} was not created as an invited member seat in ${groupId}${suffix}`
+  );
+}
+
+async function getRawOwnerAdminVerification(
+  groupId: string,
+  ownerShip: string
+): Promise<OwnerAdminVerification> {
+  const rawGroup = await getRawGroupForAdminVerification(groupId);
+
+  if (!rawGroup.admins?.includes(ADMIN_ROLE_ID)) {
+    return {
+      status: "missing",
+      reason: `Group ${groupId} has an "${ADMIN_ROLE_ID}" role, but it is not marked as an admin role.`,
+    };
+  }
+
+  const ownerSeat = getShipRecordValue(rawGroup.seats, ownerShip);
+  if (ownerSeat) {
+    if (ownerSeat.roles?.includes(ADMIN_ROLE_ID)) {
+      return { status: "verified" };
+    }
+
+    return {
+      status: "missing",
+      reason: `Owner ${ownerShip} is a member of ${groupId}, but does not have the "${ADMIN_ROLE_ID}" role.`,
+    };
+  }
+
+  const pendingRoles = getShipRecordValue(rawGroup.admissions?.pending, ownerShip);
+  if (pendingRoles) {
+    if (pendingRoles.includes(ADMIN_ROLE_ID)) {
+      return {
+        status: "missing",
+        reason: `Owner ${ownerShip} has a pending invite for ${groupId} with the "${ADMIN_ROLE_ID}" role, but is not a group member seat yet.`,
+      };
+    }
+
+    return {
+      status: "missing",
+      reason: `Owner ${ownerShip} has a pending invite for ${groupId}, but not with the "${ADMIN_ROLE_ID}" role.`,
+    };
+  }
+
+  const ownerInvite = getShipRecordValue(rawGroup.admissions?.invited, ownerShip);
+  if (ownerInvite) {
+    return {
+      status: "missing",
+      reason: `Owner ${ownerShip} is invited to ${groupId}, but no pending "${ADMIN_ROLE_ID}" role assignment was found.`,
+    };
+  }
+
+  return {
+    status: "missing",
+    reason: `Owner ${ownerShip} was not found in members or pending invites for ${groupId}.`,
+  };
+}
+
+async function assignOwnerAdminRole(groupId: string, ownerShip: string) {
+  const rawGroup = await getRawGroupWithOwnerSeat(groupId, ownerShip);
+  const ownerSeat = getShipRecordValue(rawGroup.seats, ownerShip);
+
+  if (ownerSeat?.roles?.includes(ADMIN_ROLE_ID)) {
+    console.log(`✅ Owner already has "${ADMIN_ROLE_ID}" role.`);
+    return;
+  }
+
+  console.log(`Assigning owner ${ownerShip} to "${ADMIN_ROLE_ID}" role...`);
+  await addMembersToRole({
+    groupId,
+    roleId: ADMIN_ROLE_ID,
+    ships: [ownerShip],
+  });
+  console.log(`✅ Owner assigned to "${ADMIN_ROLE_ID}" role.`);
+}
+
+async function getGroupWithRetry(groupId: string): Promise<Group> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= VERIFY_ATTEMPTS; attempt += 1) {
+    try {
+      return await getGroup(groupId);
+    } catch (err) {
+      lastError = err;
+      if (attempt < VERIFY_ATTEMPTS) {
+        await sleep(VERIFY_DELAY_MS);
+      }
+    }
+  }
+
+  throw new Error(`Could not fetch group ${groupId} for verification: ${lastError}`);
+}
+
+async function verifyGroupCreated(groupId: string): Promise<Group> {
+  console.log(`Verifying group ${groupId}...`);
+  const group = await getGroupWithRetry(groupId);
+
+  if (group.id && group.id !== groupId) {
+    throw new Error(`Created group verification returned ${group.id}, expected ${groupId}.`);
+  }
+
+  console.log(`✅ Group verified.`);
+  return group;
+}
+
+async function setAdminRole(groupId: string, roleId: string) {
+  await poke({
+    app: "groups",
+    mark: "group-action-4",
+    json: {
+      group: {
+        flag: groupId,
+        "a-group": {
+          role: {
+            roles: [roleId],
+            "a-role": {
+              "set-admin": null,
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+async function ensureAdminRole(groupId: string, group?: Group) {
+  const currentGroup = group ?? (await getGroup(groupId));
+
+  if (!groupHasRole(currentGroup, ADMIN_ROLE_ID)) {
+    console.log(`Creating "${ADMIN_ROLE_ID}" role in ${groupId}...`);
+    await addGroupRole({
+      groupId,
+      roleId: ADMIN_ROLE_ID,
+      meta: { title: "Admin", description: "Group administrator" },
+    });
+
+    await setAdminRole(groupId, ADMIN_ROLE_ID);
+  }
+}
+
+async function verifyOwnerAdmin(groupId: string, ownerShip: string): Promise<void> {
+  console.log(`Verifying ${ownerShip} admin assignment in ${groupId}...`);
+
+  let lastVerification: OwnerAdminVerification | null = null;
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= VERIFY_ATTEMPTS; attempt += 1) {
+    try {
+      const rawVerification = await getRawOwnerAdminVerification(groupId, ownerShip);
+      if (rawVerification.status === "verified") {
+        console.log(`✅ Owner admin assignment verified.`);
+        return;
+      }
+      lastVerification = rawVerification;
+    } catch (err) {
+      lastError = err;
+    }
+
+    if (attempt < VERIFY_ATTEMPTS) {
+      await sleep(VERIFY_DELAY_MS);
+    }
+  }
+
+  if (lastVerification) {
+    throw new Error(lastVerification.reason);
+  }
+
+  throw new Error(`Could not verify owner admin assignment for ${ownerShip}: ${lastError}`);
+}
+
 // Get info about a specific group
 async function getGroupInfo(groupId: string) {
   const [group, nicknameMap] = await Promise.all([
@@ -260,7 +518,11 @@ async function getGroupInfo(groupId: string) {
 }
 
 // Create a new group
-async function createGroupWithChannel(title: string, description: string = "") {
+async function createGroupWithChannel(
+  title: string,
+  description: string = "",
+  options: CreateGroupWithChannelOptions = {}
+): Promise<CreatedGroup> {
   const ship = await getCurrentShip();
   const slug = generateGroupSlug();
   const groupId = `${ship}/${slug}`;
@@ -289,14 +551,51 @@ async function createGroupWithChannel(title: string, description: string = "") {
 
   await createGroup({
     group,
+    memberIds: options.memberIds,
   });
+
+  const createdGroup = await verifyGroupCreated(groupId);
+
+  if (description) {
+    console.log(`Setting group description...`);
+    await updateGroupMeta({
+      groupId,
+      meta: {
+        title,
+        description,
+        image: "",
+        cover: "",
+      },
+    });
+  }
 
   console.log(`✅ Group created successfully!`);
   console.log(`   ID: ${groupId}`);
   console.log(`   Title: ${title}`);
+  console.log(`   Description: ${description || "(none)"}`);
   console.log(`   Channel: ${channelId}`);
 
-  return groupId;
+  return { groupId, channelId, group: createdGroup };
+}
+
+async function createOwnedGroup(title: string, owner: string, description: string = "") {
+  const ownerShip = normalizeShip(owner);
+  const { groupId, channelId, group } = await createGroupWithChannel(title, description, {
+    memberIds: [ownerShip],
+  });
+
+  await ensureAdminRole(groupId, group);
+  await assignOwnerAdminRole(groupId, ownerShip);
+  await verifyOwnerAdmin(groupId, ownerShip);
+
+  console.log(`✅ Owned group created successfully!`);
+  console.log(`   ID: ${groupId}`);
+  console.log(`   Title: ${title}`);
+  console.log(`   Description: ${description || "(none)"}`);
+  console.log(`   Owner: ${ownerShip}`);
+  console.log(`   Channel: ${channelId}`);
+
+  return { groupId, channelId, ownerShip };
 }
 
 // Invite ships to a group
@@ -690,43 +989,13 @@ async function addChannel(
 // Promote a member to admin by assigning them an admin role
 async function promoteMemberToAdmin(groupId: string, ships: string[]) {
   const normalizedShips = ships.map(normalizeShip);
-  const group = await getGroup(groupId);
-
-  // Find or create an admin role
-  const adminRole = (group.roles || []).find((r) => r.id === "admin");
-
-  if (!adminRole) {
-    // Create an "admin" role and make it admin
-    console.log(`Creating "admin" role in ${groupId}...`);
-    await addGroupRole({
-      groupId,
-      roleId: "admin",
-      meta: { title: "Admin", description: "Group administrator" },
-    });
-    await poke({
-      app: "groups",
-      mark: "group-action-4",
-      json: {
-        group: {
-          flag: groupId,
-          "a-group": {
-            role: {
-              roles: ["admin"],
-              "a-role": {
-                "set-admin": null,
-              },
-            },
-          },
-        },
-      },
-    });
-  }
+  await ensureAdminRole(groupId);
 
   console.log(`Promoting ${normalizedShips.join(", ")} to admin in ${groupId}...`);
 
   await addMembersToRole({
     groupId,
-    roleId: "admin",
+    roleId: ADMIN_ROLE_ID,
     ships: normalizedShips,
   });
 
@@ -743,11 +1012,11 @@ async function demoteMemberFromAdmin(groupId: string, ships: string[]) {
   const adminRoles = (group.roles || []).filter((r) => {
     // We can't easily tell which roles are admin from the group info alone,
     // so we target the "admin" role specifically
-    return r.id === "admin";
+    return r.id === ADMIN_ROLE_ID;
   });
 
   if (adminRoles.length === 0) {
-    console.error(`No "admin" role found in ${groupId}.`);
+    console.error(`No "${ADMIN_ROLE_ID}" role found in ${groupId}.`);
     process.exit(1);
   }
 
@@ -793,6 +1062,18 @@ async function main() {
       }
       const description = getOption(args, "description") || "";
       await createGroupWithChannel(title, description);
+      break;
+    }
+
+    case "create-owned": {
+      const title = args[1];
+      const owner = getOption(args, "owner");
+      if (!title || title.startsWith("--") || !owner || owner.startsWith("--")) {
+        console.error(GROUPS_COMMAND_HELP["create-owned"]);
+        process.exit(1);
+      }
+      const description = getOption(args, "description") || "";
+      await createOwnedGroup(title, owner, description);
       break;
     }
 
