@@ -228,7 +228,7 @@ Full group management.
 tlon groups list                                         # List your groups
 tlon groups info ~host/slug                              # Get group details
 tlon groups create "Name" [--description "..."]          # Create a group
-tlon groups create-owned "Name" --owner ~ship            # Create group, invite owner, make owner admin
+tlon groups create-owned "Name" --owner ~ship [--description "..."] # Create group, invite owner, make owner admin
 tlon groups join ~host/slug                              # Join public/invited group, or request invite if private
 tlon groups request-invite ~host/slug                    # Request invite to a private group
 tlon groups accept-invite ~host/slug                     # Accept an existing group invite
