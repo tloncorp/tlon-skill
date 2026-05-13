@@ -123,6 +123,9 @@ tlon contacts update-profile --nickname "My Name"
 # Create a group
 tlon groups create "My Group" --description "A cool group"
 
+# Create a group for a bot owner
+tlon groups create-owned "My Group" --owner ~owner-ship --description "A cool group"
+
 # Join a public or invited group; private groups without an invite request one
 tlon groups join ~host/group-slug
 

@@ -5,3 +5,5 @@ dist
 # Ignore binaries, keep package.json
 npm/*/tlon
 bin/tlon
+.claude/settings.local.json
+ships/*
