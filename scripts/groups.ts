@@ -1066,7 +1066,7 @@ async function main() {
     case "create-owned": {
       const title = args[1];
       const owner = getOption(args, "owner");
-      if (!title || !owner || owner.startsWith("--")) {
+      if (!title || title.startsWith("--") || !owner || owner.startsWith("--")) {
         console.error(GROUPS_COMMAND_HELP["create-owned"]);
         process.exit(1);
       }
