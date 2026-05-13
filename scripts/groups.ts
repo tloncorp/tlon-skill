@@ -206,6 +206,7 @@ function formatShipWithNickname(ship: string, nicknameMap: Map<string, string>):
 type CreatedGroup = {
   groupId: string;
   channelId: string;
+  group: Group;
 };
 
 type CreateGroupWithChannelOptions = {
@@ -553,6 +554,8 @@ async function createGroupWithChannel(
     memberIds: options.memberIds,
   });
 
+  const createdGroup = await verifyGroupCreated(groupId);
+
   if (description) {
     console.log(`Setting group description...`);
     await updateGroupMeta({
@@ -572,17 +575,16 @@ async function createGroupWithChannel(
   console.log(`   Description: ${description || "(none)"}`);
   console.log(`   Channel: ${channelId}`);
 
-  return { groupId, channelId };
+  return { groupId, channelId, group: createdGroup };
 }
 
 async function createOwnedGroup(title: string, owner: string, description: string = "") {
   const ownerShip = normalizeShip(owner);
-  const { groupId, channelId } = await createGroupWithChannel(title, description, {
+  const { groupId, channelId, group } = await createGroupWithChannel(title, description, {
     memberIds: [ownerShip],
   });
-  const createdGroup = await verifyGroupCreated(groupId);
 
-  await ensureAdminRole(groupId, createdGroup);
+  await ensureAdminRole(groupId, group);
   await assignOwnerAdminRole(groupId, ownerShip);
   await verifyOwnerAdmin(groupId, ownerShip);
 
