@@ -20,6 +20,9 @@ const packageFiles = [
   "npm/linux-arm64/package.json",
 ];
 
+const packageLockFile = "package-lock.json";
+const tlonSkillPackagePrefix = "@tloncorp/tlon-skill-";
+
 const newVersion = process.argv[2];
 
 if (!newVersion) {
@@ -40,6 +43,18 @@ if (!/^\d+\.\d+\.\d+(-[\w.]+)?$/.test(newVersion)) {
 
 console.log(`Bumping version to ${newVersion}...\n`);
 
+function updateTlonSkillOptionalDeps(optionalDependencies) {
+  if (!optionalDependencies) {
+    return;
+  }
+
+  for (const dep of Object.keys(optionalDependencies)) {
+    if (dep.startsWith(tlonSkillPackagePrefix)) {
+      optionalDependencies[dep] = newVersion;
+    }
+  }
+}
+
 for (const file of packageFiles) {
   const filePath = join(rootDir, file);
   try {
@@ -48,12 +63,8 @@ for (const file of packageFiles) {
     pkg.version = newVersion;
 
     // Also update optionalDependencies versions in main package.json
-    if (file === "package.json" && pkg.optionalDependencies) {
-      for (const dep of Object.keys(pkg.optionalDependencies)) {
-        if (dep.startsWith("@tloncorp/tlon-skill-")) {
-          pkg.optionalDependencies[dep] = newVersion;
-        }
-      }
+    if (file === "package.json") {
+      updateTlonSkillOptionalDeps(pkg.optionalDependencies);
     }
 
     writeFileSync(filePath, JSON.stringify(pkg, null, 2) + "\n");
@@ -61,6 +72,34 @@ for (const file of packageFiles) {
   } catch (err) {
     console.error(`  ${file}: ERROR - ${err.message}`);
   }
+}
+
+try {
+  const filePath = join(rootDir, packageLockFile);
+  const packageLock = JSON.parse(readFileSync(filePath, "utf-8"));
+  const oldVersion = packageLock.version;
+  packageLock.version = newVersion;
+
+  const rootPackage = packageLock.packages?.[""];
+  if (rootPackage) {
+    rootPackage.version = newVersion;
+    updateTlonSkillOptionalDeps(rootPackage.optionalDependencies);
+  }
+
+  if (packageLock.packages) {
+    // The platform packages are published after the bump PR is merged.
+    // Drop stale tarball entries instead of carrying lock entries for the old release.
+    for (const packagePath of Object.keys(packageLock.packages)) {
+      if (packagePath.startsWith(`node_modules/${tlonSkillPackagePrefix}`)) {
+        delete packageLock.packages[packagePath];
+      }
+    }
+  }
+
+  writeFileSync(filePath, JSON.stringify(packageLock, null, 2) + "\n");
+  console.log(`  ${packageLockFile}: ${oldVersion} → ${newVersion}`);
+} catch (err) {
+  console.error(`  ${packageLockFile}: ERROR - ${err.message}`);
 }
 
 console.log("\nDone! Don't forget to:");
