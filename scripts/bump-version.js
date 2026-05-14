@@ -43,15 +43,19 @@ if (!/^\d+\.\d+\.\d+(-[\w.]+)?$/.test(newVersion)) {
 
 console.log(`Bumping version to ${newVersion}...\n`);
 
-function updateTlonSkillOptionalDeps(optionalDependencies) {
+function getTlonSkillOptionalDeps(optionalDependencies) {
   if (!optionalDependencies) {
-    return;
+    return [];
   }
 
-  for (const dep of Object.keys(optionalDependencies)) {
-    if (dep.startsWith(tlonSkillPackagePrefix)) {
-      optionalDependencies[dep] = newVersion;
-    }
+  return Object.keys(optionalDependencies).filter((dep) =>
+    dep.startsWith(tlonSkillPackagePrefix)
+  );
+}
+
+function updateTlonSkillOptionalDeps(optionalDependencies) {
+  for (const dep of getTlonSkillOptionalDeps(optionalDependencies)) {
+    optionalDependencies[dep] = newVersion;
   }
 }
 
@@ -87,12 +91,26 @@ try {
   }
 
   if (packageLock.packages) {
-    // The platform packages are published after the bump PR is merged.
-    // Drop stale tarball entries instead of carrying lock entries for the old release.
+    const platformPackagePaths = new Set(
+      getTlonSkillOptionalDeps(rootPackage?.optionalDependencies).map(
+        (dep) => `node_modules/${dep}`
+      )
+    );
+
     for (const packagePath of Object.keys(packageLock.packages)) {
       if (packagePath.startsWith(`node_modules/${tlonSkillPackagePrefix}`)) {
-        delete packageLock.packages[packagePath];
+        if (platformPackagePaths.has(packagePath)) {
+          packageLock.packages[packagePath] = { optional: true };
+        } else {
+          delete packageLock.packages[packagePath];
+        }
       }
+    }
+
+    // npm 11 requires lock entries for optional deps. These packages publish
+    // after the bump PR merges, so use placeholders instead of old tarballs.
+    for (const packagePath of platformPackagePaths) {
+      packageLock.packages[packagePath] = { optional: true };
     }
   }
 
