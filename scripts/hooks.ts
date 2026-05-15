@@ -557,12 +557,7 @@ async function main() {
       if (!name) {
         printUsageAndExit(HOOKS_COMMAND_HELP.init);
       }
-      const typeRaw = getOption(args, "type") || "on-post";
-      if (!isHookTemplateType(typeRaw)) {
-        printUsageAndExit(
-          `Invalid --type: ${typeRaw}. Expected one of: on-post, cron, moderation, bare`
-        );
-      }
+      const typeRaw = (getOption(args, "type") || "on-post") as HookTemplateType;
       const out = getOption(args, "out");
       const force = hasFlag(args, "force");
       initHookTemplate(name, typeRaw, out, force);

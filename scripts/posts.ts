@@ -382,14 +382,6 @@ async function main() {
         break;
       }
 
-      case "send":
-        printErrorAndExit(POSTS_UNSUPPORTED_COMMAND_ERRORS.send);
-
-      case "reply":
-        printErrorAndExit(POSTS_UNSUPPORTED_COMMAND_ERRORS.reply);
-
-      default:
-        printUsageAndExit(POSTS_HELP);
     }
     process.exit(0);
   } catch (error) {

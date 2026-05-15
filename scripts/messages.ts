@@ -62,6 +62,16 @@ function getMessagesHelp(command?: string): string {
   return command ? MESSAGES_COMMAND_HELP[command] ?? MESSAGES_HELP : MESSAGES_HELP;
 }
 
+function hasSearchChannel(args: string[]): boolean {
+  const channelIdx = args.indexOf("--channel");
+  const channel = channelIdx !== -1 ? args[channelIdx + 1] : undefined;
+  return !!channel && !channel.startsWith("--");
+}
+
+function isSearchQueryHelpLiteral(args: string[]): boolean {
+  return args[0] === "search" && isHelpArg(args[1]) && hasSearchChannel(args);
+}
+
 function validateMessagesArgs(args: string[]): void {
   const command = args[0];
   if (!command || !MESSAGES_COMMAND_HELP[command]) {
@@ -76,9 +86,7 @@ function validateMessagesArgs(args: string[]): void {
       return;
     }
     case "search": {
-      const channelIdx = args.indexOf("--channel");
-      const channel = channelIdx !== -1 ? args[channelIdx + 1] : undefined;
-      if (!args[1] || args[1].startsWith("--") || !channel || channel.startsWith("--")) {
+      if (!args[1] || args[1] === "--channel" || !hasSearchChannel(args)) {
         printUsageAndExit(MESSAGES_COMMAND_HELP.search);
       }
       return;
@@ -397,7 +405,7 @@ async function main() {
     printHelpAndExit(MESSAGES_HELP);
   }
 
-  if (wantsHelp(args.slice(1))) {
+  if (wantsHelp(args.slice(1)) && !isSearchQueryHelpLiteral(args)) {
     printHelpAndExit(getMessagesHelp(command));
   }
 
