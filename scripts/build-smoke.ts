@@ -1,7 +1,13 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import {
+  CLI_MATRIX_CASES,
+  COMMAND_FAMILIES,
+  type CliCase,
+  normalizeCliOutput,
+} from "./cli-test-matrix";
 
 const rootDir = resolve(process.cwd());
 const binaryPath = join(rootDir, "dist", "tlon-run");
@@ -10,35 +16,22 @@ const packageJson = JSON.parse(
   readFileSync(join(rootDir, "package.json"), "utf-8")
 ) as { version: string };
 
-type SmokeCase = {
-  name: string;
-  args: string[];
-  expectedStdout?: string;
-  stdoutIncludes?: string;
+type RunOptions = {
+  argsPrefix?: string[];
+  env?: Record<string, string>;
 };
 
-function hermeticEnv(tempRoot: string): Record<string, string> {
+type CliResult = {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+};
+
+function hermeticEnv(tempRoot: string, extraEnv: Record<string, string> = {}): Record<string, string> {
   const home = join(tempRoot, "home");
   const cacheDir = join(tempRoot, "cache");
   mkdirSync(home);
   mkdirSync(cacheDir);
-
-  writeFileSync(
-    join(cacheDir, "zod.json"),
-    JSON.stringify({
-      url: "https://zod.example",
-      ship: "zod",
-      cookie: "urbauth-~zod=fake",
-    })
-  );
-  writeFileSync(
-    join(cacheDir, "bus.json"),
-    JSON.stringify({
-      url: "https://bus.example",
-      ship: "bus",
-      cookie: "urbauth-~bus=fake",
-    })
-  );
 
   const env: Record<string, string> = {};
   for (const key of ["PATH", "SystemRoot", "WINDIR"]) {
@@ -50,8 +43,7 @@ function hermeticEnv(tempRoot: string): Record<string, string> {
   env.HOME = home;
   env.TLON_CACHE_DIR = cacheDir;
   env.OPENCLAW_CONFIG = join(home, "missing-openclaw.json");
-  env.TLON_CONFIG_FILE = join(home, "missing-ship.json");
-  return env;
+  return { ...env, ...extraEnv };
 }
 
 function fail(message: string): never {
@@ -59,66 +51,115 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-function assertSmokeCase(testCase: SmokeCase): void {
+function runBuiltCli(args: string[], options: RunOptions = {}): CliResult {
   const tempRoot = mkdtempSync(join(tmpdir(), "tlon-build-smoke-"));
   try {
-    const result = spawnSync(binaryPath, testCase.args, {
+    const result = spawnSync(binaryPath, [...(options.argsPrefix ?? []), ...args], {
       cwd: rootDir,
-      env: hermeticEnv(tempRoot),
+      env: hermeticEnv(tempRoot, options.env),
       encoding: "utf-8",
       timeout: SMOKE_TIMEOUT_MS,
     });
 
     if (result.error) {
-      fail(`${testCase.name}: failed to run binary: ${result.error.message}`);
-    }
-    if (result.status !== 0) {
-      fail(
-        `${testCase.name}: expected exit 0, got ${result.status}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
-      );
-    }
-    if (result.stderr !== "") {
-      fail(`${testCase.name}: expected empty stderr, got:\n${result.stderr}`);
-    }
-    if (
-      testCase.expectedStdout !== undefined &&
-      result.stdout !== testCase.expectedStdout
-    ) {
-      fail(
-        `${testCase.name}: unexpected stdout\nexpected:\n${testCase.expectedStdout}\nactual:\n${result.stdout}`
-      );
-    }
-    if (
-      testCase.stdoutIncludes !== undefined &&
-      !result.stdout.includes(testCase.stdoutIncludes)
-    ) {
-      fail(
-        `${testCase.name}: stdout did not include ${JSON.stringify(testCase.stdoutIncludes)}\nstdout:\n${result.stdout}`
-      );
+      fail(`failed to run binary: ${result.error.message}`);
     }
 
-    console.log(`ok - ${testCase.name}`);
+    return {
+      exitCode: result.status ?? 1,
+      stdout: normalizeCliOutput(result.stdout),
+      stderr: normalizeCliOutput(result.stderr),
+    };
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
   }
 }
 
-for (const testCase of [
-  {
-    name: "tlon-run --version",
-    args: ["--version"],
-    expectedStdout: `${packageJson.version}\n`,
-  },
-  {
-    name: "tlon-run upload --help",
-    args: ["upload", "--help"],
-    stdoutIncludes: "Usage: upload",
-  },
-  {
-    name: "tlon-run activity --help",
-    args: ["activity", "--help"],
-    stdoutIncludes: "Usage: activity",
-  },
-] satisfies SmokeCase[]) {
-  assertSmokeCase(testCase);
+function assertCliCase(testCase: CliCase, result: CliResult): void {
+  if (result.exitCode !== testCase.expectedExitCode) {
+    fail(
+      `${testCase.name}: expected exit ${testCase.expectedExitCode}, got ${result.exitCode}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+    );
+  }
+
+  if (testCase.stdout !== undefined && result.stdout !== testCase.stdout) {
+    fail(
+      `${testCase.name}: unexpected stdout\nexpected:\n${testCase.stdout}\nactual:\n${result.stdout}`
+    );
+  }
+  for (const expected of testCase.stdoutIncludes ?? []) {
+    if (!result.stdout.includes(expected)) {
+      fail(`${testCase.name}: stdout did not include ${JSON.stringify(expected)}\nstdout:\n${result.stdout}`);
+    }
+  }
+  for (const unexpected of testCase.stdoutExcludes ?? []) {
+    if (result.stdout.includes(unexpected)) {
+      fail(`${testCase.name}: stdout included ${JSON.stringify(unexpected)}\nstdout:\n${result.stdout}`);
+    }
+  }
+
+  if (testCase.stderr !== undefined && result.stderr !== testCase.stderr) {
+    fail(
+      `${testCase.name}: unexpected stderr\nexpected:\n${testCase.stderr}\nactual:\n${result.stderr}`
+    );
+  }
+  for (const expected of testCase.stderrIncludes ?? []) {
+    if (!result.stderr.includes(expected)) {
+      fail(`${testCase.name}: stderr did not include ${JSON.stringify(expected)}\nstderr:\n${result.stderr}`);
+    }
+  }
+  for (const unexpected of testCase.stderrExcludes ?? []) {
+    if (result.stderr.includes(unexpected)) {
+      fail(`${testCase.name}: stderr included ${JSON.stringify(unexpected)}\nstderr:\n${result.stderr}`);
+    }
+  }
+}
+
+function assertCase(testCase: CliCase, options: RunOptions = {}): void {
+  const result = runBuiltCli(testCase.args, options);
+  assertCliCase(testCase, result);
+  console.log(`ok - ${testCase.name}`);
+}
+
+assertCase({
+  name: "tlon-run --version",
+  args: ["--version"],
+  expectedExitCode: 0,
+  stdout: `${packageJson.version}\n`,
+  stderr: "",
+});
+
+for (const testCase of CLI_MATRIX_CASES) {
+  assertCase(testCase);
+}
+
+const hostileHelpCommands = [
+  { name: "top-level", args: ["--help"] },
+  ...COMMAND_FAMILIES.map((family) => ({
+    name: family,
+    args: [family, "--help"],
+  })),
+];
+
+for (const command of hostileHelpCommands) {
+  const configPath = join("/nonexistent", `${command.name}-ship.json`);
+
+  assertCase(
+    {
+      name: `${command.name} help with nonexistent TLON_CONFIG_FILE`,
+      args: command.args,
+      expectedExitCode: 0,
+      stderr: "",
+      stdoutIncludes: ["Usage:"],
+    },
+    { env: { TLON_CONFIG_FILE: configPath } }
+  );
+
+  assertCase({
+    name: `${command.name} help with CLI --config /nonexistent`,
+    args: ["--config", configPath, ...command.args],
+    expectedExitCode: 0,
+    stderr: "",
+    stdoutIncludes: ["Usage:"],
+  });
 }

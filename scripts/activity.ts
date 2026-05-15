@@ -11,6 +11,7 @@
 
 import { getInitialActivity, getGroupAndChannelUnreads, getTextContent } from "@tloncorp/api";
 import { ensureClient } from "./api-client";
+import { isHelpArg, printErrorAndExit, printHelpAndExit, printUsageAndExit } from "./cli-utils";
 
 interface ActivityEvent {
   id: string;
@@ -33,17 +34,13 @@ interface ActivityEvent {
   contactUpdateValue?: string | null;
 }
 
-const ACTIVITY_HELP = `Usage: activity <command>
+const ACTIVITY_HELP = `Usage: tlon activity <command>
 
 Commands:
   mentions [--limit N]   Show mention activity
   replies [--limit N]    Show reply activity
   all [--limit N]        Show all activity
   unreads                Show unread counts`;
-
-function printHelp() {
-  console.log(ACTIVITY_HELP);
-}
 
 // Extract text content from a Story (which is actually an array of blocks)
 function extractText(content: any): string {
@@ -225,14 +222,16 @@ async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
 
-  if (command === "--help" || command === "-h") {
-    printHelp();
-    process.exit(0);
+  if (isHelpArg(command)) {
+    printHelpAndExit(ACTIVITY_HELP);
   }
 
   if (!command) {
-    printHelp();
-    process.exit(1);
+    printUsageAndExit(ACTIVITY_HELP);
+  }
+
+  if (!["mentions", "replies", "all", "unreads"].includes(command)) {
+    printUsageAndExit(ACTIVITY_HELP);
   }
 
   await ensureClient();
@@ -257,11 +256,8 @@ async function main() {
     case 'unreads':
       await getUnreads();
       break;
-    default:
-      printHelp();
-      process.exit(1);
   }
   process.exit(0);
 }
 
-main().catch(console.error);
+main().catch(printErrorAndExit);

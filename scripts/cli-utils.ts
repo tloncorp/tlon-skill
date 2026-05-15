@@ -44,6 +44,29 @@ export function wantsHelp(args: string[]): boolean {
   return args.includes("--help") || args.includes("-h");
 }
 
+export function isHelpArg(arg: string | undefined): boolean {
+  return arg === "--help" || arg === "-h";
+}
+
+export function printHelpAndExit(help: string): never {
+  console.log(help);
+  process.exit(0);
+}
+
+export function printUsageAndExit(help: string): never {
+  console.error(help);
+  process.exit(1);
+}
+
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+export function printErrorAndExit(error: unknown): never {
+  console.error(`Error: ${errorMessage(error)}`);
+  process.exit(1);
+}
+
 export const CHANNEL_KINDS = ["chat", "diary", "heap"] as const;
 
 /**

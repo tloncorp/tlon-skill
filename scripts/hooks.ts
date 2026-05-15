@@ -22,7 +22,15 @@ import { poke, scry, subscribe, unsubscribe } from "@tloncorp/api";
 import { Atom, jam } from "@urbit/nockjs";
 import { render } from "@urbit/aura";
 import { ensureClient } from "./api-client";
-import { getOption, hasFlag } from "./cli-utils";
+import {
+  getOption,
+  hasFlag,
+  isHelpArg,
+  printErrorAndExit,
+  printHelpAndExit,
+  printUsageAndExit,
+  wantsHelp,
+} from "./cli-utils";
 
 // Helper to create a cord (UTF-8 string as little-endian atom) from a JS string
 // Atom.fromCord doesnt handle multi-byte UTF-8 (like emojis) correctly
@@ -65,6 +73,97 @@ function sleep(ms: number): Promise<void> {
 }
 
 type HookTemplateType = "on-post" | "cron" | "moderation" | "bare";
+
+const HOOKS_HELP = `Usage: tlon hooks <command>
+
+Commands:
+  init <name> [--type] [--out]      Create a starter hook template
+  list                              List all hooks
+  get <id>                          Get hook details and source
+  add <name> <src-file>             Add a new hook from file
+  edit <id> [--name] [--src]        Edit hook name or source
+  delete <id>                       Delete a hook
+  order <nest> <id1> [id2...]       Set execution order for channel
+  config <id> <nest> <key=value...> Configure hook for channel (values are nouns serialized as text)
+  cron <id> <schedule> [--nest]     Schedule periodic execution
+  rest <id> [--nest]                Stop a cron job
+
+Hook IDs are @uv format (e.g., 0v1a.2b3c4...)
+Schedule is @dr format (e.g., ~h1 for 1 hour, ~m30 for 30 minutes)
+
+Examples:
+  tlon hooks init my-hook --type on-post
+  tlon hooks add my-hook ./my-hook.hoon
+  tlon hooks config 0v1a.2b3c4 chat/~host/channel key1=value1 key2=value2
+  tlon hooks cron 0v1a.2b3c4 ~h1 --nest chat/~host/channel`;
+
+const HOOKS_COMMAND_HELP: Record<string, string> = {
+  init: "Usage: tlon hooks init <name> [--type on-post|cron|moderation|bare] [--out <file>] [--force]",
+  list: "Usage: tlon hooks list",
+  get: "Usage: tlon hooks get <id>",
+  add: "Usage: tlon hooks add <name> <src-file>",
+  edit: "Usage: tlon hooks edit <id> [--name <name>] [--src <file>]",
+  delete: "Usage: tlon hooks delete <id>",
+  del: "Usage: tlon hooks delete <id>",
+  order: "Usage: tlon hooks order <nest> <id1> [id2...]",
+  config: "Usage: tlon hooks config <id> <nest> <key=value...>",
+  cron: "Usage: tlon hooks cron <id> <schedule> [--nest <nest>]\n  schedule: @dr format like ~h1 (1 hour) or ~m30 (30 minutes)",
+  rest: "Usage: tlon hooks rest <id> [--nest <nest>]",
+};
+
+function getHooksHelp(command?: string): string {
+  return command ? HOOKS_COMMAND_HELP[command] ?? HOOKS_HELP : HOOKS_HELP;
+}
+
+function validateHooksArgs(args: string[]): void {
+  const command = args[0];
+  if (!command || !HOOKS_COMMAND_HELP[command]) {
+    printUsageAndExit(HOOKS_HELP);
+  }
+
+  switch (command) {
+    case "list":
+      return;
+    case "init": {
+      if (!args[1]) printUsageAndExit(HOOKS_COMMAND_HELP.init);
+      const typeRaw = (getOption(args, "type") || "on-post") as HookTemplateType;
+      if (!["on-post", "cron", "moderation", "bare"].includes(typeRaw)) {
+        printUsageAndExit(
+          `Invalid --type: ${typeRaw}. Expected one of: on-post, cron, moderation, bare`
+        );
+      }
+      return;
+    }
+    case "get":
+    case "edit":
+    case "delete":
+    case "del":
+    case "rest": {
+      if (!args[1]) printUsageAndExit(HOOKS_COMMAND_HELP[command]);
+      return;
+    }
+    case "add": {
+      if (!args[1] || !args[2]) printUsageAndExit(HOOKS_COMMAND_HELP.add);
+      return;
+    }
+    case "order": {
+      const ids = args.slice(2).filter((arg) => !arg.startsWith("--"));
+      if (!args[1] || ids.length === 0) printUsageAndExit(HOOKS_COMMAND_HELP.order);
+      return;
+    }
+    case "config": {
+      const configPairs = args.slice(3).filter((arg) => !arg.startsWith("--"));
+      if (!args[1] || !args[2] || configPairs.length === 0) {
+        printUsageAndExit(HOOKS_COMMAND_HELP.config);
+      }
+      return;
+    }
+    case "cron": {
+      if (!args[1] || !args[2]) printUsageAndExit(HOOKS_COMMAND_HELP.cron);
+      return;
+    }
+  }
+}
 
 function getHookTemplate(name: string, type: HookTemplateType): string {
   const safeName = name.replace(/[^a-zA-Z0-9-_ ]/g, "").trim() || "my-hook";
@@ -435,19 +534,29 @@ async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
 
+  if (isHelpArg(command)) {
+    printHelpAndExit(HOOKS_HELP);
+  }
+
+  if (wantsHelp(args.slice(1))) {
+    printHelpAndExit(getHooksHelp(command));
+  }
+
+  validateHooksArgs(args);
+
   await ensureClient();
 
   switch (command) {
     case "init": {
       const name = args[1];
       if (!name) {
-        console.error("Usage: hooks.ts init <name> [--type on-post|cron|moderation|bare] [--out <file>] [--force]");
-        process.exit(1);
+        printUsageAndExit(HOOKS_COMMAND_HELP.init);
       }
       const typeRaw = (getOption(args, "type") || "on-post") as HookTemplateType;
       if (!["on-post", "cron", "moderation", "bare"].includes(typeRaw)) {
-        console.error(`Invalid --type: ${typeRaw}. Expected one of: on-post, cron, moderation, bare`);
-        process.exit(1);
+        printUsageAndExit(
+          `Invalid --type: ${typeRaw}. Expected one of: on-post, cron, moderation, bare`
+        );
       }
       const out = getOption(args, "out");
       const force = hasFlag(args, "force");
@@ -463,8 +572,7 @@ async function main() {
     case "get": {
       const id = args[1];
       if (!id) {
-        console.error("Usage: hooks.ts get <id>");
-        process.exit(1);
+        printUsageAndExit(HOOKS_COMMAND_HELP.get);
       }
       await getHook(id);
       break;
@@ -474,8 +582,7 @@ async function main() {
       const name = args[1];
       const srcPath = args[2];
       if (!name || !srcPath) {
-        console.error("Usage: hooks.ts add <name> <src-file>");
-        process.exit(1);
+        printUsageAndExit(HOOKS_COMMAND_HELP.add);
       }
       await addHook(name, srcPath);
       break;
@@ -484,8 +591,7 @@ async function main() {
     case "edit": {
       const id = args[1];
       if (!id) {
-        console.error("Usage: hooks.ts edit <id> [--name <name>] [--src <file>]");
-        process.exit(1);
+        printUsageAndExit(HOOKS_COMMAND_HELP.edit);
       }
       const name = getOption(args, "name");
       const srcPath = getOption(args, "src");
@@ -497,8 +603,7 @@ async function main() {
     case "del": {
       const id = args[1];
       if (!id) {
-        console.error("Usage: hooks.ts delete <id>");
-        process.exit(1);
+        printUsageAndExit(HOOKS_COMMAND_HELP.delete);
       }
       await deleteHook(id);
       break;
@@ -508,8 +613,7 @@ async function main() {
       const nest = args[1];
       const ids = args.slice(2).filter((a) => !a.startsWith("--"));
       if (!nest || ids.length === 0) {
-        console.error("Usage: hooks.ts order <nest> <id1> [id2...]");
-        process.exit(1);
+        printUsageAndExit(HOOKS_COMMAND_HELP.order);
       }
       await setOrder(nest, ids);
       break;
@@ -520,8 +624,7 @@ async function main() {
       const nest = args[2];
       const configPairs = args.slice(3).filter((a) => !a.startsWith("--"));
       if (!id || !nest || configPairs.length === 0) {
-        console.error("Usage: hooks.ts config <id> <nest> <key=value...>");
-        process.exit(1);
+        printUsageAndExit(HOOKS_COMMAND_HELP.config);
       }
       const config: Record<string, string> = {};
       for (const pair of configPairs) {
@@ -536,9 +639,7 @@ async function main() {
       const id = args[1];
       const schedule = args[2];
       if (!id || !schedule) {
-        console.error("Usage: hooks.ts cron <id> <schedule> [--nest <nest>]");
-        console.error("  schedule: @dr format like ~h1 (1 hour) or ~m30 (30 minutes)");
-        process.exit(1);
+        printUsageAndExit(HOOKS_COMMAND_HELP.cron);
       }
       const nest = getOption(args, "nest");
       await cronHook(id, schedule, nest);
@@ -548,8 +649,7 @@ async function main() {
     case "rest": {
       const id = args[1];
       if (!id) {
-        console.error("Usage: hooks.ts rest <id> [--nest <nest>]");
-        process.exit(1);
+        printUsageAndExit(HOOKS_COMMAND_HELP.rest);
       }
       const nest = getOption(args, "nest");
       await restHook(id, nest);
@@ -557,36 +657,10 @@ async function main() {
     }
 
     default:
-      console.log(`Usage: hooks.ts <command>
-
-Commands:
-  init <name> [--type] [--out]      Create a starter hook template
-  list                              List all hooks
-  get <id>                          Get hook details and source
-  add <name> <src-file>             Add a new hook from file
-  edit <id> [--name] [--src]        Edit hook name or source
-  delete <id>                       Delete a hook
-  order <nest> <id1> [id2...]       Set execution order for channel
-  config <id> <nest> <key=value...> Configure hook for channel (values are nouns serialized as text)
-  cron <id> <schedule> [--nest]     Schedule periodic execution
-  rest <id> [--nest]                Stop a cron job
-
-Hook IDs are @uv format (e.g., 0v1a.2b3c4...)
-Schedule is @dr format (e.g., ~h1 for 1 hour, ~m30 for 30 minutes)
-
-Examples:
-  tlon hooks init my-hook --type on-post
-  tlon hooks add my-hook ./my-hook.hoon
-  tlon hooks config 0v1a.2b3c4 chat/~host/channel key1=value1 key2=value2
-  tlon hooks cron 0v1a.2b3c4 ~h1 --nest chat/~host/channel
-`);
-      process.exit(1);
+      printUsageAndExit(HOOKS_HELP);
   }
 
   process.exit(0);
 }
 
-main().catch((err) => {
-  console.error("Error:", err.message || err);
-  process.exit(1);
-});
+main().catch(printErrorAndExit);

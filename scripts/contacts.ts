@@ -17,6 +17,13 @@ import {
 } from "@tloncorp/api";
 import type { Contact } from "@tloncorp/api";
 import { ensureClient, normalizeShip } from "./api-client";
+import {
+  isHelpArg,
+  printErrorAndExit,
+  printHelpAndExit,
+  printUsageAndExit,
+  wantsHelp,
+} from "./cli-utils";
 
 interface ContactEditField {
   nickname?: string;
@@ -24,6 +31,73 @@ interface ContactEditField {
   status?: string;
   avatar?: string;
   cover?: string;
+}
+
+const CONTACTS_HELP = `Usage: tlon contacts <command>
+
+Commands:
+  list                     List all contacts
+  self                     Show your profile
+  get ~ship                Get a contact's profile
+  sync ~ship [~ship2 ...]  Sync profiles
+  add ~ship                Add a contact
+  remove ~ship             Remove a contact
+  update ~ship --nickname <name> --avatar <url>
+                           Update a contact's metadata
+  update-profile [options] Update your profile
+
+Examples:
+  tlon contacts list
+  tlon contacts get ~sampel-palnet
+  tlon contacts update-profile --nickname "New Name"`;
+
+const CONTACTS_COMMAND_HELP: Record<string, string> = {
+  list: "Usage: tlon contacts list",
+  self: "Usage: tlon contacts self",
+  get: "Usage: tlon contacts get ~ship",
+  sync: "Usage: tlon contacts sync ~ship [~ship2 ...]",
+  add: "Usage: tlon contacts add ~ship",
+  remove: "Usage: tlon contacts remove ~ship",
+  del: "Usage: tlon contacts remove ~ship",
+  update: "Usage: tlon contacts update ~ship [--nickname <name>] [--avatar <url>]",
+  "update-profile":
+    "Usage: tlon contacts update-profile [--nickname <name>] [--bio <text>] [--status <text>] [--avatar <url>] [--cover <url>]",
+};
+
+function getContactsHelp(command?: string): string {
+  return command ? CONTACTS_COMMAND_HELP[command] ?? CONTACTS_HELP : CONTACTS_HELP;
+}
+
+function validateContactsArgs(args: string[]): void {
+  const command = args[0];
+  if (!command || !CONTACTS_COMMAND_HELP[command]) {
+    printUsageAndExit(CONTACTS_HELP);
+  }
+
+  switch (command) {
+    case "list":
+    case "self":
+      return;
+    case "get":
+    case "sync":
+    case "add":
+    case "remove":
+    case "del":
+    case "update": {
+      if (!args[1]) printUsageAndExit(CONTACTS_COMMAND_HELP[command]);
+      return;
+    }
+    case "update-profile": {
+      if (
+        !["--nickname", "--bio", "--status", "--avatar", "--cover"].some((flag) =>
+          args.includes(flag)
+        )
+      ) {
+        printUsageAndExit(CONTACTS_COMMAND_HELP["update-profile"]);
+      }
+      return;
+    }
+  }
 }
 
 // Helper to extract profile values
@@ -172,6 +246,16 @@ async function main() {
   const command = args[0];
 
   try {
+    if (isHelpArg(command)) {
+      printHelpAndExit(CONTACTS_HELP);
+    }
+
+    if (wantsHelp(args.slice(1))) {
+      printHelpAndExit(getContactsHelp(command));
+    }
+
+    validateContactsArgs(args);
+
     await ensureClient();
     let result: any;
 
@@ -186,24 +270,21 @@ async function main() {
 
       case "get":
         if (!args[1]) {
-          console.error("Usage: contacts.ts get ~ship");
-          process.exit(1);
+          printUsageAndExit(CONTACTS_COMMAND_HELP.get);
         }
         result = await getContact(args[1]);
         break;
 
       case "sync":
         if (!args[1]) {
-          console.error("Usage: contacts.ts sync ~ship [~ship2 ...]");
-          process.exit(1);
+          printUsageAndExit(CONTACTS_COMMAND_HELP.sync);
         }
         result = await syncProfiles(args.slice(1));
         break;
 
       case "add":
         if (!args[1]) {
-          console.error("Usage: contacts.ts add ~ship");
-          process.exit(1);
+          printUsageAndExit(CONTACTS_COMMAND_HELP.add);
         }
         result = await addContact(args[1]);
         break;
@@ -211,8 +292,7 @@ async function main() {
       case "remove":
       case "del":
         if (!args[1]) {
-          console.error("Usage: contacts.ts remove ~ship");
-          process.exit(1);
+          printUsageAndExit(CONTACTS_COMMAND_HELP.remove);
         }
         result = await removeContact(args[1]);
         break;
@@ -220,8 +300,7 @@ async function main() {
       case "update": {
         const ship = args[1];
         if (!ship) {
-          console.error("Usage: contacts.ts update ~ship [--nickname <name>] [--avatar <url>]");
-          process.exit(1);
+          printUsageAndExit(CONTACTS_COMMAND_HELP.update);
         }
         const nicknameIdx = args.indexOf("--nickname");
         const avatarIdx = args.indexOf("--avatar");
@@ -251,34 +330,15 @@ async function main() {
       }
 
       default:
-        console.log(`Usage: contacts.ts <command>
-
-Commands:
-  list                     List all contacts
-  self                     Show your profile
-  get ~ship                Get a contact's profile
-  sync ~ship [~ship2 ...]   Sync profiles
-  add ~ship                Add a contact
-  remove ~ship             Remove a contact
-  update ~ship --nickname <name> --avatar <url>
-                           Update a contact's metadata
-  update-profile [options] Update your profile
-
-Examples:
-  npx ts-node scripts/contacts.ts list
-  npx ts-node scripts/contacts.ts get ~sampel-palnet
-  npx ts-node scripts/contacts.ts update-profile --nickname "New Name"
-`);
-        process.exit(1);
+        printUsageAndExit(CONTACTS_HELP);
     }
 
     if (result) {
       console.log(JSON.stringify(result, null, 2));
     }
     process.exit(0);
-  } catch (error: any) {
-    console.error(`Error: ${error.message}`);
-    process.exit(1);
+  } catch (error) {
+    printErrorAndExit(error);
   }
 }
 
