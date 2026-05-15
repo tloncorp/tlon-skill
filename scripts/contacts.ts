@@ -23,7 +23,6 @@ import {
   printErrorAndExit,
   printHelpAndExit,
   printUsageAndExit,
-  wantsHelp,
 } from "./cli-utils";
 
 interface ContactEditField {
@@ -69,6 +68,10 @@ const CONTACTS_COMMAND_HELP: Record<string, string> = {
 
 function getContactsHelp(command?: string): string {
   return command ? CONTACTS_COMMAND_HELP[command] ?? CONTACTS_HELP : CONTACTS_HELP;
+}
+
+function isContactsHelpRequest(args: string[]): boolean {
+  return args.length === 2 && isHelpArg(args[1]);
 }
 
 function validateContactsArgs(args: string[]): void {
@@ -253,7 +256,7 @@ async function main() {
       printHelpAndExit(CONTACTS_HELP);
     }
 
-    if (wantsHelp(args.slice(1))) {
+    if (isContactsHelpRequest(args)) {
       printHelpAndExit(getContactsHelp(command));
     }
 

@@ -133,7 +133,7 @@ for (const testCase of CLI_MATRIX_CASES) {
   assertCase(testCase);
 }
 
-const literalHelpMessageCommands = [
+const literalOptionLikeValueCommands = [
   {
     name: "dms send message",
     args: ["dms", "send", "0v123", "use", "--help"],
@@ -146,11 +146,27 @@ const literalHelpMessageCommands = [
     name: "posts edit message",
     args: ["posts", "edit", "chat/~host/channel", "170.141", "use", "--help"],
   },
+  {
+    name: "contacts update-profile value",
+    args: ["contacts", "update-profile", "--status", "--help"],
+  },
+  {
+    name: "contacts update value",
+    args: ["contacts", "update", "~zod", "--nickname", "-h"],
+  },
+  {
+    name: "channels create title",
+    args: ["channels", "create", "~host/group", "--roadmap"],
+  },
+  {
+    name: "channels rename title",
+    args: ["channels", "rename", "chat/~host/channel", "--roadmap"],
+  },
 ];
 
-for (const command of literalHelpMessageCommands) {
+for (const command of literalOptionLikeValueCommands) {
   assertCase({
-    name: `${command.name} literal --help reaches auth`,
+    name: `${command.name} option-like value reaches auth`,
     args: command.args,
     expectedExitCode: 1,
     stdout: "",

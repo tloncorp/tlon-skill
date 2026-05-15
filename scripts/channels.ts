@@ -88,10 +88,15 @@ const CHANNELS_COMMAND_HELP: Record<string, string> = {
   "del-readers": `Usage: tlon channels del-readers <group-flag> <nest> <role1> [role2...]\nExample: tlon channels del-readers ~host/group-slug chat/~host/slug admin`,
 };
 
+const CHANNEL_CREATE_FLAGS = ["kind", "description"] as const;
 const CHANNEL_UPDATE_FLAGS = ["title", "description"] as const;
 
 function getChannelsHelp(command?: string) {
   return command ? CHANNELS_COMMAND_HELP[command] ?? CHANNELS_HELP : CHANNELS_HELP;
+}
+
+function isKnownChannelCreateOption(arg: string | undefined): boolean {
+  return CHANNEL_CREATE_FLAGS.some((flag) => arg === `--${flag}`);
 }
 
 function validateChannelsArgs(args: string[]): void {
@@ -112,7 +117,7 @@ function validateChannelsArgs(args: string[]): void {
       return;
     }
     case "create": {
-      if (!args[1] || !args[2] || args[2].startsWith("--")) {
+      if (!args[1] || !args[2] || isKnownChannelCreateOption(args[2])) {
         printUsageAndExit(CHANNELS_COMMAND_HELP.create);
       }
       if (looksLikePositionalChannelKind(args, 2)) {
@@ -136,7 +141,7 @@ function validateChannelsArgs(args: string[]): void {
       return;
     }
     case "rename": {
-      if (!args[1] || !args[2] || args[2].startsWith("--")) {
+      if (!args[1] || !args[2]) {
         printUsageAndExit(CHANNELS_COMMAND_HELP.rename);
       }
       return;
