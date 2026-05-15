@@ -10,7 +10,7 @@
  */
 export function getOption(args: string[], name: string): string | undefined {
   const idx = args.indexOf(`--${name}`);
-  if (idx !== -1 && args[idx + 1]) {
+  if (idx !== -1 && args[idx + 1] !== undefined) {
     return args[idx + 1];
   }
   return undefined;
@@ -23,7 +23,7 @@ export function hasOptionValue(
 ): boolean {
   const idx = args.indexOf(`--${name}`);
   const value = idx !== -1 ? args[idx + 1] : undefined;
-  if (!value) {
+  if (value === undefined) {
     return false;
   }
 

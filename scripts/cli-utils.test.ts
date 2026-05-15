@@ -34,6 +34,10 @@ describe("cli-utils", () => {
       expect(getOption(args, "kind")).toBe("chat");
     });
 
+    it("preserves empty option values", () => {
+      expect(getOption(["update", "--description", ""], "description")).toBe("");
+    });
+
     it("does not flag ordinary titles", () => {
       const args = ["add-channel", "~zod/test", "Projects"];
       expect(looksLikePositionalChannelKind(args, 2)).toBe(false);
@@ -69,6 +73,12 @@ describe("cli-utils", () => {
       const args = ["update-profile", "--bio", "--nickname", "Pat"];
 
       expect(hasOptionValue(args, "bio", ["nickname", "bio"])).toBe(false);
+    });
+
+    it("treats an empty string as an explicit option value", () => {
+      const args = ["update-profile", "--status", ""];
+
+      expect(hasOptionValue(args, "status", ["status"])).toBe(true);
     });
   });
 });

@@ -62,14 +62,18 @@ function getMessagesHelp(command?: string): string {
   return command ? MESSAGES_COMMAND_HELP[command] ?? MESSAGES_HELP : MESSAGES_HELP;
 }
 
-function hasSearchChannel(args: string[]): boolean {
-  const channelIdx = args.indexOf("--channel");
-  const channel = channelIdx !== -1 ? args[channelIdx + 1] : undefined;
-  return !!channel && !channel.startsWith("--");
+function getSearchChannel(args: string[]): string | undefined {
+  for (let i = 2; i < args.length; i++) {
+    if (args[i] === "--channel") {
+      const channel = args[i + 1];
+      return channel && !channel.startsWith("--") ? channel : undefined;
+    }
+  }
+  return undefined;
 }
 
 function isSearchQueryHelpLiteral(args: string[]): boolean {
-  return args[0] === "search" && isHelpArg(args[1]) && hasSearchChannel(args);
+  return args[0] === "search" && isHelpArg(args[1]) && !!getSearchChannel(args);
 }
 
 function validateMessagesArgs(args: string[]): void {
@@ -86,7 +90,7 @@ function validateMessagesArgs(args: string[]): void {
       return;
     }
     case "search": {
-      if (!args[1] || args[1] === "--channel" || !hasSearchChannel(args)) {
+      if (!args[1] || !getSearchChannel(args)) {
         printUsageAndExit(MESSAGES_COMMAND_HELP.search);
       }
       return;
@@ -454,12 +458,7 @@ async function main() {
 
       case "search": {
         const query = args[1];
-        let channel: string | null = null;
-        for (let i = 2; i < args.length; i++) {
-          if (args[i] === "--channel" && args[i + 1]) {
-            channel = args[i + 1];
-          }
-        }
+        const channel = getSearchChannel(args);
 
         if (!query || !channel) {
           printUsageAndExit(MESSAGES_COMMAND_HELP.search);

@@ -181,6 +181,10 @@ const literalOptionLikeValueCommands = [
     args: ["posts", "edit", "chat/~host/channel", "170.141", "use", "--help"],
   },
   {
+    name: "messages search query",
+    args: ["messages", "search", "--channel", "--channel", "chat/~host/channel"],
+  },
+  {
     name: "contacts update-profile value",
     args: ["contacts", "update-profile", "--status", "--help"],
   },
@@ -223,6 +227,22 @@ const literalOptionLikeValueCommands = [
   {
     name: "notebook title",
     args: ["notebook", "diary/~host/notes", "--help"],
+  },
+  {
+    name: "contacts update-profile empty value",
+    args: ["contacts", "update-profile", "--status", ""],
+  },
+  {
+    name: "contacts update empty value",
+    args: ["contacts", "update", "~zod", "--nickname", ""],
+  },
+  {
+    name: "channels update empty value",
+    args: ["channels", "update", "chat/~host/channel", "--description", ""],
+  },
+  {
+    name: "groups update empty value",
+    args: ["groups", "update", "~host/group", "--description", ""],
   },
 ];
 
