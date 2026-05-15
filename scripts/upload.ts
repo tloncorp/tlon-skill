@@ -70,7 +70,11 @@ function isUrl(input: string): boolean {
 }
 
 function bufferToBlobPart(buffer: Buffer): Uint8Array<ArrayBuffer> {
-  return Uint8Array.from(buffer);
+  return new Uint8Array(
+    buffer.buffer as ArrayBuffer,
+    buffer.byteOffset,
+    buffer.byteLength
+  );
 }
 
 /** Read all of stdin into a Buffer (30s timeout) */

@@ -44,6 +44,8 @@ if (!/^\d+\.\d+\.\d+(-[\w.]+)?$/.test(newVersion)) {
 
 console.log(`Bumping version to ${newVersion}...\n`);
 
+let failed = false;
+
 function getTlonSkillOptionalDeps(optionalDependencies) {
   if (!optionalDependencies) {
     return [];
@@ -134,6 +136,7 @@ for (const file of packageFiles) {
     writeFileSync(filePath, JSON.stringify(pkg, null, 2) + "\n");
     console.log(`  ${file}: ${oldVersion} → ${newVersion}`);
   } catch (err) {
+    failed = true;
     console.error(`  ${file}: ERROR - ${err.message}`);
   }
 }
@@ -144,7 +147,13 @@ try {
   refreshPackageLockFromLocalPlatformPackages(rootPackage);
   console.log(`  ${packageLockFile}: ${oldVersion} → ${newVersion}`);
 } catch (err) {
+  failed = true;
   console.error(`  ${packageLockFile}: ERROR - ${err.message}`);
+}
+
+if (failed) {
+  console.error("\nVersion bump failed; see errors above.");
+  process.exit(1);
 }
 
 console.log("\nDone! Don't forget to:");

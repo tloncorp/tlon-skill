@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 
 const rootDir = resolve(process.cwd());
 const binaryPath = join(rootDir, "dist", "tlon-run");
+const SMOKE_TIMEOUT_MS = 15_000;
 const packageJson = JSON.parse(
   readFileSync(join(rootDir, "package.json"), "utf-8")
 ) as { version: string };
@@ -65,6 +66,7 @@ function assertSmokeCase(testCase: SmokeCase): void {
       cwd: rootDir,
       env: hermeticEnv(tempRoot),
       encoding: "utf-8",
+      timeout: SMOKE_TIMEOUT_MS,
     });
 
     if (result.error) {
