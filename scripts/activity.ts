@@ -33,6 +33,18 @@ interface ActivityEvent {
   contactUpdateValue?: string | null;
 }
 
+const ACTIVITY_HELP = `Usage: activity <command>
+
+Commands:
+  mentions [--limit N]   Show mention activity
+  replies [--limit N]    Show reply activity
+  all [--limit N]        Show all activity
+  unreads                Show unread counts`;
+
+function printHelp() {
+  console.log(ACTIVITY_HELP);
+}
+
 // Extract text content from a Story (which is actually an array of blocks)
 function extractText(content: any): string {
   if (!content) return "";
@@ -212,6 +224,17 @@ async function getUnreads() {
 async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
+
+  if (command === "--help" || command === "-h") {
+    printHelp();
+    process.exit(0);
+  }
+
+  if (!command) {
+    printHelp();
+    process.exit(1);
+  }
+
   await ensureClient();
   
   // Parse --limit flag
@@ -235,11 +258,7 @@ async function main() {
       await getUnreads();
       break;
     default:
-      console.log('Usage:');
-      console.log('  npx ts-node scripts/activity.ts mentions [--limit N]');
-      console.log('  npx ts-node scripts/activity.ts replies [--limit N]');
-      console.log('  npx ts-node scripts/activity.ts all [--limit N]');
-      console.log('  npx ts-node scripts/activity.ts unreads');
+      printHelp();
       process.exit(1);
   }
   process.exit(0);

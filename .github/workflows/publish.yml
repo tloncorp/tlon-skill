@@ -33,14 +33,14 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version-file: .tool-versions
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.3.4
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build binary
         run: node scripts/build-all.js --target=${{ matrix.target }}
@@ -68,7 +68,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version-file: .tool-versions
           registry-url: "https://registry.npmjs.org"
 
       - name: Download all artifacts

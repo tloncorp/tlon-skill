@@ -317,8 +317,14 @@ async function getGroupsApi(): Promise<ApiGroup[]> {
   return getGroups();
 }
 
+type GroupNavSection = {
+  sectionId?: string;
+  channels?: Array<{ channelId?: string }>;
+};
+
 function findChannelSectionId(group: ApiGroup, channelId: string): string {
-  const section = (group.navSections || []).find((nav) =>
+  const navSections = (group.navSections || []) as GroupNavSection[];
+  const section = navSections.find((nav) =>
     (nav.channels || []).some((channel) => channel.channelId === channelId)
   );
   return section?.sectionId || "default";

@@ -5,6 +5,7 @@
  * Example: node scripts/bump-version.js 0.1.5
  */
 
+import { execFileSync } from "child_process";
 import { readFileSync, writeFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -59,6 +60,65 @@ function updateTlonSkillOptionalDeps(optionalDependencies) {
   }
 }
 
+function targetFromPlatformPackage(packageName) {
+  return packageName.slice(tlonSkillPackagePrefix.length);
+}
+
+function getLocalPlatformOptionalDeps(optionalDependencies) {
+  return Object.fromEntries(
+    getTlonSkillOptionalDeps(optionalDependencies).map((dep) => [
+      dep,
+      `file:npm/${targetFromPlatformPackage(dep)}`,
+    ])
+  );
+}
+
+function readJson(file) {
+  return JSON.parse(readFileSync(join(rootDir, file), "utf-8"));
+}
+
+function writeJson(file, value) {
+  writeFileSync(join(rootDir, file), JSON.stringify(value, null, 2) + "\n");
+}
+
+function refreshPackageLockFromLocalPlatformPackages(finalRootPackage) {
+  const originalPackageJson = readFileSync(join(rootDir, "package.json"), "utf-8");
+  const localPlatformDeps = getLocalPlatformOptionalDeps(
+    finalRootPackage.optionalDependencies
+  );
+
+  const tempRootPackage = structuredClone(finalRootPackage);
+  tempRootPackage.optionalDependencies = {
+    ...tempRootPackage.optionalDependencies,
+    ...localPlatformDeps,
+  };
+
+  try {
+    writeJson("package.json", tempRootPackage);
+    execFileSync(
+      "npm",
+      ["install", "--package-lock-only", "--ignore-scripts", "--no-audit", "--no-fund"],
+      { cwd: rootDir, stdio: "inherit" }
+    );
+  } finally {
+    writeFileSync(join(rootDir, "package.json"), originalPackageJson);
+  }
+
+  const packageLock = readJson(packageLockFile);
+  packageLock.version = newVersion;
+
+  const rootPackage = packageLock.packages?.[""];
+  if (rootPackage) {
+    rootPackage.version = newVersion;
+    rootPackage.optionalDependencies = {
+      ...rootPackage.optionalDependencies,
+      ...finalRootPackage.optionalDependencies,
+    };
+  }
+
+  writeJson(packageLockFile, packageLock);
+}
+
 for (const file of packageFiles) {
   const filePath = join(rootDir, file);
   try {
@@ -79,42 +139,9 @@ for (const file of packageFiles) {
 }
 
 try {
-  const filePath = join(rootDir, packageLockFile);
-  const packageLock = JSON.parse(readFileSync(filePath, "utf-8"));
-  const oldVersion = packageLock.version;
-  packageLock.version = newVersion;
-
-  const rootPackage = packageLock.packages?.[""];
-  if (rootPackage) {
-    rootPackage.version = newVersion;
-    updateTlonSkillOptionalDeps(rootPackage.optionalDependencies);
-  }
-
-  if (packageLock.packages) {
-    const platformPackagePaths = new Set(
-      getTlonSkillOptionalDeps(rootPackage?.optionalDependencies).map(
-        (dep) => `node_modules/${dep}`
-      )
-    );
-
-    for (const packagePath of Object.keys(packageLock.packages)) {
-      if (packagePath.startsWith(`node_modules/${tlonSkillPackagePrefix}`)) {
-        if (platformPackagePaths.has(packagePath)) {
-          packageLock.packages[packagePath] = { optional: true };
-        } else {
-          delete packageLock.packages[packagePath];
-        }
-      }
-    }
-
-    // npm 11 requires lock entries for optional deps. These packages publish
-    // after the bump PR merges, so use placeholders instead of old tarballs.
-    for (const packagePath of platformPackagePaths) {
-      packageLock.packages[packagePath] = { optional: true };
-    }
-  }
-
-  writeFileSync(filePath, JSON.stringify(packageLock, null, 2) + "\n");
+  const oldVersion = readJson(packageLockFile).version;
+  const rootPackage = readJson("package.json");
+  refreshPackageLockFromLocalPlatformPackages(rootPackage);
   console.log(`  ${packageLockFile}: ${oldVersion} → ${newVersion}`);
 } catch (err) {
   console.error(`  ${packageLockFile}: ERROR - ${err.message}`);
