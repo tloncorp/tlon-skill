@@ -32,6 +32,7 @@ import type { Channel as ApiChannel, Group as ApiGroup } from "@tloncorp/api";
 import { ensureClient, getCurrentShip } from "./api-client";
 import {
   getOption,
+  hasOptionValue,
   isHelpArg,
   looksLikePositionalChannelKind,
   printErrorAndExit,
@@ -59,7 +60,7 @@ Commands:
   all
   info <nest>
   create <group-id> "Channel Name" [--kind chat|diary|heap] [--description "..."]
-  update <nest> --title "..." [--description "..."]
+  update <nest> (--title "..." | --description "...")
   rename <nest> "New Title"
   delete <nest>
   add-writers <nest> <role1> [role2...]
@@ -78,7 +79,7 @@ const CHANNELS_COMMAND_HELP: Record<string, string> = {
   all: `Usage: tlon channels all`,
   info: `Usage: tlon channels info <nest>\nExample: tlon channels info chat/~host/slug`,
   create: `Usage: tlon channels create <group-id> "Channel Name" [--kind chat|diary|heap] [--description "..."]\nExample: tlon channels create ~host/group-slug "Projects" --kind chat`,
-  update: `Usage: tlon channels update <nest> --title "..." [--description "..."]\nExample: tlon channels update chat/~host/slug --title "New Title"`,
+  update: `Usage: tlon channels update <nest> (--title "..." | --description "...")\nExample: tlon channels update chat/~host/slug --title "New Title"`,
   rename: `Usage: tlon channels rename <nest> "New Title"\nExample: tlon channels rename chat/~host/slug "Project Updates"`,
   delete: `Usage: tlon channels delete <nest>\nExample: tlon channels delete chat/~host/slug`,
   "add-writers": `Usage: tlon channels add-writers <nest> <role1> [role2...]\nExample: tlon channels add-writers chat/~host/slug admin`,
@@ -121,7 +122,7 @@ function validateChannelsArgs(args: string[]): void {
     }
     case "update": {
       if (!args[1]) printUsageAndExit(CHANNELS_COMMAND_HELP.update);
-      if (!getOption(args, "title") && !getOption(args, "description")) {
+      if (!hasOptionValue(args, "title") && !hasOptionValue(args, "description")) {
         printUsageAndExit(
           `Error: At least one of --title or --description is required\n${CHANNELS_COMMAND_HELP.update}`
         );

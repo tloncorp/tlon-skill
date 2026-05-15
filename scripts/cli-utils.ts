@@ -16,6 +16,12 @@ export function getOption(args: string[], name: string): string | undefined {
   return undefined;
 }
 
+export function hasOptionValue(args: string[], name: string): boolean {
+  const idx = args.indexOf(`--${name}`);
+  const value = idx !== -1 ? args[idx + 1] : undefined;
+  return !!value && !value.startsWith("--");
+}
+
 /**
  * Check if a flag is present in args
  * @param args Array of arguments

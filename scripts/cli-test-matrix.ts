@@ -31,19 +31,42 @@ export type CliCase = {
 
 const SCRIPT_ERA_PATTERNS = [
   "npx ts-node",
-  "activity.ts",
-  "channels.ts",
-  "contacts.ts",
-  "dms.ts",
-  "expose.ts",
-  "groups.ts",
-  "hooks.ts",
-  "main.ts",
-  "messages.ts",
-  "notebook-post.ts",
-  "posts.ts",
-  "settings.ts",
-  "upload.ts",
+  "Usage: activity.ts",
+  "Usage: channels.ts",
+  "Usage: contacts.ts",
+  "Usage: dms.ts",
+  "Usage: expose.ts",
+  "Usage: groups.ts",
+  "Usage: hooks.ts",
+  "Usage: messages.ts",
+  "Usage: notebook-post.ts",
+  "Usage: posts.ts",
+  "Usage: settings.ts",
+  "Usage: upload.ts",
+  "Example: activity.ts",
+  "Example: channels.ts",
+  "Example: contacts.ts",
+  "Example: dms.ts",
+  "Example: expose.ts",
+  "Example: groups.ts",
+  "Example: hooks.ts",
+  "Example: messages.ts",
+  "Example: notebook-post.ts",
+  "Example: posts.ts",
+  "Example: settings.ts",
+  "Example: upload.ts",
+  "scripts/activity.ts",
+  "scripts/channels.ts",
+  "scripts/contacts.ts",
+  "scripts/dms.ts",
+  "scripts/expose.ts",
+  "scripts/groups.ts",
+  "scripts/hooks.ts",
+  "scripts/messages.ts",
+  "scripts/notebook-post.ts",
+  "scripts/posts.ts",
+  "scripts/settings.ts",
+  "scripts/upload.ts",
 ];
 
 const STACK_PATTERNS = [
@@ -139,6 +162,26 @@ export const MISSING_REQUIRED_CASES: CliCase[] = [
 ];
 
 export const SPECIAL_INPUT_CASES: CliCase[] = [
+  usageErrorCase(
+    "contacts update-profile missing flag value",
+    ["contacts", "update-profile", "--nickname"],
+    "Usage: tlon contacts update-profile"
+  ),
+  usageErrorCase(
+    "messages search missing query",
+    ["messages", "search", "--channel", "chat/~host/slug"],
+    "Usage: tlon messages search"
+  ),
+  usageErrorCase(
+    "posts edit missing message",
+    ["posts", "edit", "chat/~host/channel", "170.141"],
+    "Usage: tlon posts edit"
+  ),
+  usageErrorCase(
+    "hooks init invalid type",
+    ["hooks", "init", "my-hook", "--type", "definitely-not-a-type"],
+    "Invalid --type: definitely-not-a-type"
+  ),
   {
     ...usageErrorCase(
       "upload unknown option",

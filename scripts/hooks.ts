@@ -72,7 +72,12 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-type HookTemplateType = "on-post" | "cron" | "moderation" | "bare";
+const HOOK_TEMPLATE_TYPES = ["on-post", "cron", "moderation", "bare"] as const;
+type HookTemplateType = (typeof HOOK_TEMPLATE_TYPES)[number];
+
+function isHookTemplateType(value: string): value is HookTemplateType {
+  return (HOOK_TEMPLATE_TYPES as readonly string[]).includes(value);
+}
 
 const HOOKS_HELP = `Usage: tlon hooks <command>
 
@@ -126,8 +131,8 @@ function validateHooksArgs(args: string[]): void {
       return;
     case "init": {
       if (!args[1]) printUsageAndExit(HOOKS_COMMAND_HELP.init);
-      const typeRaw = (getOption(args, "type") || "on-post") as HookTemplateType;
-      if (!["on-post", "cron", "moderation", "bare"].includes(typeRaw)) {
+      const typeRaw = getOption(args, "type") || "on-post";
+      if (!isHookTemplateType(typeRaw)) {
         printUsageAndExit(
           `Invalid --type: ${typeRaw}. Expected one of: on-post, cron, moderation, bare`
         );
@@ -552,8 +557,8 @@ async function main() {
       if (!name) {
         printUsageAndExit(HOOKS_COMMAND_HELP.init);
       }
-      const typeRaw = (getOption(args, "type") || "on-post") as HookTemplateType;
-      if (!["on-post", "cron", "moderation", "bare"].includes(typeRaw)) {
+      const typeRaw = getOption(args, "type") || "on-post";
+      if (!isHookTemplateType(typeRaw)) {
         printUsageAndExit(
           `Invalid --type: ${typeRaw}. Expected one of: on-post, cron, moderation, bare`
         );

@@ -19,6 +19,7 @@ import { addReaction, deletePost, editPost, getChannelPosts, getCurrentUserId, r
 import type { Post } from "@tloncorp/api";
 import { ensureClient } from "./api-client";
 import {
+  hasOptionValue,
   isHelpArg,
   printErrorAndExit,
   printHelpAndExit,
@@ -54,17 +55,33 @@ const POSTS_COMMAND_HELP: Record<string, string> = {
   unreact: "Usage: tlon posts unreact <channel> <post-id>",
   edit: "Usage: tlon posts edit <channel> <post-id> <message> [--title <title>] [--image <url>] [--content <json-file>]",
   delete: "Usage: tlon posts delete <channel> <post-id>",
-  send: "error: Channel post send is handled by the Tlon channel plugin.\nUse the channel message tool with channel=tlon instead.",
-  reply: "error: Channel post reply is handled by the Tlon channel plugin.\nUse the channel message tool with channel=tlon and replyTo instead.",
+};
+
+const POSTS_UNSUPPORTED_COMMAND_ERRORS: Record<string, string> = {
+  send: "Channel post send is handled by the Tlon channel plugin.\nUse the channel message tool with channel=tlon instead.",
+  reply: "Channel post reply is handled by the Tlon channel plugin.\nUse the channel message tool with channel=tlon and replyTo instead.",
 };
 
 function getPostsHelp(command?: string): string {
   return command ? POSTS_COMMAND_HELP[command] ?? POSTS_HELP : POSTS_HELP;
 }
 
+function firstPostEditFlagIndex(args: string[]): number {
+  const flagIndexes = ["--title", "--content", "--image"]
+    .map((flag) => args.indexOf(flag))
+    .filter((idx) => idx !== -1);
+  return flagIndexes.length > 0 ? Math.min(...flagIndexes) : args.length;
+}
+
 function validatePostsArgs(args: string[]): void {
   const command = args[0];
-  if (!command || !POSTS_COMMAND_HELP[command]) {
+  if (!command) {
+    printUsageAndExit(POSTS_HELP);
+  }
+  if (POSTS_UNSUPPORTED_COMMAND_ERRORS[command]) {
+    printErrorAndExit(POSTS_UNSUPPORTED_COMMAND_ERRORS[command]);
+  }
+  if (!POSTS_COMMAND_HELP[command]) {
     printUsageAndExit(POSTS_HELP);
   }
 
@@ -80,11 +97,11 @@ function validatePostsArgs(args: string[]): void {
     }
     case "edit": {
       if (!args[1] || !args[2]) printUsageAndExit(POSTS_COMMAND_HELP.edit);
+      const message = args.slice(3, firstPostEditFlagIndex(args)).join(" ");
+      if (!message && !hasOptionValue(args, "content")) {
+        printUsageAndExit(POSTS_COMMAND_HELP.edit);
+      }
       return;
-    }
-    case "send":
-    case "reply": {
-      printUsageAndExit(POSTS_COMMAND_HELP[command]);
     }
   }
 }
@@ -366,12 +383,10 @@ async function main() {
       }
 
       case "send":
-        printUsageAndExit(POSTS_COMMAND_HELP.send);
-        break;
+        printErrorAndExit(POSTS_UNSUPPORTED_COMMAND_ERRORS.send);
 
       case "reply":
-        printUsageAndExit(POSTS_COMMAND_HELP.reply);
-        break;
+        printErrorAndExit(POSTS_UNSUPPORTED_COMMAND_ERRORS.reply);
 
       default:
         printUsageAndExit(POSTS_HELP);

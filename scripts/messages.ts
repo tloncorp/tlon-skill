@@ -78,7 +78,7 @@ function validateMessagesArgs(args: string[]): void {
     case "search": {
       const channelIdx = args.indexOf("--channel");
       const channel = channelIdx !== -1 ? args[channelIdx + 1] : undefined;
-      if (!args[1] || !channel || channel.startsWith("--")) {
+      if (!args[1] || args[1].startsWith("--") || !channel || channel.startsWith("--")) {
         printUsageAndExit(MESSAGES_COMMAND_HELP.search);
       }
       return;

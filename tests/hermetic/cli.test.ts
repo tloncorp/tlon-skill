@@ -91,22 +91,21 @@ async function runCli(args: string[], options: RunOptions = {}): Promise<CliResu
       }
     );
 
-    let timedOut = false;
-    const timeout = setTimeout(() => {
-      timedOut = true;
-      proc.kill();
-    }, CLI_TIMEOUT_MS);
-
-    const [stdout, stderr, exitCode] = await Promise.all([
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const output = Promise.all([
       new Response(proc.stdout).text(),
       new Response(proc.stderr).text(),
       proc.exited,
     ]);
-    clearTimeout(timeout);
+    const timeoutFailure = new Promise<never>((_, reject) => {
+      timeout = setTimeout(() => {
+        proc.kill("SIGKILL");
+        reject(new Error(`CLI timed out after ${CLI_TIMEOUT_MS}ms: ${args.join(" ")}`));
+      }, CLI_TIMEOUT_MS);
+    });
 
-    if (timedOut) {
-      throw new Error(`CLI timed out after ${CLI_TIMEOUT_MS}ms: ${args.join(" ")}`);
-    }
+    const [stdout, stderr, exitCode] = await Promise.race([output, timeoutFailure]);
+    if (timeout) clearTimeout(timeout);
 
     return {
       exitCode,

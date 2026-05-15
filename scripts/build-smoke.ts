@@ -142,7 +142,7 @@ const hostileHelpCommands = [
 ];
 
 for (const command of hostileHelpCommands) {
-  const configPath = join("/nonexistent", `${command.name}-ship.json`);
+  const configPath = join(tmpdir(), "tlon-missing-config", `${command.name}-ship.json`);
 
   assertCase(
     {

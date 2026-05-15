@@ -18,6 +18,7 @@ import {
 import type { Contact } from "@tloncorp/api";
 import { ensureClient, normalizeShip } from "./api-client";
 import {
+  hasOptionValue,
   isHelpArg,
   printErrorAndExit,
   printHelpAndExit,
@@ -32,6 +33,8 @@ interface ContactEditField {
   avatar?: string;
   cover?: string;
 }
+
+const PROFILE_UPDATE_FLAGS = ["nickname", "bio", "status", "avatar", "cover"] as const;
 
 const CONTACTS_HELP = `Usage: tlon contacts <command>
 
@@ -88,11 +91,7 @@ function validateContactsArgs(args: string[]): void {
       return;
     }
     case "update-profile": {
-      if (
-        !["--nickname", "--bio", "--status", "--avatar", "--cover"].some((flag) =>
-          args.includes(flag)
-        )
-      ) {
+      if (!PROFILE_UPDATE_FLAGS.some((flag) => hasOptionValue(args, flag))) {
         printUsageAndExit(CONTACTS_COMMAND_HELP["update-profile"]);
       }
       return;
