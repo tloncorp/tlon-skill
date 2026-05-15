@@ -16,10 +16,18 @@ export function getOption(args: string[], name: string): string | undefined {
   return undefined;
 }
 
-export function hasOptionValue(args: string[], name: string): boolean {
+export function hasOptionValue(
+  args: string[],
+  name: string,
+  knownOptionNames: readonly string[] = []
+): boolean {
   const idx = args.indexOf(`--${name}`);
   const value = idx !== -1 ? args[idx + 1] : undefined;
-  return !!value && !value.startsWith("--");
+  if (!value) {
+    return false;
+  }
+
+  return !knownOptionNames.some((optionName) => value === `--${optionName}`);
 }
 
 /**

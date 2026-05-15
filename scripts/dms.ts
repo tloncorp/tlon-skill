@@ -60,6 +60,17 @@ function getDmsHelp(command?: string): string {
   return command ? DMS_COMMAND_HELP[command] ?? DMS_HELP : DMS_HELP;
 }
 
+function isDmsMessageHelpLiteral(args: string[]): boolean {
+  const command = args[0];
+  if (command === "send") {
+    return !!args[1] && wantsHelp(args.slice(2));
+  }
+  if (command === "reply") {
+    return !!args[1] && !!args[2] && wantsHelp(args.slice(3));
+  }
+  return false;
+}
+
 function validateDmsArgs(args: string[]): void {
   const command = args[0];
   if (!command || !DMS_COMMAND_HELP[command]) {
@@ -72,7 +83,7 @@ function validateDmsArgs(args: string[]): void {
       const message = args.slice(2).join(" ");
       if (!clubId || !message) printUsageAndExit(DMS_COMMAND_HELP.send);
       if (!isClub(clubId)) {
-        printUsageAndExit("Error: send only supports group DMs (club IDs starting with 0v)");
+        printErrorAndExit("send only supports group DMs (club IDs starting with 0v)");
       }
       return;
     }
@@ -82,7 +93,7 @@ function validateDmsArgs(args: string[]): void {
       const message = args.slice(3).join(" ");
       if (!clubId || !postId || !message) printUsageAndExit(DMS_COMMAND_HELP.reply);
       if (!isClub(clubId)) {
-        printUsageAndExit("Error: reply only supports group DMs (club IDs starting with 0v)");
+        printErrorAndExit("reply only supports group DMs (club IDs starting with 0v)");
       }
       return;
     }
@@ -295,7 +306,7 @@ async function main() {
     printHelpAndExit(DMS_HELP);
   }
 
-  if (wantsHelp(args.slice(1))) {
+  if (wantsHelp(args.slice(1)) && !isDmsMessageHelpLiteral(args)) {
     printHelpAndExit(getDmsHelp(command));
   }
 
@@ -311,7 +322,7 @@ async function main() {
         printUsageAndExit(DMS_COMMAND_HELP.send);
       }
       if (!isClub(clubId)) {
-        printUsageAndExit("Error: send only supports group DMs (club IDs starting with 0v)");
+        printErrorAndExit("send only supports group DMs (club IDs starting with 0v)");
       }
       const result = await sendClubMessage(clubId, message);
       if (result.success) {
@@ -331,7 +342,7 @@ async function main() {
         printUsageAndExit(DMS_COMMAND_HELP.reply);
       }
       if (!isClub(clubId)) {
-        printUsageAndExit("Error: reply only supports group DMs (club IDs starting with 0v)");
+        printErrorAndExit("reply only supports group DMs (club IDs starting with 0v)");
       }
       const result = await replyToClub(clubId, postId, message);
       if (result.success) {

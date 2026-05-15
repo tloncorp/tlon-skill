@@ -167,6 +167,21 @@ const hostileHelpCommands = [
   })),
 ];
 
+const literalHelpMessageCommands = [
+  {
+    name: "dms send message",
+    args: ["dms", "send", "0v123", "use", "--help"],
+  },
+  {
+    name: "dms reply message",
+    args: ["dms", "reply", "0v123", "~zod/170.141", "use", "--help"],
+  },
+  {
+    name: "posts edit message",
+    args: ["posts", "edit", "chat/~host/channel", "170.141", "use", "--help"],
+  },
+];
+
 describe("CLI hermetic subprocess behavior", () => {
   it("prints source CLI version without host credentials", async () => {
     const result = await runCli(["--version"]);
@@ -206,6 +221,17 @@ describe("CLI hermetic subprocess behavior", () => {
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("Usage:");
       expect(result.stderr).toBe("");
+    });
+  }
+
+  for (const command of literalHelpMessageCommands) {
+    it(`does not treat ${command.name} literal --help as command help`, async () => {
+      const result = await runCli(command.args);
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).not.toContain("Usage:");
+      expect(result.stderr).toContain("Missing Urbit config");
     });
   }
 });

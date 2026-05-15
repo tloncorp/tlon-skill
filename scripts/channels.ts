@@ -88,6 +88,8 @@ const CHANNELS_COMMAND_HELP: Record<string, string> = {
   "del-readers": `Usage: tlon channels del-readers <group-flag> <nest> <role1> [role2...]\nExample: tlon channels del-readers ~host/group-slug chat/~host/slug admin`,
 };
 
+const CHANNEL_UPDATE_FLAGS = ["title", "description"] as const;
+
 function getChannelsHelp(command?: string) {
   return command ? CHANNELS_COMMAND_HELP[command] ?? CHANNELS_HELP : CHANNELS_HELP;
 }
@@ -122,7 +124,11 @@ function validateChannelsArgs(args: string[]): void {
     }
     case "update": {
       if (!args[1]) printUsageAndExit(CHANNELS_COMMAND_HELP.update);
-      if (!hasOptionValue(args, "title") && !hasOptionValue(args, "description")) {
+      if (
+        !CHANNEL_UPDATE_FLAGS.some((flag) =>
+          hasOptionValue(args, flag, CHANNEL_UPDATE_FLAGS)
+        )
+      ) {
         printUsageAndExit(
           `Error: At least one of --title or --description is required\n${CHANNELS_COMMAND_HELP.update}`
         );

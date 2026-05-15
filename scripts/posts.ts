@@ -62,15 +62,30 @@ const POSTS_UNSUPPORTED_COMMAND_ERRORS: Record<string, string> = {
   reply: "Channel post reply is handled by the Tlon channel plugin.\nUse the channel message tool with channel=tlon and replyTo instead.",
 };
 
+const POST_EDIT_OPTION_FLAGS = ["title", "content", "image"] as const;
+
 function getPostsHelp(command?: string): string {
   return command ? POSTS_COMMAND_HELP[command] ?? POSTS_HELP : POSTS_HELP;
 }
 
 function firstPostEditFlagIndex(args: string[]): number {
-  const flagIndexes = ["--title", "--content", "--image"]
-    .map((flag) => args.indexOf(flag))
+  const flagIndexes = POST_EDIT_OPTION_FLAGS
+    .map((flag) => args.indexOf(`--${flag}`))
     .filter((idx) => idx !== -1);
   return flagIndexes.length > 0 ? Math.min(...flagIndexes) : args.length;
+}
+
+function getPostEditMessage(args: string[]): string {
+  return args.slice(3, firstPostEditFlagIndex(args)).join(" ");
+}
+
+function isPostEditMessageHelpLiteral(args: string[]): boolean {
+  return (
+    args[0] === "edit" &&
+    !!args[1] &&
+    !!args[2] &&
+    wantsHelp(args.slice(3, firstPostEditFlagIndex(args)))
+  );
 }
 
 function validatePostsArgs(args: string[]): void {
@@ -97,8 +112,8 @@ function validatePostsArgs(args: string[]): void {
     }
     case "edit": {
       if (!args[1] || !args[2]) printUsageAndExit(POSTS_COMMAND_HELP.edit);
-      const message = args.slice(3, firstPostEditFlagIndex(args)).join(" ");
-      if (!message && !hasOptionValue(args, "content")) {
+      const message = getPostEditMessage(args);
+      if (!message && !hasOptionValue(args, "content", POST_EDIT_OPTION_FLAGS)) {
         printUsageAndExit(POSTS_COMMAND_HELP.edit);
       }
       return;
@@ -274,7 +289,7 @@ async function main() {
     printHelpAndExit(POSTS_HELP);
   }
 
-  if (wantsHelp(args.slice(1))) {
+  if (wantsHelp(args.slice(1)) && !isPostEditMessageHelpLiteral(args)) {
     printHelpAndExit(getPostsHelp(command));
   }
 
@@ -319,12 +334,6 @@ async function main() {
         const contentIdx = args.indexOf("--content");
         const imageIdx = args.indexOf("--image");
         
-        // Find where flags start
-        let flagStart = args.length;
-        if (titleIdx !== -1 && titleIdx < flagStart) flagStart = titleIdx;
-        if (contentIdx !== -1 && contentIdx < flagStart) flagStart = contentIdx;
-        if (imageIdx !== -1 && imageIdx < flagStart) flagStart = imageIdx;
-        
         const newTitle = titleIdx !== -1 ? args[titleIdx + 1] : undefined;
         const contentFile = contentIdx !== -1 ? args[contentIdx + 1] : undefined;
         const newImage = imageIdx !== -1 ? args[imageIdx + 1] : undefined;
@@ -352,7 +361,7 @@ async function main() {
           result = await editChannelPostWithContent(channel, postId, content, metadata);
         } else {
           // Plain text/markdown message
-          const message = args.slice(3, flagStart).join(" ");
+          const message = getPostEditMessage(args);
           if (!message) {
             printUsageAndExit(POSTS_COMMAND_HELP.edit);
           }

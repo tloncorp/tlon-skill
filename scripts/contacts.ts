@@ -91,7 +91,11 @@ function validateContactsArgs(args: string[]): void {
       return;
     }
     case "update-profile": {
-      if (!PROFILE_UPDATE_FLAGS.some((flag) => hasOptionValue(args, flag))) {
+      if (
+        !PROFILE_UPDATE_FLAGS.some((flag) =>
+          hasOptionValue(args, flag, PROFILE_UPDATE_FLAGS)
+        )
+      ) {
         printUsageAndExit(CONTACTS_COMMAND_HELP["update-profile"]);
       }
       return;

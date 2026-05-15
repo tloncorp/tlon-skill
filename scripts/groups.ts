@@ -71,6 +71,7 @@ import type { Group } from "@tloncorp/api";
 import { ensureClient, getCurrentShip, normalizeShip } from "./api-client";
 import {
   getOption,
+  hasOptionValue,
   isHelpArg,
   looksLikePositionalChannelKind,
   printErrorAndExit,
@@ -80,6 +81,7 @@ import {
 } from "./cli-utils";
 
 const ADMIN_ROLE_ID = "admin";
+const GROUP_UPDATE_FLAGS = ["title", "description", "image", "cover"] as const;
 
 // Generate a random short ID for the group
 function generateGroupSlug(): string {
@@ -196,9 +198,21 @@ function validateGroupsArgs(args: string[]): void {
     case "reject-invite":
     case "cancel-join":
     case "rescind-request":
-    case "delete":
-    case "update": {
+    case "delete": {
       if (!args[1]) printUsageAndExit(GROUPS_COMMAND_HELP[command]);
+      return;
+    }
+    case "update": {
+      if (!args[1]) printUsageAndExit(GROUPS_COMMAND_HELP.update);
+      if (
+        !GROUP_UPDATE_FLAGS.some((flag) =>
+          hasOptionValue(args, flag, GROUP_UPDATE_FLAGS)
+        )
+      ) {
+        printUsageAndExit(
+          `Error: At least one of --title, --description, --image, or --cover is required\n${GROUPS_COMMAND_HELP.update}`
+        );
+      }
       return;
     }
     case "invite":

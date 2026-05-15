@@ -133,6 +133,32 @@ for (const testCase of CLI_MATRIX_CASES) {
   assertCase(testCase);
 }
 
+const literalHelpMessageCommands = [
+  {
+    name: "dms send message",
+    args: ["dms", "send", "0v123", "use", "--help"],
+  },
+  {
+    name: "dms reply message",
+    args: ["dms", "reply", "0v123", "~zod/170.141", "use", "--help"],
+  },
+  {
+    name: "posts edit message",
+    args: ["posts", "edit", "chat/~host/channel", "170.141", "use", "--help"],
+  },
+];
+
+for (const command of literalHelpMessageCommands) {
+  assertCase({
+    name: `${command.name} literal --help reaches auth`,
+    args: command.args,
+    expectedExitCode: 1,
+    stdout: "",
+    stderrIncludes: ["Missing Urbit config"],
+    stderrExcludes: ["Usage:"],
+  });
+}
+
 const hostileHelpCommands = [
   { name: "top-level", args: ["--help"] },
   ...COMMAND_FAMILIES.map((family) => ({

@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   getOption,
   getRequiredOptionValue,
+  hasOptionValue,
   looksLikePositionalChannelKind,
   wantsHelp,
 } from "./cli-utils";
@@ -54,6 +55,20 @@ describe("cli-utils", () => {
       expect(() => getRequiredOptionValue(["--content", "--markdown", "post.md"], 0)).toThrow(
         "--content requires a value"
       );
+    });
+  });
+
+  describe("hasOptionValue", () => {
+    it("allows values that start with dashes when they are not known options", () => {
+      const args = ["update-profile", "--bio", "--starts-with-dashes"];
+
+      expect(hasOptionValue(args, "bio", ["nickname", "bio"])).toBe(true);
+    });
+
+    it("treats a following known option as a missing value", () => {
+      const args = ["update-profile", "--bio", "--nickname", "Pat"];
+
+      expect(hasOptionValue(args, "bio", ["nickname", "bio"])).toBe(false);
     });
   });
 });

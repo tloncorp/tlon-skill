@@ -217,6 +217,19 @@ async function getUnreads() {
   }
 }
 
+const ACTIVITY_HANDLERS = {
+  mentions: (limit: number) => getActivity("mentions", limit),
+  replies: (limit: number) => getActivity("replies", limit),
+  all: (limit: number) => getActivity("all", limit),
+  unreads: (_limit: number) => getUnreads(),
+} satisfies Record<string, (limit: number) => Promise<void>>;
+
+type ActivityCommand = keyof typeof ACTIVITY_HANDLERS;
+
+function isActivityCommand(command: string): command is ActivityCommand {
+  return Object.prototype.hasOwnProperty.call(ACTIVITY_HANDLERS, command);
+}
+
 // Main
 async function main() {
   const args = process.argv.slice(2);
@@ -230,7 +243,7 @@ async function main() {
     printUsageAndExit(ACTIVITY_HELP);
   }
 
-  if (!["mentions", "replies", "all", "unreads"].includes(command)) {
+  if (!isActivityCommand(command)) {
     printUsageAndExit(ACTIVITY_HELP);
   }
 
@@ -243,20 +256,7 @@ async function main() {
     limit = parseInt(args[limitIdx + 1], 10);
   }
   
-  switch (command) {
-    case 'mentions':
-      await getActivity('mentions', limit);
-      break;
-    case 'replies':
-      await getActivity('replies', limit);
-      break;
-    case 'all':
-      await getActivity('all', limit);
-      break;
-    case 'unreads':
-      await getUnreads();
-      break;
-  }
+  await ACTIVITY_HANDLERS[command](limit);
   process.exit(0);
 }
 

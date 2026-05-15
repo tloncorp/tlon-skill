@@ -178,6 +178,11 @@ export const SPECIAL_INPUT_CASES: CliCase[] = [
     "Usage: tlon posts edit"
   ),
   usageErrorCase(
+    "groups update missing update flag",
+    ["groups", "update", "~host/group-slug"],
+    "At least one of --title, --description, --image, or --cover is required"
+  ),
+  usageErrorCase(
     "hooks init invalid type",
     ["hooks", "init", "my-hook", "--type", "definitely-not-a-type"],
     "Invalid --type: definitely-not-a-type"
