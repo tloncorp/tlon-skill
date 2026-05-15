@@ -29,7 +29,6 @@ import {
   printErrorAndExit,
   printHelpAndExit,
   printUsageAndExit,
-  wantsHelp,
 } from "./cli-utils";
 
 // Helper to create a cord (UTF-8 string as little-endian atom) from a JS string
@@ -118,6 +117,10 @@ const HOOKS_COMMAND_HELP: Record<string, string> = {
 
 function getHooksHelp(command?: string): string {
   return command ? HOOKS_COMMAND_HELP[command] ?? HOOKS_HELP : HOOKS_HELP;
+}
+
+function isHooksHelpRequest(args: string[]): boolean {
+  return args.length === 2 && isHelpArg(args[1]);
 }
 
 function validateHooksArgs(args: string[]): void {
@@ -543,7 +546,7 @@ async function main() {
     printHelpAndExit(HOOKS_HELP);
   }
 
-  if (wantsHelp(args.slice(1))) {
+  if (isHooksHelpRequest(args)) {
     printHelpAndExit(getHooksHelp(command));
   }
 

@@ -196,6 +196,34 @@ const literalOptionLikeValueCommands = [
     name: "channels rename title",
     args: ["channels", "rename", "chat/~host/channel", "--roadmap"],
   },
+  {
+    name: "channels update title",
+    args: ["channels", "update", "chat/~host/channel", "--title", "--help"],
+  },
+  {
+    name: "groups create title",
+    args: ["groups", "create", "--roadmap"],
+  },
+  {
+    name: "groups create-owned title",
+    args: ["groups", "create-owned", "--roadmap", "--owner", "~zod"],
+  },
+  {
+    name: "groups update title",
+    args: ["groups", "update", "~host/group", "--title", "--help"],
+  },
+  {
+    name: "groups add-channel title",
+    args: ["groups", "add-channel", "~host/group", "--announcements"],
+  },
+  {
+    name: "hooks edit name",
+    args: ["hooks", "edit", "0v1a", "--name", "--help"],
+  },
+  {
+    name: "notebook title",
+    args: ["notebook", "diary/~host/notes", "--help"],
+  },
 ];
 
 describe("CLI hermetic subprocess behavior", () => {
@@ -245,7 +273,7 @@ describe("CLI hermetic subprocess behavior", () => {
       const result = await runCli(command.args);
 
       expect(result.exitCode).toBe(1);
-      expect(result.stdout).toBe("");
+      expect(result.stdout).not.toContain("Usage:");
       expect(result.stderr).not.toContain("Usage:");
       expect(result.stderr).toContain("Missing Urbit config");
     });

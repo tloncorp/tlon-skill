@@ -23,10 +23,10 @@ import type { Story } from "@tloncorp/api";
 import { ensureClient } from "./api-client";
 import {
   getRequiredOptionValue,
+  isHelpArg,
   printErrorAndExit,
   printHelpAndExit,
   printUsageAndExit,
-  wantsHelp,
 } from "./cli-utils";
 import { normalizeNotebookContent, type NotebookStory } from "./notebook-content";
 import { markdownToStory } from "./story";
@@ -57,6 +57,10 @@ Examples:
   tlon notebook diary/~host/notes "My Post" --image https://example.com/img.png
   echo '[{"inline":["Hello!"]}]' | tlon notebook diary/~host/notes "Test" --stdin
   tlon notebook diary/~host/notes "Markdown Post" --markdown post.md`;
+
+function isNotebookHelpRequest(args: string[]): boolean {
+  return args.length === 1 && isHelpArg(args[0]);
+}
 
 function toApiStory(content: NotebookStory): Story {
   return content as unknown as Story;
@@ -95,7 +99,7 @@ export async function postToNotebook(
 async function main() {
   const args = process.argv.slice(2);
 
-  if (wantsHelp(args)) {
+  if (isNotebookHelpRequest(args)) {
     printHelpAndExit(NOTEBOOK_HELP);
   }
 

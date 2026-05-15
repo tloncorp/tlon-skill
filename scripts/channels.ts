@@ -38,7 +38,6 @@ import {
   printErrorAndExit,
   printHelpAndExit,
   printUsageAndExit,
-  wantsHelp,
 } from "./cli-utils";
 
 function generateChannelSlug(): string {
@@ -97,6 +96,10 @@ function getChannelsHelp(command?: string) {
 
 function isKnownChannelCreateOption(arg: string | undefined): boolean {
   return CHANNEL_CREATE_FLAGS.some((flag) => arg === `--${flag}`);
+}
+
+function isChannelsHelpRequest(args: string[]): boolean {
+  return args.length === 2 && isHelpArg(args[1]);
 }
 
 function validateChannelsArgs(args: string[]): void {
@@ -479,7 +482,7 @@ async function main() {
     printHelpAndExit(CHANNELS_HELP);
   }
 
-  if (wantsHelp(args.slice(1))) {
+  if (isChannelsHelpRequest(args)) {
     printHelpAndExit(getChannelsHelp(command));
   }
 

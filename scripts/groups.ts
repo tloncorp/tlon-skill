@@ -77,11 +77,13 @@ import {
   printErrorAndExit,
   printHelpAndExit,
   printUsageAndExit,
-  wantsHelp,
 } from "./cli-utils";
 
 const ADMIN_ROLE_ID = "admin";
+const GROUP_CREATE_FLAGS = ["description"] as const;
+const GROUP_CREATE_OWNED_FLAGS = ["owner", "description"] as const;
 const GROUP_UPDATE_FLAGS = ["title", "description", "image", "cover"] as const;
+const GROUP_ADD_CHANNEL_FLAGS = ["kind", "description"] as const;
 
 // Generate a random short ID for the group
 function generateGroupSlug(): string {
@@ -168,6 +170,17 @@ function getGroupsHelp(command?: string) {
   return command ? GROUPS_COMMAND_HELP[command] ?? GROUPS_HELP : GROUPS_HELP;
 }
 
+function isKnownGroupsOption(
+  arg: string | undefined,
+  optionNames: readonly string[]
+): boolean {
+  return optionNames.some((optionName) => arg === `--${optionName}`);
+}
+
+function isGroupsHelpRequest(args: string[]): boolean {
+  return args.length === 2 && isHelpArg(args[1]);
+}
+
 function validateGroupsArgs(args: string[]): void {
   const command = args[0];
   if (!command || !GROUPS_COMMAND_HELP[command]) {
@@ -179,13 +192,20 @@ function validateGroupsArgs(args: string[]): void {
       return;
     case "create": {
       const title = args[1];
-      if (!title || title.startsWith("--")) printUsageAndExit(GROUPS_COMMAND_HELP.create);
+      if (!title || isKnownGroupsOption(title, GROUP_CREATE_FLAGS)) {
+        printUsageAndExit(GROUPS_COMMAND_HELP.create);
+      }
       return;
     }
     case "create-owned": {
       const title = args[1];
       const owner = getOption(args, "owner");
-      if (!title || title.startsWith("--") || !owner || owner.startsWith("--")) {
+      if (
+        !title ||
+        isKnownGroupsOption(title, GROUP_CREATE_OWNED_FLAGS) ||
+        !owner ||
+        owner.startsWith("--")
+      ) {
         printUsageAndExit(GROUPS_COMMAND_HELP["create-owned"]);
       }
       return;
@@ -250,7 +270,7 @@ function validateGroupsArgs(args: string[]): void {
       return;
     }
     case "add-channel": {
-      if (!args[1] || !args[2] || args[2].startsWith("--")) {
+      if (!args[1] || !args[2] || isKnownGroupsOption(args[2], GROUP_ADD_CHANNEL_FLAGS)) {
         printUsageAndExit(GROUPS_COMMAND_HELP["add-channel"]);
       }
       if (looksLikePositionalChannelKind(args, 2)) {
@@ -1146,7 +1166,7 @@ async function main() {
     printHelpAndExit(GROUPS_HELP);
   }
 
-  if (wantsHelp(args.slice(1))) {
+  if (isGroupsHelpRequest(args)) {
     printHelpAndExit(getGroupsHelp(command));
   }
 
@@ -1172,7 +1192,12 @@ async function main() {
     case "create-owned": {
       const title = args[1];
       const owner = getOption(args, "owner");
-      if (!title || title.startsWith("--") || !owner || owner.startsWith("--")) {
+      if (
+        !title ||
+        isKnownGroupsOption(title, GROUP_CREATE_OWNED_FLAGS) ||
+        !owner ||
+        owner.startsWith("--")
+      ) {
         console.error(GROUPS_COMMAND_HELP["create-owned"]);
         process.exit(1);
       }

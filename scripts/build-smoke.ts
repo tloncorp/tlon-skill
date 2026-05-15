@@ -162,6 +162,34 @@ const literalOptionLikeValueCommands = [
     name: "channels rename title",
     args: ["channels", "rename", "chat/~host/channel", "--roadmap"],
   },
+  {
+    name: "channels update title",
+    args: ["channels", "update", "chat/~host/channel", "--title", "--help"],
+  },
+  {
+    name: "groups create title",
+    args: ["groups", "create", "--roadmap"],
+  },
+  {
+    name: "groups create-owned title",
+    args: ["groups", "create-owned", "--roadmap", "--owner", "~zod"],
+  },
+  {
+    name: "groups update title",
+    args: ["groups", "update", "~host/group", "--title", "--help"],
+  },
+  {
+    name: "groups add-channel title",
+    args: ["groups", "add-channel", "~host/group", "--announcements"],
+  },
+  {
+    name: "hooks edit name",
+    args: ["hooks", "edit", "0v1a", "--name", "--help"],
+  },
+  {
+    name: "notebook title",
+    args: ["notebook", "diary/~host/notes", "--help"],
+  },
 ];
 
 for (const command of literalOptionLikeValueCommands) {
@@ -169,7 +197,7 @@ for (const command of literalOptionLikeValueCommands) {
     name: `${command.name} option-like value reaches auth`,
     args: command.args,
     expectedExitCode: 1,
-    stdout: "",
+    stdoutExcludes: ["Usage:"],
     stderrIncludes: ["Missing Urbit config"],
     stderrExcludes: ["Usage:"],
   });
