@@ -25,7 +25,9 @@ import { ensureClient } from "./api-client";
 import {
   getOption,
   hasFlag,
+  hasOptionValue,
   isHelpArg,
+  isSubcommandHelpRequest,
   printErrorAndExit,
   printHelpAndExit,
   printUsageAndExit,
@@ -73,6 +75,7 @@ function sleep(ms: number): Promise<void> {
 
 const HOOK_TEMPLATE_TYPES = ["on-post", "cron", "moderation", "bare"] as const;
 type HookTemplateType = (typeof HOOK_TEMPLATE_TYPES)[number];
+const HOOK_INIT_OPTIONS = ["type", "out", "force"] as const;
 
 function isHookTemplateType(value: string): value is HookTemplateType {
   return (HOOK_TEMPLATE_TYPES as readonly string[]).includes(value);
@@ -119,8 +122,23 @@ function getHooksHelp(command?: string): string {
   return command ? HOOKS_COMMAND_HELP[command] ?? HOOKS_HELP : HOOKS_HELP;
 }
 
-function isHooksHelpRequest(args: string[]): boolean {
-  return args.length === 2 && isHelpArg(args[1]);
+function getHookInitType(args: string[]): HookTemplateType {
+  if (!hasFlag(args, "type")) {
+    return "on-post";
+  }
+
+  if (!hasOptionValue(args, "type", HOOK_INIT_OPTIONS)) {
+    printUsageAndExit(HOOKS_COMMAND_HELP.init);
+  }
+
+  const typeRaw = getOption(args, "type");
+  if (!typeRaw || !isHookTemplateType(typeRaw)) {
+    printUsageAndExit(
+      `Invalid --type: ${typeRaw ?? ""}. Expected one of: on-post, cron, moderation, bare`
+    );
+  }
+
+  return typeRaw;
 }
 
 function validateHooksArgs(args: string[]): void {
@@ -134,12 +152,7 @@ function validateHooksArgs(args: string[]): void {
       return;
     case "init": {
       if (!args[1]) printUsageAndExit(HOOKS_COMMAND_HELP.init);
-      const typeRaw = getOption(args, "type") || "on-post";
-      if (!isHookTemplateType(typeRaw)) {
-        printUsageAndExit(
-          `Invalid --type: ${typeRaw}. Expected one of: on-post, cron, moderation, bare`
-        );
-      }
+      getHookInitType(args);
       return;
     }
     case "get":
@@ -546,7 +559,7 @@ async function main() {
     printHelpAndExit(HOOKS_HELP);
   }
 
-  if (isHooksHelpRequest(args)) {
+  if (isSubcommandHelpRequest(args)) {
     printHelpAndExit(getHooksHelp(command));
   }
 
@@ -560,7 +573,7 @@ async function main() {
       if (!name) {
         printUsageAndExit(HOOKS_COMMAND_HELP.init);
       }
-      const typeRaw = (getOption(args, "type") || "on-post") as HookTemplateType;
+      const typeRaw = getHookInitType(args);
       const out = getOption(args, "out");
       const force = hasFlag(args, "force");
       initHookTemplate(name, typeRaw, out, force);

@@ -34,6 +34,7 @@ import {
   getOption,
   hasOptionValue,
   isHelpArg,
+  isSubcommandHelpRequest,
   looksLikePositionalChannelKind,
   printErrorAndExit,
   printHelpAndExit,
@@ -87,19 +88,10 @@ const CHANNELS_COMMAND_HELP: Record<string, string> = {
   "del-readers": `Usage: tlon channels del-readers <group-flag> <nest> <role1> [role2...]\nExample: tlon channels del-readers ~host/group-slug chat/~host/slug admin`,
 };
 
-const CHANNEL_CREATE_FLAGS = ["kind", "description"] as const;
 const CHANNEL_UPDATE_FLAGS = ["title", "description"] as const;
 
 function getChannelsHelp(command?: string) {
   return command ? CHANNELS_COMMAND_HELP[command] ?? CHANNELS_HELP : CHANNELS_HELP;
-}
-
-function isKnownChannelCreateOption(arg: string | undefined): boolean {
-  return CHANNEL_CREATE_FLAGS.some((flag) => arg === `--${flag}`);
-}
-
-function isChannelsHelpRequest(args: string[]): boolean {
-  return args.length === 2 && isHelpArg(args[1]);
 }
 
 function validateChannelsArgs(args: string[]): void {
@@ -120,7 +112,7 @@ function validateChannelsArgs(args: string[]): void {
       return;
     }
     case "create": {
-      if (!args[1] || !args[2] || isKnownChannelCreateOption(args[2])) {
+      if (!args[1] || args[2] === undefined) {
         printUsageAndExit(CHANNELS_COMMAND_HELP.create);
       }
       if (looksLikePositionalChannelKind(args, 2)) {
@@ -482,7 +474,7 @@ async function main() {
     printHelpAndExit(CHANNELS_HELP);
   }
 
-  if (isChannelsHelpRequest(args)) {
+  if (isSubcommandHelpRequest(args)) {
     printHelpAndExit(getChannelsHelp(command));
   }
 
@@ -528,7 +520,7 @@ async function main() {
       case "create": {
         const groupId = args[1];
         const title = args[2];
-        if (!groupId || !title) {
+        if (!groupId || title === undefined) {
           console.error(CHANNELS_COMMAND_HELP.create);
           process.exit(1);
         }
@@ -537,8 +529,8 @@ async function main() {
           console.error(CHANNELS_COMMAND_HELP.create);
           process.exit(1);
         }
-        const kind = (getOption(args, "kind") as "chat" | "diary" | "heap") || "chat";
-        const description = getOption(args, "description") || "";
+        const kind = (getOption(args, "kind", 3) as "chat" | "diary" | "heap") || "chat";
+        const description = getOption(args, "description", 3) || "";
         await createChannelInGroup(groupId, title, kind, description);
         break;
       }

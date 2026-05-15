@@ -73,6 +73,7 @@ import {
   getOption,
   hasOptionValue,
   isHelpArg,
+  isSubcommandHelpRequest,
   looksLikePositionalChannelKind,
   printErrorAndExit,
   printHelpAndExit,
@@ -80,10 +81,7 @@ import {
 } from "./cli-utils";
 
 const ADMIN_ROLE_ID = "admin";
-const GROUP_CREATE_FLAGS = ["description"] as const;
-const GROUP_CREATE_OWNED_FLAGS = ["owner", "description"] as const;
 const GROUP_UPDATE_FLAGS = ["title", "description", "image", "cover"] as const;
-const GROUP_ADD_CHANNEL_FLAGS = ["kind", "description"] as const;
 
 // Generate a random short ID for the group
 function generateGroupSlug(): string {
@@ -170,17 +168,6 @@ function getGroupsHelp(command?: string) {
   return command ? GROUPS_COMMAND_HELP[command] ?? GROUPS_HELP : GROUPS_HELP;
 }
 
-function isKnownGroupsOption(
-  arg: string | undefined,
-  optionNames: readonly string[]
-): boolean {
-  return optionNames.some((optionName) => arg === `--${optionName}`);
-}
-
-function isGroupsHelpRequest(args: string[]): boolean {
-  return args.length === 2 && isHelpArg(args[1]);
-}
-
 function validateGroupsArgs(args: string[]): void {
   const command = args[0];
   if (!command || !GROUPS_COMMAND_HELP[command]) {
@@ -192,20 +179,15 @@ function validateGroupsArgs(args: string[]): void {
       return;
     case "create": {
       const title = args[1];
-      if (!title || isKnownGroupsOption(title, GROUP_CREATE_FLAGS)) {
+      if (title === undefined) {
         printUsageAndExit(GROUPS_COMMAND_HELP.create);
       }
       return;
     }
     case "create-owned": {
       const title = args[1];
-      const owner = getOption(args, "owner");
-      if (
-        !title ||
-        isKnownGroupsOption(title, GROUP_CREATE_OWNED_FLAGS) ||
-        !owner ||
-        owner.startsWith("--")
-      ) {
+      const owner = getOption(args, "owner", 2);
+      if (title === undefined || !owner || owner.startsWith("--")) {
         printUsageAndExit(GROUPS_COMMAND_HELP["create-owned"]);
       }
       return;
@@ -270,7 +252,7 @@ function validateGroupsArgs(args: string[]): void {
       return;
     }
     case "add-channel": {
-      if (!args[1] || !args[2] || isKnownGroupsOption(args[2], GROUP_ADD_CHANNEL_FLAGS)) {
+      if (!args[1] || args[2] === undefined) {
         printUsageAndExit(GROUPS_COMMAND_HELP["add-channel"]);
       }
       if (looksLikePositionalChannelKind(args, 2)) {
@@ -1166,7 +1148,7 @@ async function main() {
     printHelpAndExit(GROUPS_HELP);
   }
 
-  if (isGroupsHelpRequest(args)) {
+  if (isSubcommandHelpRequest(args)) {
     printHelpAndExit(getGroupsHelp(command));
   }
 
@@ -1181,27 +1163,22 @@ async function main() {
 
     case "create": {
       const title = args[1];
-      if (!title) {
+      if (title === undefined) {
         printUsageAndExit(GROUPS_COMMAND_HELP.create);
       }
-      const description = getOption(args, "description") || "";
+      const description = getOption(args, "description", 2) || "";
       await createGroupWithChannel(title, description);
       break;
     }
 
     case "create-owned": {
       const title = args[1];
-      const owner = getOption(args, "owner");
-      if (
-        !title ||
-        isKnownGroupsOption(title, GROUP_CREATE_OWNED_FLAGS) ||
-        !owner ||
-        owner.startsWith("--")
-      ) {
+      const owner = getOption(args, "owner", 2);
+      if (title === undefined || !owner || owner.startsWith("--")) {
         console.error(GROUPS_COMMAND_HELP["create-owned"]);
         process.exit(1);
       }
-      const description = getOption(args, "description") || "";
+      const description = getOption(args, "description", 2) || "";
       await createOwnedGroup(title, owner, description);
       break;
     }
@@ -1466,7 +1443,7 @@ async function main() {
     case "add-channel": {
       const groupId = args[1];
       const title = args[2];
-      if (!groupId || !title) {
+      if (!groupId || title === undefined) {
         console.error(GROUPS_COMMAND_HELP["add-channel"]);
         process.exit(1);
       }
@@ -1475,8 +1452,8 @@ async function main() {
         console.error(GROUPS_COMMAND_HELP["add-channel"]);
         process.exit(1);
       }
-      const kind = (getOption(args, "kind") as "chat" | "diary" | "heap") || "chat";
-      const description = getOption(args, "description") || "";
+      const kind = (getOption(args, "kind", 3) as "chat" | "diary" | "heap") || "chat";
+      const description = getOption(args, "description", 3) || "";
       await addChannel(groupId, title, kind, description);
       break;
     }

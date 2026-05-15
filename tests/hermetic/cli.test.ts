@@ -167,85 +167,6 @@ const hostileHelpCommands = [
   })),
 ];
 
-const literalOptionLikeValueCommands = [
-  {
-    name: "dms send message",
-    args: ["dms", "send", "0v123", "use", "--help"],
-  },
-  {
-    name: "dms reply message",
-    args: ["dms", "reply", "0v123", "~zod/170.141", "use", "--help"],
-  },
-  {
-    name: "posts edit message",
-    args: ["posts", "edit", "chat/~host/channel", "170.141", "use", "--help"],
-  },
-  {
-    name: "messages search query",
-    args: ["messages", "search", "--channel", "--channel", "chat/~host/channel"],
-  },
-  {
-    name: "contacts update-profile value",
-    args: ["contacts", "update-profile", "--status", "--help"],
-  },
-  {
-    name: "contacts update value",
-    args: ["contacts", "update", "~zod", "--nickname", "-h"],
-  },
-  {
-    name: "channels create title",
-    args: ["channels", "create", "~host/group", "--roadmap"],
-  },
-  {
-    name: "channels rename title",
-    args: ["channels", "rename", "chat/~host/channel", "--roadmap"],
-  },
-  {
-    name: "channels update title",
-    args: ["channels", "update", "chat/~host/channel", "--title", "--help"],
-  },
-  {
-    name: "groups create title",
-    args: ["groups", "create", "--roadmap"],
-  },
-  {
-    name: "groups create-owned title",
-    args: ["groups", "create-owned", "--roadmap", "--owner", "~zod"],
-  },
-  {
-    name: "groups update title",
-    args: ["groups", "update", "~host/group", "--title", "--help"],
-  },
-  {
-    name: "groups add-channel title",
-    args: ["groups", "add-channel", "~host/group", "--announcements"],
-  },
-  {
-    name: "hooks edit name",
-    args: ["hooks", "edit", "0v1a", "--name", "--help"],
-  },
-  {
-    name: "notebook title",
-    args: ["notebook", "diary/~host/notes", "--help"],
-  },
-  {
-    name: "contacts update-profile empty value",
-    args: ["contacts", "update-profile", "--status", ""],
-  },
-  {
-    name: "contacts update empty value",
-    args: ["contacts", "update", "~zod", "--nickname", ""],
-  },
-  {
-    name: "channels update empty value",
-    args: ["channels", "update", "chat/~host/channel", "--description", ""],
-  },
-  {
-    name: "groups update empty value",
-    args: ["groups", "update", "~host/group", "--description", ""],
-  },
-];
-
 describe("CLI hermetic subprocess behavior", () => {
   it("prints source CLI version without host credentials", async () => {
     const result = await runCli(["--version"]);
@@ -288,14 +209,4 @@ describe("CLI hermetic subprocess behavior", () => {
     });
   }
 
-  for (const command of literalOptionLikeValueCommands) {
-    it(`does not treat ${command.name} option-like value as local CLI syntax`, async () => {
-      const result = await runCli(command.args);
-
-      expect(result.exitCode).toBe(1);
-      expect(result.stdout).not.toContain("Usage:");
-      expect(result.stderr).not.toContain("Usage:");
-      expect(result.stderr).toContain("Missing Urbit config");
-    });
-  }
 });

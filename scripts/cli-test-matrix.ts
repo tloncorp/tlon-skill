@@ -117,6 +117,17 @@ function usageErrorCase(name: string, args: string[], usage = "Usage:"): CliCase
   };
 }
 
+function authRequiredCase(name: string, args: string[]): CliCase {
+  return {
+    name,
+    args,
+    expectedExitCode: 1,
+    stdoutExcludes: ["Usage:"],
+    stderrIncludes: ["Missing Urbit config"],
+    stderrExcludes: ["Usage:"],
+  };
+}
+
 export const TOP_LEVEL_HELP_CASE = helpCase("top-level --help", ["--help"], "tlon");
 
 export const UNKNOWN_TOP_LEVEL_CASE: CliCase = {
@@ -187,6 +198,16 @@ export const SPECIAL_INPUT_CASES: CliCase[] = [
     ["hooks", "init", "my-hook", "--type", "definitely-not-a-type"],
     "Invalid --type: definitely-not-a-type"
   ),
+  usageErrorCase(
+    "hooks init missing type value",
+    ["hooks", "init", "my-hook", "--type"],
+    "Usage: tlon hooks init"
+  ),
+  usageErrorCase(
+    "hooks init type followed by known option",
+    ["hooks", "init", "my-hook", "--type", "--out", "hook.hoon"],
+    "Usage: tlon hooks init"
+  ),
   {
     ...usageErrorCase(
       "upload unknown option",
@@ -230,6 +251,159 @@ export const NESTED_HELP_CASES: CliCase[] = [
   ),
 ];
 
+export const LITERAL_OPTION_LIKE_VALUE_CASES: CliCase[] = [
+  authRequiredCase("dms send message option-like value reaches auth", [
+    "dms",
+    "send",
+    "0v123",
+    "use",
+    "--help",
+  ]),
+  authRequiredCase("dms reply message option-like value reaches auth", [
+    "dms",
+    "reply",
+    "0v123",
+    "~zod/170.141",
+    "use",
+    "--help",
+  ]),
+  authRequiredCase("posts edit message option-like value reaches auth", [
+    "posts",
+    "edit",
+    "chat/~host/channel",
+    "170.141",
+    "use",
+    "--help",
+  ]),
+  authRequiredCase("messages search query option-like value reaches auth", [
+    "messages",
+    "search",
+    "--channel",
+    "--channel",
+    "chat/~host/channel",
+  ]),
+  authRequiredCase("contacts update-profile value option-like value reaches auth", [
+    "contacts",
+    "update-profile",
+    "--status",
+    "--help",
+  ]),
+  authRequiredCase("contacts update value option-like value reaches auth", [
+    "contacts",
+    "update",
+    "~zod",
+    "--nickname",
+    "-h",
+  ]),
+  authRequiredCase("channels create title option-like value reaches auth", [
+    "channels",
+    "create",
+    "~host/group",
+    "--roadmap",
+  ]),
+  authRequiredCase("channels create exact flag-name title reaches auth", [
+    "channels",
+    "create",
+    "~host/group",
+    "--kind",
+  ]),
+  authRequiredCase("channels rename title option-like value reaches auth", [
+    "channels",
+    "rename",
+    "chat/~host/channel",
+    "--roadmap",
+  ]),
+  authRequiredCase("channels update title option-like value reaches auth", [
+    "channels",
+    "update",
+    "chat/~host/channel",
+    "--title",
+    "--help",
+  ]),
+  authRequiredCase("groups create title option-like value reaches auth", [
+    "groups",
+    "create",
+    "--roadmap",
+  ]),
+  authRequiredCase("groups create exact flag-name title reaches auth", [
+    "groups",
+    "create",
+    "--description",
+  ]),
+  authRequiredCase("groups create-owned title option-like value reaches auth", [
+    "groups",
+    "create-owned",
+    "--roadmap",
+    "--owner",
+    "~zod",
+  ]),
+  authRequiredCase("groups create-owned exact flag-name title reaches auth", [
+    "groups",
+    "create-owned",
+    "--owner",
+    "--owner",
+    "~zod",
+  ]),
+  authRequiredCase("groups update title option-like value reaches auth", [
+    "groups",
+    "update",
+    "~host/group",
+    "--title",
+    "--help",
+  ]),
+  authRequiredCase("groups add-channel title option-like value reaches auth", [
+    "groups",
+    "add-channel",
+    "~host/group",
+    "--announcements",
+  ]),
+  authRequiredCase("groups add-channel exact flag-name title reaches auth", [
+    "groups",
+    "add-channel",
+    "~host/group",
+    "--kind",
+  ]),
+  authRequiredCase("hooks edit name option-like value reaches auth", [
+    "hooks",
+    "edit",
+    "0v1a",
+    "--name",
+    "--help",
+  ]),
+  authRequiredCase("notebook title option-like value reaches auth", [
+    "notebook",
+    "diary/~host/notes",
+    "--help",
+  ]),
+  authRequiredCase("contacts update-profile empty value reaches auth", [
+    "contacts",
+    "update-profile",
+    "--status",
+    "",
+  ]),
+  authRequiredCase("contacts update empty value reaches auth", [
+    "contacts",
+    "update",
+    "~zod",
+    "--nickname",
+    "",
+  ]),
+  authRequiredCase("channels update empty value reaches auth", [
+    "channels",
+    "update",
+    "chat/~host/channel",
+    "--description",
+    "",
+  ]),
+  authRequiredCase("groups update empty value reaches auth", [
+    "groups",
+    "update",
+    "~host/group",
+    "--description",
+    "",
+  ]),
+];
+
 export const CLI_MATRIX_CASES: CliCase[] = [
   TOP_LEVEL_HELP_CASE,
   UNKNOWN_TOP_LEVEL_CASE,
@@ -239,6 +413,7 @@ export const CLI_MATRIX_CASES: CliCase[] = [
   ...MISSING_REQUIRED_CASES,
   ...SPECIAL_INPUT_CASES,
   ...NESTED_HELP_CASES,
+  ...LITERAL_OPTION_LIKE_VALUE_CASES,
 ];
 
 export function normalizeCliOutput(text: string): string {

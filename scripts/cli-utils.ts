@@ -6,10 +6,15 @@
  * Get an option value from command line args
  * @param args Array of arguments
  * @param name Option name (without --)
+ * @param startIndex Index to begin searching from
  * @returns The option value or undefined
  */
-export function getOption(args: string[], name: string): string | undefined {
-  const idx = args.indexOf(`--${name}`);
+export function getOption(
+  args: string[],
+  name: string,
+  startIndex = 0
+): string | undefined {
+  const idx = args.indexOf(`--${name}`, startIndex);
   if (idx !== -1 && args[idx + 1] !== undefined) {
     return args[idx + 1];
   }
@@ -60,6 +65,14 @@ export function wantsHelp(args: string[]): boolean {
 
 export function isHelpArg(arg: string | undefined): boolean {
   return arg === "--help" || arg === "-h";
+}
+
+export function isSubcommandHelpRequest(args: string[]): boolean {
+  return args.length === 2 && isHelpArg(args[1]);
+}
+
+export function isCommandHelpRequest(args: string[]): boolean {
+  return args.length === 1 && isHelpArg(args[0]);
 }
 
 export function printHelpAndExit(help: string): never {

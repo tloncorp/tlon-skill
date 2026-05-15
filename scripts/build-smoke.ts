@@ -19,6 +19,10 @@ const packageJson = JSON.parse(
 type RunOptions = {
   argsPrefix?: string[];
   env?: Record<string, string>;
+  prepare?: (tempRoot: string) => {
+    argsPrefix?: string[];
+    env?: Record<string, string>;
+  } | void;
 };
 
 type CliResult = {
@@ -54,9 +58,15 @@ function fail(message: string): never {
 function runBuiltCli(args: string[], options: RunOptions = {}): CliResult {
   const tempRoot = mkdtempSync(join(tmpdir(), "tlon-build-smoke-"));
   try {
-    const result = spawnSync(binaryPath, [...(options.argsPrefix ?? []), ...args], {
+    const prepared = options.prepare?.(tempRoot) ?? {};
+    const argsPrefix = prepared.argsPrefix ?? options.argsPrefix ?? [];
+    const env = {
+      ...(options.env ?? {}),
+      ...(prepared.env ?? {}),
+    };
+    const result = spawnSync(binaryPath, [...argsPrefix, ...args], {
       cwd: rootDir,
-      env: hermeticEnv(tempRoot, options.env),
+      env: hermeticEnv(tempRoot, env),
       encoding: "utf-8",
       timeout: SMOKE_TIMEOUT_MS,
     });
@@ -133,96 +143,6 @@ for (const testCase of CLI_MATRIX_CASES) {
   assertCase(testCase);
 }
 
-const literalOptionLikeValueCommands = [
-  {
-    name: "dms send message",
-    args: ["dms", "send", "0v123", "use", "--help"],
-  },
-  {
-    name: "dms reply message",
-    args: ["dms", "reply", "0v123", "~zod/170.141", "use", "--help"],
-  },
-  {
-    name: "posts edit message",
-    args: ["posts", "edit", "chat/~host/channel", "170.141", "use", "--help"],
-  },
-  {
-    name: "messages search query",
-    args: ["messages", "search", "--channel", "--channel", "chat/~host/channel"],
-  },
-  {
-    name: "contacts update-profile value",
-    args: ["contacts", "update-profile", "--status", "--help"],
-  },
-  {
-    name: "contacts update value",
-    args: ["contacts", "update", "~zod", "--nickname", "-h"],
-  },
-  {
-    name: "channels create title",
-    args: ["channels", "create", "~host/group", "--roadmap"],
-  },
-  {
-    name: "channels rename title",
-    args: ["channels", "rename", "chat/~host/channel", "--roadmap"],
-  },
-  {
-    name: "channels update title",
-    args: ["channels", "update", "chat/~host/channel", "--title", "--help"],
-  },
-  {
-    name: "groups create title",
-    args: ["groups", "create", "--roadmap"],
-  },
-  {
-    name: "groups create-owned title",
-    args: ["groups", "create-owned", "--roadmap", "--owner", "~zod"],
-  },
-  {
-    name: "groups update title",
-    args: ["groups", "update", "~host/group", "--title", "--help"],
-  },
-  {
-    name: "groups add-channel title",
-    args: ["groups", "add-channel", "~host/group", "--announcements"],
-  },
-  {
-    name: "hooks edit name",
-    args: ["hooks", "edit", "0v1a", "--name", "--help"],
-  },
-  {
-    name: "notebook title",
-    args: ["notebook", "diary/~host/notes", "--help"],
-  },
-  {
-    name: "contacts update-profile empty value",
-    args: ["contacts", "update-profile", "--status", ""],
-  },
-  {
-    name: "contacts update empty value",
-    args: ["contacts", "update", "~zod", "--nickname", ""],
-  },
-  {
-    name: "channels update empty value",
-    args: ["channels", "update", "chat/~host/channel", "--description", ""],
-  },
-  {
-    name: "groups update empty value",
-    args: ["groups", "update", "~host/group", "--description", ""],
-  },
-];
-
-for (const command of literalOptionLikeValueCommands) {
-  assertCase({
-    name: `${command.name} option-like value reaches auth`,
-    args: command.args,
-    expectedExitCode: 1,
-    stdoutExcludes: ["Usage:"],
-    stderrIncludes: ["Missing Urbit config"],
-    stderrExcludes: ["Usage:"],
-  });
-}
-
 const hostileHelpCommands = [
   { name: "top-level", args: ["--help"] },
   ...COMMAND_FAMILIES.map((family) => ({
@@ -232,8 +152,6 @@ const hostileHelpCommands = [
 ];
 
 for (const command of hostileHelpCommands) {
-  const configPath = join(tmpdir(), "tlon-missing-config", `${command.name}-ship.json`);
-
   assertCase(
     {
       name: `${command.name} help with nonexistent TLON_CONFIG_FILE`,
@@ -242,14 +160,27 @@ for (const command of hostileHelpCommands) {
       stderr: "",
       stdoutIncludes: ["Usage:"],
     },
-    { env: { TLON_CONFIG_FILE: configPath } }
+    {
+      prepare: (tempRoot) => ({
+        env: {
+          TLON_CONFIG_FILE: join(tempRoot, `${command.name}-ship.json`),
+        },
+      }),
+    }
   );
 
-  assertCase({
-    name: `${command.name} help with CLI --config /nonexistent`,
-    args: ["--config", configPath, ...command.args],
-    expectedExitCode: 0,
-    stderr: "",
-    stdoutIncludes: ["Usage:"],
-  });
+  assertCase(
+    {
+      name: `${command.name} help with CLI --config /nonexistent`,
+      args: command.args,
+      expectedExitCode: 0,
+      stderr: "",
+      stdoutIncludes: ["Usage:"],
+    },
+    {
+      prepare: (tempRoot) => ({
+        argsPrefix: ["--config", join(tempRoot, `${command.name}-ship.json`)],
+      }),
+    }
+  );
 }
