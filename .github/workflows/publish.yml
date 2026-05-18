@@ -12,18 +12,45 @@ on:
         type: boolean
         default: true
 
+permissions:
+  contents: read
+
 jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .tool-versions
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.4
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check
+        run: npm run check
+
   build:
+    needs: quality
+    timeout-minutes: 20
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             target: darwin-arm64
-          - os: macos-14        # Cross-compile x64 from ARM64
+          - os: macos-15-intel
             target: darwin-x64
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             target: linux-x64
-          - os: ubuntu-latest   # Cross-compile arm64 from x64
+          - os: ubuntu-24.04-arm
             target: linux-arm64
 
     runs-on: ${{ matrix.os }}
@@ -45,23 +72,99 @@ jobs:
       - name: Build binary
         run: node scripts/build-all.js --target=${{ matrix.target }}
 
-      - name: Upload artifact
+      - name: Smoke binary
+        run: npm run release:binary-smoke -- --binary npm/${{ matrix.target }}/tlon
+
+      - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
           name: binary-${{ matrix.target }}
           path: npm/${{ matrix.target }}/tlon
+          if-no-files-found: error
+
+  package:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .tool-versions
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.4
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: binary-*
+          path: artifacts
+
+      - name: Pack release tarballs
+        run: npm run release:package -- --artifacts-dir artifacts --out-dir release-tarballs
+
+      - name: Upload package tarballs
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-tarballs
+          path: release-tarballs/*
+          if-no-files-found: error
+
+  package-smoke:
+    needs: package
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            target: darwin-arm64
+          - os: macos-15-intel
+            target: darwin-x64
+          - os: ubuntu-24.04
+            target: linux-x64
+          - os: ubuntu-24.04-arm
+            target: linux-arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .tool-versions
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.4
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download package tarballs
+        uses: actions/download-artifact@v4
+        with:
+          name: package-tarballs
+          path: release-tarballs
+
+      - name: Smoke installed package
+        run: npm run release:package-smoke -- --tarball-dir release-tarballs --target=${{ matrix.target }}
 
   publish:
-    needs: build
-    runs-on: ubuntu-latest
+    needs: package-smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
       contents: read
       id-token: write
-    # Run on: version tag push, workflow_call from bump, or manual dispatch with dry_run=false
-    if: >-
-      (startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push') ||
-      github.event_name == 'workflow_call' ||
-      github.event.inputs.dry_run == 'false'
 
     steps:
       - uses: actions/checkout@v4
@@ -71,27 +174,34 @@ jobs:
           node-version-file: .tool-versions
           registry-url: "https://registry.npmjs.org"
 
-      - name: Download all artifacts
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.4
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download package tarballs
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          name: package-tarballs
+          path: release-tarballs
 
-      - name: Copy binaries to npm packages
-        run: |
-          for target in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
-            mkdir -p npm/$target
-            cp artifacts/binary-$target/tlon npm/$target/
-            chmod +x npm/$target/tlon
-          done
+      - name: Read package version
+        id: package
+        run: node -p "'version=' + require('./package.json').version" >> "$GITHUB_OUTPUT"
+
+      - name: Dry run
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'false' }}
+        run: echo "Dry run: skipping npm publish"
 
       - name: Publish platform packages
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.dry_run == 'false' }}
         run: |
           for target in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
-            echo "Publishing @tloncorp/tlon-skill-$target..."
-            cd npm/$target
-            npm publish --access public --provenance
-            cd ../..
+            npm publish "release-tarballs/tloncorp-tlon-skill-${target}-${{ steps.package.outputs.version }}.tgz" --access public --provenance
           done
 
-      - name: Publish main package
-        run: npm publish --access public --provenance
+      - name: Publish root package
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.dry_run == 'false' }}
+        run: npm publish "release-tarballs/tloncorp-tlon-skill-${{ steps.package.outputs.version }}.tgz" --access public --provenance
