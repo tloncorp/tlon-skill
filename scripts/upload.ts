@@ -69,6 +69,14 @@ function isUrl(input: string): boolean {
   return /^https?:\/\//i.test(input);
 }
 
+function bufferToBlobPart(buffer: Buffer): Uint8Array<ArrayBuffer> {
+  return new Uint8Array(
+    buffer.buffer as ArrayBuffer,
+    buffer.byteOffset,
+    buffer.byteLength
+  );
+}
+
 /** Read all of stdin into a Buffer (30s timeout) */
 async function readStdin(): Promise<Buffer> {
   const TIMEOUT_MS = 30_000;
@@ -123,7 +131,7 @@ export async function uploadFromFile(filePath: string, contentType?: string): Pr
   }
   const buffer = fs.readFileSync(resolved);
   const ct = contentType || mimeFromPath(resolved);
-  const blob = new Blob([buffer], { type: ct });
+  const blob = new Blob([bufferToBlobPart(buffer)], { type: ct });
   const fileName = path.basename(resolved);
   return doUpload(blob, ct, fileName);
 }
@@ -134,7 +142,7 @@ export async function uploadFromStdin(contentType: string): Promise<string> {
   if (buffer.length === 0) {
     throw new Error("No data received on stdin");
   }
-  const blob = new Blob([buffer], { type: contentType });
+  const blob = new Blob([bufferToBlobPart(buffer)], { type: contentType });
   return doUpload(blob, contentType);
 }
 

@@ -26,13 +26,13 @@ import { getOption, hasFlag } from "./cli-utils";
 
 // Helper to create a cord (UTF-8 string as little-endian atom) from a JS string
 // Atom.fromCord doesnt handle multi-byte UTF-8 (like emojis) correctly
-function cordFromUtf8(s: string): typeof Atom.prototype {
+function cordFromUtf8(s: string): Atom {
   const bytes = Buffer.from(s, "utf8");
   let num = 0n;
   for (let i = 0; i < bytes.length; i++) {
     num |= BigInt(bytes[i]) << BigInt(i * 8);
   }
-  return Atom.fromInt(num);
+  return new Atom(num);
 }
 
 // Types based on sur/hooks.hoon

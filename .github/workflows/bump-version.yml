@@ -21,10 +21,16 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version-file: .tool-versions
 
       - name: Bump version
         run: node scripts/bump-version.js ${{ inputs.version }}
+
+      - name: Verify install lockfile
+        run: npm ci --dry-run
+
+      - name: Verify clean install
+        run: npm ci
 
       - name: Create bump PR
         uses: peter-evans/create-pull-request@v7

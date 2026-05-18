@@ -19,6 +19,7 @@
 
 import * as fs from "fs";
 import { getCurrentUserId, sendPost } from "@tloncorp/api";
+import type { Story } from "@tloncorp/api";
 import { ensureClient } from "./api-client";
 import { getRequiredOptionValue } from "./cli-utils";
 import { normalizeNotebookContent, type NotebookStory } from "./notebook-content";
@@ -28,6 +29,10 @@ interface PostResult {
   success: boolean;
   error?: string;
   messageId?: string;
+}
+
+function toApiStory(content: NotebookStory): Story {
+  return content as unknown as Story;
 }
 
 export async function postToNotebook(
@@ -44,7 +49,7 @@ export async function postToNotebook(
       channelId: nest,
       authorId,
       sentAt,
-      content,
+      content: toApiStory(content),
       metadata: {
         title,
         description: "",

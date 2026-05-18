@@ -19,11 +19,10 @@ import {
   getPostReference,
   getPostWithReplies,
   getTextContent,
+  parsePostBlob,
   searchChannel,
 } from "@tloncorp/api";
-import type { ContentReference, Post } from "@tloncorp/api";
-import { parsePostBlob } from "@tloncorp/api/lib/content-helpers";
-import type { PostBlobDataEntry } from "@tloncorp/api/lib/content-helpers";
+import type { ClientPostBlobData, ContentReference, Post } from "@tloncorp/api";
 import { ensureClient, normalizeShip } from "./api-client";
 
 // Extract text content from a Story
@@ -122,7 +121,7 @@ async function printPosts(posts: Post[], resolve: boolean, highlightId?: string)
     // Show blob/attachment info (PDFs, files, voice memos)
     if (post.blob) {
       try {
-        const blobData: PostBlobDataEntry[] = parsePostBlob(post.blob);
+        const blobData: ClientPostBlobData = parsePostBlob(post.blob);
         for (const entry of blobData) {
           if (entry.type === "file") {
             console.log(`  📎 [${entry.name || "file"}] (${entry.mimeType || "unknown"}, ${entry.size ? Math.round(entry.size / 1024) + "KB" : "?"})`);
@@ -258,6 +257,22 @@ async function fetchContext(
   }
 }
 
+async function getPostWithOptionalAuthor({
+  channelId,
+  postId,
+  authorId,
+}: {
+  channelId: string;
+  postId: string;
+  authorId?: string;
+}) {
+  return getPostWithReplies({
+    channelId,
+    postId,
+    authorId: authorId ?? "",
+  });
+}
+
 // Fetch a single post (with replies if it's a thread)
 async function fetchPost(
   channelId: string,
@@ -268,7 +283,7 @@ async function fetchPost(
   console.log(`Fetching post ${postId} from ${channelId}\n`);
 
   try {
-    const post = await getPostWithReplies({
+    const post = await getPostWithOptionalAuthor({
       channelId,
       postId,
       authorId,
