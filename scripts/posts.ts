@@ -18,7 +18,108 @@ import * as fs from "fs";
 import { addReaction, deletePost, editPost, getChannelPosts, getCurrentUserId, removeReaction } from "@tloncorp/api";
 import type { Post } from "@tloncorp/api";
 import { ensureClient } from "./api-client";
+import {
+  hasOptionValue,
+  isHelpArg,
+  printErrorAndExit,
+  printHelpAndExit,
+  printUsageAndExit,
+  wantsHelp,
+} from "./cli-utils";
 import { markdownToStory, type Story } from "./story";
+
+const POSTS_HELP = `Usage: tlon posts <command>
+
+Note: Sending and replying to posts is handled by the Tlon channel plugin.
+
+Commands:
+  react <channel> <post-id> <emoji>     React to a post with an emoji
+  unreact <channel> <post-id>           Remove your reaction from a post
+  edit <channel> <post-id> <message>    Edit a post [--title <t>] [--image <url>] [--content <json>]
+  delete <channel> <post-id>            Delete a post
+
+Edit options:
+  --title <title>      Set/update notebook post title
+  --image <url>        Set/update cover image (notebooks)
+  --content <file>     Use Story JSON file for rich content (notebooks)
+
+Examples:
+  tlon posts edit chat/~host/channel 170.141... "Updated message"
+  tlon posts edit diary/~host/notes 170.141... --title "New Title" --image https://example.com/cover.jpg --content article.json
+
+Channel format: chat/~host/channel-name, diary/~host/name, heap/~host/name
+Use 'tlon messages channel <nest> --limit N' to see post IDs.`;
+
+const POSTS_COMMAND_HELP: Record<string, string> = {
+  react: "Usage: tlon posts react <channel> <post-id> <emoji>",
+  unreact: "Usage: tlon posts unreact <channel> <post-id>",
+  edit: "Usage: tlon posts edit <channel> <post-id> <message> [--title <title>] [--image <url>] [--content <json-file>]",
+  delete: "Usage: tlon posts delete <channel> <post-id>",
+};
+
+const POSTS_UNSUPPORTED_COMMAND_ERRORS: Record<string, string> = {
+  send: "Channel post send is handled by the Tlon channel plugin.\nUse the channel message tool with channel=tlon instead.",
+  reply: "Channel post reply is handled by the Tlon channel plugin.\nUse the channel message tool with channel=tlon and replyTo instead.",
+};
+
+const POST_EDIT_OPTION_FLAGS = ["title", "content", "image"] as const;
+
+function getPostsHelp(command?: string): string {
+  return command ? POSTS_COMMAND_HELP[command] ?? POSTS_HELP : POSTS_HELP;
+}
+
+function firstPostEditFlagIndex(args: string[]): number {
+  const flagIndexes = POST_EDIT_OPTION_FLAGS
+    .map((flag) => args.indexOf(`--${flag}`))
+    .filter((idx) => idx !== -1);
+  return flagIndexes.length > 0 ? Math.min(...flagIndexes) : args.length;
+}
+
+function getPostEditMessage(args: string[]): string {
+  return args.slice(3, firstPostEditFlagIndex(args)).join(" ");
+}
+
+function isPostEditMessageHelpLiteral(args: string[]): boolean {
+  return (
+    args[0] === "edit" &&
+    !!args[1] &&
+    !!args[2] &&
+    wantsHelp(args.slice(3, firstPostEditFlagIndex(args)))
+  );
+}
+
+function validatePostsArgs(args: string[]): void {
+  const command = args[0];
+  if (!command) {
+    printUsageAndExit(POSTS_HELP);
+  }
+  if (POSTS_UNSUPPORTED_COMMAND_ERRORS[command]) {
+    printErrorAndExit(POSTS_UNSUPPORTED_COMMAND_ERRORS[command]);
+  }
+  if (!POSTS_COMMAND_HELP[command]) {
+    printUsageAndExit(POSTS_HELP);
+  }
+
+  switch (command) {
+    case "react": {
+      if (!args[1] || !args[2] || !args[3]) printUsageAndExit(POSTS_COMMAND_HELP.react);
+      return;
+    }
+    case "unreact":
+    case "delete": {
+      if (!args[1] || !args[2]) printUsageAndExit(POSTS_COMMAND_HELP[command]);
+      return;
+    }
+    case "edit": {
+      if (!args[1] || !args[2]) printUsageAndExit(POSTS_COMMAND_HELP.edit);
+      const message = getPostEditMessage(args);
+      if (!message && !hasOptionValue(args, "content", POST_EDIT_OPTION_FLAGS)) {
+        printUsageAndExit(POSTS_COMMAND_HELP.edit);
+      }
+      return;
+    }
+  }
+}
 
 // Strip optional ~ship/ prefix from a post ID, returning just the numeric part
 function extractNumericId(id: string): string {
@@ -184,6 +285,16 @@ async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
 
+  if (isHelpArg(command)) {
+    printHelpAndExit(POSTS_HELP);
+  }
+
+  if (wantsHelp(args.slice(1)) && !isPostEditMessageHelpLiteral(args)) {
+    printHelpAndExit(getPostsHelp(command));
+  }
+
+  validatePostsArgs(args);
+
   await ensureClient(['channels']);
 
   try {
@@ -191,8 +302,7 @@ async function main() {
       case "react": {
         const [_, channel, postId, emoji] = args;
         if (!channel || !postId || !emoji) {
-          console.error("Usage: posts.ts react <channel> <post-id> <emoji>");
-          process.exit(1);
+          printUsageAndExit(POSTS_COMMAND_HELP.react);
         }
         const result = await reactToPost(channel, postId, emoji);
         if (!result.success) {
@@ -206,8 +316,7 @@ async function main() {
       case "unreact": {
         const [_, channel, postId] = args;
         if (!channel || !postId) {
-          console.error("Usage: posts.ts unreact <channel> <post-id>");
-          process.exit(1);
+          printUsageAndExit(POSTS_COMMAND_HELP.unreact);
         }
         const result = await unreactToPost(channel, postId);
         if (!result.success) {
@@ -225,19 +334,12 @@ async function main() {
         const contentIdx = args.indexOf("--content");
         const imageIdx = args.indexOf("--image");
         
-        // Find where flags start
-        let flagStart = args.length;
-        if (titleIdx !== -1 && titleIdx < flagStart) flagStart = titleIdx;
-        if (contentIdx !== -1 && contentIdx < flagStart) flagStart = contentIdx;
-        if (imageIdx !== -1 && imageIdx < flagStart) flagStart = imageIdx;
-        
         const newTitle = titleIdx !== -1 ? args[titleIdx + 1] : undefined;
         const contentFile = contentIdx !== -1 ? args[contentIdx + 1] : undefined;
         const newImage = imageIdx !== -1 ? args[imageIdx + 1] : undefined;
         
         if (!channel || !postId) {
-          console.error("Usage: posts.ts edit <channel> <post-id> [message] [--title <title>] [--image <url>] [--content <json-file>]");
-          process.exit(1);
+          printUsageAndExit(POSTS_COMMAND_HELP.edit);
         }
 
         // Fetch existing post to preserve metadata not being explicitly changed
@@ -259,10 +361,9 @@ async function main() {
           result = await editChannelPostWithContent(channel, postId, content, metadata);
         } else {
           // Plain text/markdown message
-          const message = args.slice(3, flagStart).join(" ");
+          const message = getPostEditMessage(args);
           if (!message) {
-            console.error("Usage: posts.ts edit <channel> <post-id> <message> [--title <title>] [--image <url>] [--content <json-file>]");
-            process.exit(1);
+            printUsageAndExit(POSTS_COMMAND_HELP.edit);
           }
           result = await editChannelPost(channel, postId, message, metadata);
         }
@@ -279,8 +380,7 @@ async function main() {
         const channel = args[1];
         const postId = args[2];
         if (!channel || !postId) {
-          console.error("Usage: posts.ts delete <channel> <post-id>");
-          process.exit(1);
+          printUsageAndExit(POSTS_COMMAND_HELP.delete);
         }
         const result = await deleteChannelPost(channel, postId);
         if (!result.success) {
@@ -291,50 +391,10 @@ async function main() {
         break;
       }
 
-      case "send":
-        console.error("error: Channel post send is handled by the Tlon channel plugin.");
-        console.error("Use the channel message tool with channel=tlon instead.");
-        process.exit(1);
-        break;
-
-      case "reply":
-        console.error("error: Channel post reply is handled by the Tlon channel plugin.");
-        console.error("Use the channel message tool with channel=tlon and replyTo instead.");
-        process.exit(1);
-        break;
-
-      default:
-        console.log(`Usage: posts.ts <command>
-
-Note: Sending and replying to posts is handled by the Tlon channel plugin.
-
-Commands:
-  react <channel> <post-id> <emoji>     React to a post with an emoji
-  unreact <channel> <post-id>           Remove your reaction from a post
-  edit <channel> <post-id> <message>    Edit a post [--title <t>] [--image <url>] [--content <json>]
-  delete <channel> <post-id>            Delete a post
-
-Edit options:
-  --title <title>      Set/update notebook post title
-  --image <url>        Set/update cover image (notebooks)
-  --content <file>     Use Story JSON file for rich content (notebooks)
-
-Examples:
-  # Edit with plain text
-  tlon posts edit chat/~host/channel 170.141... "Updated message"
-  
-  # Edit notebook with rich Story JSON and new cover image
-  tlon posts edit diary/~host/notes 170.141... --title "New Title" --image https://example.com/cover.jpg --content article.json
-
-Channel format: chat/~host/channel-name, diary/~host/name, heap/~host/name
-Use 'tlon messages channel <nest> --limit N' to see post IDs.
-`);
-        process.exit(1);
     }
     process.exit(0);
-  } catch (error: any) {
-    console.error(`Error: ${error.message}`);
-    process.exit(1);
+  } catch (error) {
+    printErrorAndExit(error);
   }
 }
 

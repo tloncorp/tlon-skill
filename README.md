@@ -12,14 +12,17 @@ npm install @tloncorp/tlon-skill
 **Direct download (no Node required):**
 ```bash
 # macOS ARM64
-curl -L https://registry.npmjs.org/@tloncorp/tlon-skill-darwin-arm64/-/tlon-skill-darwin-arm64-0.1.0.tgz | tar -xz
+curl -L https://registry.npmjs.org/@tloncorp/tlon-skill-darwin-arm64/-/tlon-skill-darwin-arm64-0.4.0.tgz | tar -xz
 mv package/tlon /usr/local/bin/
 
 # macOS x64
-curl -L https://registry.npmjs.org/@tloncorp/tlon-skill-darwin-x64/-/tlon-skill-darwin-x64-0.1.0.tgz | tar -xz
+curl -L https://registry.npmjs.org/@tloncorp/tlon-skill-darwin-x64/-/tlon-skill-darwin-x64-0.4.0.tgz | tar -xz
 
 # Linux x64
-curl -L https://registry.npmjs.org/@tloncorp/tlon-skill-linux-x64/-/tlon-skill-linux-x64-0.1.0.tgz | tar -xz
+curl -L https://registry.npmjs.org/@tloncorp/tlon-skill-linux-x64/-/tlon-skill-linux-x64-0.4.0.tgz | tar -xz
+
+# Linux ARM64
+curl -L https://registry.npmjs.org/@tloncorp/tlon-skill-linux-arm64/-/tlon-skill-linux-arm64-0.4.0.tgz | tar -xz
 ```
 
 ## Configuration
@@ -143,10 +146,25 @@ tlon groups reject-invite ~host/group-slug
 - **Groups**: Create, join, invite/request flows, roles, privacy (member nicknames shown)
 - **Hooks**: Manage channel hooks (add, edit, delete, order, config, cron)
 - **Messages**: History, search (author nicknames shown)
-- **DMs**: Send, react, accept/decline
-- **Posts**: React, delete
+- **DMs**: Group DM send/reply, react, accept/decline
+- **Posts**: React, edit, delete
 - **Notebook**: Post to diary channels
 - **Settings**: Hot-reload plugin config via settings-store
+
+## Development
+
+Use the Node version in `.tool-versions` and Bun `1.3.4`.
+
+```bash
+npm ci
+npm run typecheck
+npm run test:unit
+npm run test:integration
+npm run build:smoke
+npm run check
+```
+
+`npm run check` is the main local quality gate and is also run by CI. Coverage reporting is available with `npm run test:coverage`.
 
 ## Documentation
 

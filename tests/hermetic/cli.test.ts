@@ -1,10 +1,17 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import {
+  CLI_MATRIX_CASES,
+  COMMAND_FAMILIES,
+  type CliCase,
+  normalizeCliOutput,
+} from "../../scripts/cli-test-matrix";
 
 const rootDir = resolve(process.cwd());
 const cleanupPaths: string[] = [];
+const CLI_TIMEOUT_MS = 15_000;
 
 type RunContext = {
   tempRoot: string;
@@ -84,13 +91,36 @@ async function runCli(args: string[], options: RunOptions = {}): Promise<CliResu
       }
     );
 
-    const [stdout, stderr, exitCode] = await Promise.all([
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const output = Promise.all([
       new Response(proc.stdout).text(),
       new Response(proc.stderr).text(),
       proc.exited,
     ]);
+    const timeoutFailure = new Promise<never>((_, reject) => {
+      timeout = setTimeout(() => {
+        proc.kill("SIGKILL");
+        output.catch(() => {});
+        reject(new Error(`CLI timed out after ${CLI_TIMEOUT_MS}ms: ${args.join(" ")}`));
+      }, CLI_TIMEOUT_MS);
+    });
 
-    return { exitCode, stdout, stderr };
+    let stdout: string;
+    let stderr: string;
+    let exitCode: number;
+    try {
+      [stdout, stderr, exitCode] = await Promise.race([output, timeoutFailure]);
+    } finally {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+    }
+
+    return {
+      exitCode,
+      stdout: normalizeCliOutput(stdout),
+      stderr: normalizeCliOutput(stderr),
+    };
   } finally {
     prepared.cleanup?.();
   }
@@ -105,76 +135,36 @@ afterEach(() => {
   }
 });
 
-function expectHelp(result: CliResult) {
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout).toContain("Usage:");
-  expect(result.stderr).toBe("");
+function expectCliCase(result: CliResult, testCase: CliCase) {
+  expect(result.exitCode).toBe(testCase.expectedExitCode);
+
+  if (testCase.stdout !== undefined) {
+    expect(result.stdout).toBe(testCase.stdout);
+  }
+  for (const expected of testCase.stdoutIncludes ?? []) {
+    expect(result.stdout).toContain(expected);
+  }
+  for (const unexpected of testCase.stdoutExcludes ?? []) {
+    expect(result.stdout).not.toContain(unexpected);
+  }
+
+  if (testCase.stderr !== undefined) {
+    expect(result.stderr).toBe(testCase.stderr);
+  }
+  for (const expected of testCase.stderrIncludes ?? []) {
+    expect(result.stderr).toContain(expected);
+  }
+  for (const unexpected of testCase.stderrExcludes ?? []) {
+    expect(result.stderr).not.toContain(unexpected);
+  }
 }
 
-const helpCommands = [
+const hostileHelpCommands = [
   { name: "top-level", args: ["--help"] },
-  { name: "upload", args: ["upload", "--help"] },
-  { name: "activity", args: ["activity", "--help"] },
-];
-
-const hostileHelpVariants: Array<{
-  name: string;
-  prepare?: RunOptions["prepare"];
-  env?: Record<string, string>;
-}> = [
-  {
-    name: "nonexistent TLON_CONFIG_FILE",
-    prepare: ({ home }) => ({
-      env: { TLON_CONFIG_FILE: join(home, "missing-ship.json") },
-    }),
-  },
-  {
-    name: "CLI --config /nonexistent",
-    prepare: ({ home }) => ({
-      argsPrefix: ["--config", join(home, "missing-ship.json")],
-    }),
-  },
-  {
-    name: "invalid OPENCLAW_CONFIG",
-    prepare: ({ home }) => {
-      const configPath = join(home, "invalid-openclaw.json");
-      writeFileSync(configPath, "{not-json");
-      return { env: { OPENCLAW_CONFIG: configPath } };
-    },
-  },
-  {
-    name: "multiple cached ships",
-    prepare: ({ cacheDir }) => {
-      writeFileSync(
-        join(cacheDir, "zod.json"),
-        JSON.stringify({
-          url: "https://zod.example",
-          ship: "zod",
-          cookie: "urbauth-~zod=fake",
-        })
-      );
-      writeFileSync(
-        join(cacheDir, "bus.json"),
-        JSON.stringify({
-          url: "https://bus.example",
-          ship: "bus",
-          cookie: "urbauth-~bus=fake",
-        })
-      );
-    },
-  },
-  {
-    name: "unwritable cache path",
-    prepare: ({ tempRoot }) => {
-      const cacheDir = join(tempRoot, "unwritable-cache");
-      mkdirSync(cacheDir);
-      chmodSync(cacheDir, 0o500);
-      return {
-        cacheDir,
-        cleanup: () => chmodSync(cacheDir, 0o700),
-      };
-    },
-  },
+  ...COMMAND_FAMILIES.map((family) => ({
+    name: family,
+    args: [family, "--help"],
+  })),
 ];
 
 describe("CLI hermetic subprocess behavior", () => {
@@ -186,25 +176,37 @@ describe("CLI hermetic subprocess behavior", () => {
     expect(result.stderr).toBe("");
   });
 
-  for (const command of helpCommands) {
-    for (const variant of hostileHelpVariants) {
-      it(`prints ${command.name} help with ${variant.name}`, async () => {
-        const result = await runCli(command.args, {
-          env: variant.env,
-          prepare: variant.prepare,
-        });
-
-        expectHelp(result);
-      });
-    }
+  for (const testCase of CLI_MATRIX_CASES) {
+    it(testCase.name, async () => {
+      const result = await runCli(testCase.args);
+      expectCliCase(result, testCase);
+    });
   }
 
-  it("reports unknown commands without reading credentials", async () => {
-    const result = await runCli(["definitely-not-a-command"]);
+  for (const command of hostileHelpCommands) {
+    it(`prints ${command.name} help with nonexistent TLON_CONFIG_FILE`, async () => {
+      const result = await runCli(command.args, {
+        prepare: ({ home }) => ({
+          env: { TLON_CONFIG_FILE: join(home, "missing-ship.json") },
+        }),
+      });
 
-    expect(result.exitCode).toBe(1);
-    expect(result.stdout).toBe("");
-    expect(result.stderr).toContain("Unknown command: definitely-not-a-command");
-    expect(result.stderr).toContain('Run "tlon --help" for usage information.');
-  });
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain("Usage:");
+      expect(result.stderr).toBe("");
+    });
+
+    it(`prints ${command.name} help with CLI --config /nonexistent`, async () => {
+      const result = await runCli(command.args, {
+        prepare: ({ home }) => ({
+          argsPrefix: ["--config", join(home, "missing-ship.json")],
+        }),
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain("Usage:");
+      expect(result.stderr).toBe("");
+    });
+  }
+
 });

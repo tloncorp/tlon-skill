@@ -18,8 +18,27 @@ import * as fs from "fs";
 import * as path from "path";
 import { uploadFile } from "@tloncorp/api";
 import { ensureClient } from "./api-client";
+import { printHelpAndExit, printUsageAndExit } from "./cli-utils";
 
 const DEFAULT_CONTENT_TYPE = "application/octet-stream";
+const UPLOAD_HELP = `Usage: tlon upload <url-or-path> [options]
+       tlon upload --stdin [-t mime/type]
+
+Upload a file to Tlon storage from a URL, local path, or stdin.
+Outputs the uploaded URL on success.
+
+Options:
+  --stdin         Read binary data from stdin instead of a file/URL
+  -t, --type      Override content type (e.g., image/png, application/pdf)
+  -h, --help      Show this help
+
+Examples:
+  tlon upload https://example.com/image.png
+  tlon upload ./photo.jpg
+  tlon upload ~/Pictures/screenshot.png
+  tlon upload ./mystery-file -t image/webp
+  cat image.png | tlon upload --stdin -t image/png
+  curl -s https://example.com/img.jpg | tlon upload --stdin -t image/jpeg`;
 
 /** Common extension → MIME type mappings (no external dependency needed) */
 const MIME_TYPES: Record<string, string> = {
@@ -156,20 +175,23 @@ export async function main(args: string[]) {
     const arg = args[i];
     if (arg === "--stdin") {
       stdinMode = true;
-    } else if ((arg === "-t" || arg === "--type") && args[i + 1]) {
+    } else if (arg === "-t" || arg === "--type") {
+      if (!args[i + 1] || args[i + 1].startsWith("-")) {
+        printUsageAndExit(`Error: ${arg} requires a value\n\n${UPLOAD_HELP}`);
+      }
       contentType = args[i + 1];
       i++;
     } else if (arg === "--help" || arg === "-h") {
-      printHelp();
-      process.exit(0);
+      printHelpAndExit(UPLOAD_HELP);
+    } else if (arg.startsWith("-")) {
+      printUsageAndExit(`Error: Unknown option: ${arg}\n\n${UPLOAD_HELP}`);
     } else {
       positional.push(arg);
     }
   }
 
   if (!stdinMode && positional.length === 0) {
-    printHelp();
-    process.exit(1);
+    printUsageAndExit(UPLOAD_HELP);
   }
 
   await ensureClient();
@@ -190,25 +212,4 @@ export async function main(args: string[]) {
 
   console.log(uploadedUrl);
   process.exit(0);
-}
-
-function printHelp() {
-  console.log(`Usage: upload <url-or-path> [options]
-       upload --stdin [-t mime/type]
-
-Upload a file to Tlon storage from a URL, local path, or stdin.
-Outputs the uploaded URL on success.
-
-Options:
-  --stdin         Read binary data from stdin instead of a file/URL
-  -t, --type      Override content type (e.g., image/png, application/pdf)
-  -h, --help      Show this help
-
-Examples:
-  tlon upload https://example.com/image.png
-  tlon upload ./photo.jpg
-  tlon upload ~/Pictures/screenshot.png
-  tlon upload ./mystery-file -t image/webp
-  cat image.png | tlon upload --stdin -t image/png
-  curl -s https://example.com/img.jpg | tlon upload --stdin -t image/jpeg`);
 }

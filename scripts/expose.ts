@@ -18,7 +18,63 @@
  */
 
 import { poke, scry } from "@tloncorp/api";
-import { ensureClient, getConfig } from "./api-client";
+import { ensureClient } from "./api-client";
+import {
+  isHelpArg,
+  printErrorAndExit,
+  printHelpAndExit,
+  printUsageAndExit,
+  wantsHelp,
+} from "./cli-utils";
+
+const EXPOSE_HELP = `Usage: tlon expose <command>
+
+Manage public exposure of Tlon content via the %expose agent.
+
+Commands:
+  list                    List all exposed content with public URLs
+  show <cite-path>        Expose a post publicly
+  hide <cite-path>        Hide an exposed post
+  check <cite-path>       Check if a post is exposed
+  url <cite-path>         Get the public URL for a post
+
+Cite path formats:
+  Simplified:  chat/~host/channel/170.141...
+               diary/~host/channel/170.141...
+               heap/~host/channel/170.141...
+
+  Full:        /1/chan/chat/~host/channel/msg/170.141...
+               /1/chan/diary/~host/channel/note/170.141...
+               /1/chan/heap/~host/channel/curio/170.141...
+
+Examples:
+  tlon expose list
+  tlon expose show chat/~nocsyx-lassul/my-channel/170.141.184.507...
+  tlon expose hide chat/~nocsyx-lassul/my-channel/170.141.184.507...
+  tlon expose check diary/~nocsyx-lassul/blog/170.141.184.507...
+  tlon expose url diary/~nocsyx-lassul/blog/170.141.184.507...`;
+
+const EXPOSE_COMMAND_HELP: Record<string, string> = {
+  list: "Usage: tlon expose list",
+  show: "Usage: tlon expose show <cite-path>\nExample: tlon expose show chat/~host/channel/170.141...",
+  hide: "Usage: tlon expose hide <cite-path>",
+  check: "Usage: tlon expose check <cite-path>",
+  url: "Usage: tlon expose url <cite-path>",
+};
+
+function getExposeHelp(command?: string): string {
+  return command ? EXPOSE_COMMAND_HELP[command] ?? EXPOSE_HELP : EXPOSE_HELP;
+}
+
+function validateExposeArgs(args: string[]): void {
+  const command = args[0];
+  if (!command || !EXPOSE_COMMAND_HELP[command]) {
+    printUsageAndExit(EXPOSE_HELP);
+  }
+  if (command !== "list" && !args[1]) {
+    printUsageAndExit(EXPOSE_COMMAND_HELP[command]);
+  }
+}
 
 // Expand a simplified cite path to full format
 // chat/~host/channel/170.141... -> /1/chan/chat/~host/channel/msg/170.141...
@@ -179,6 +235,16 @@ async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
 
+  if (isHelpArg(command)) {
+    printHelpAndExit(EXPOSE_HELP);
+  }
+
+  if (wantsHelp(args.slice(1))) {
+    printHelpAndExit(getExposeHelp(command));
+  }
+
+  validateExposeArgs(args);
+
   const config = await ensureClient();
 
   try {
@@ -201,9 +267,7 @@ async function main() {
       case "show": {
         const citePath = args[1];
         if (!citePath) {
-          console.error("Usage: tlon expose show <cite-path>");
-          console.error("Example: tlon expose show chat/~host/channel/170.141...");
-          process.exit(1);
+          printUsageAndExit(EXPOSE_COMMAND_HELP.show);
         }
 
         await showPost(citePath);
@@ -217,8 +281,7 @@ async function main() {
       case "hide": {
         const citePath = args[1];
         if (!citePath) {
-          console.error("Usage: tlon expose hide <cite-path>");
-          process.exit(1);
+          printUsageAndExit(EXPOSE_COMMAND_HELP.hide);
         }
 
         await hidePost(citePath);
@@ -229,8 +292,7 @@ async function main() {
       case "check": {
         const citePath = args[1];
         if (!citePath) {
-          console.error("Usage: tlon expose check <cite-path>");
-          process.exit(1);
+          printUsageAndExit(EXPOSE_COMMAND_HELP.check);
         }
 
         const isExposed = await checkExposed(citePath);
@@ -248,8 +310,7 @@ async function main() {
       case "url": {
         const citePath = args[1];
         if (!citePath) {
-          console.error("Usage: tlon expose url <cite-path>");
-          process.exit(1);
+          printUsageAndExit(EXPOSE_COMMAND_HELP.url);
         }
 
         const fullPath = expandCitePath(citePath);
@@ -259,40 +320,12 @@ async function main() {
       }
 
       default:
-        console.log(`Usage: tlon expose <command>
-
-Manage public exposure of Tlon content via the %expose agent.
-
-Commands:
-  list                    List all exposed content with public URLs
-  show <cite-path>        Expose a post publicly
-  hide <cite-path>        Hide an exposed post
-  check <cite-path>       Check if a post is exposed
-  url <cite-path>         Get the public URL for a post
-
-Cite path formats:
-  Simplified:  chat/~host/channel/170.141...
-               diary/~host/channel/170.141...
-               heap/~host/channel/170.141...
-
-  Full:        /1/chan/chat/~host/channel/msg/170.141...
-               /1/chan/diary/~host/channel/note/170.141...
-               /1/chan/heap/~host/channel/curio/170.141...
-
-Examples:
-  tlon expose list
-  tlon expose show chat/~nocsyx-lassul/my-channel/170.141.184.507...
-  tlon expose hide chat/~nocsyx-lassul/my-channel/170.141.184.507...
-  tlon expose check diary/~nocsyx-lassul/blog/170.141.184.507...
-  tlon expose url diary/~nocsyx-lassul/blog/170.141.184.507...
-`);
-        process.exit(command ? 1 : 0);
+        printUsageAndExit(EXPOSE_HELP);
     }
 
     process.exit(0);
-  } catch (error: any) {
-    console.error(`Error: ${error.message}`);
-    process.exit(1);
+  } catch (error) {
+    printErrorAndExit(error);
   }
 }
 

@@ -24,6 +24,84 @@ import {
 } from "@tloncorp/api";
 import type { ClientPostBlobData, ContentReference, Post } from "@tloncorp/api";
 import { ensureClient, normalizeShip } from "./api-client";
+import {
+  isHelpArg,
+  printErrorAndExit,
+  printHelpAndExit,
+  printUsageAndExit,
+  wantsHelp,
+} from "./cli-utils";
+
+const MESSAGES_HELP = `Usage: tlon messages <command>
+
+Commands:
+  dm ~ship                                    Show DM history
+  channel <nest>                              Show channel messages
+  history <nest>                              Alias for channel
+  search "query" --channel <nest>             Search in channel
+  context <channel|~ship> <postId>            Show messages around a post
+  post <channel|~ship> <postId>               Fetch a single post with replies
+
+Examples:
+  tlon messages dm ~sampel-palnet --limit 10
+  tlon messages channel chat/~host/channel-slug --limit 20
+  tlon messages search "hello" --channel chat/~host/slug
+  tlon messages context chat/~host/slug 170.141.184... --limit 5
+  tlon messages post chat/~host/slug 170.141.184...`;
+
+const MESSAGES_COMMAND_HELP: Record<string, string> = {
+  dm: "Usage: tlon messages dm ~ship [--limit N] [--resolve-cites]",
+  channel: "Usage: tlon messages channel chat/~host/slug [--limit N] [--resolve-cites]",
+  history: 'Usage: tlon messages history "chat/~host/channel-slug" [--limit N] [--resolve-cites]',
+  search: 'Usage: tlon messages search "query" --channel chat/~host/slug',
+  context: "Usage: tlon messages context <channel|~ship> <postId> [--limit N] [--resolve-cites]",
+  post: "Usage: tlon messages post <channel|~ship> <postId> [--author ~ship] [--resolve-cites]",
+};
+
+function getMessagesHelp(command?: string): string {
+  return command ? MESSAGES_COMMAND_HELP[command] ?? MESSAGES_HELP : MESSAGES_HELP;
+}
+
+function getSearchChannel(args: string[]): string | undefined {
+  for (let i = 2; i < args.length; i++) {
+    if (args[i] === "--channel") {
+      const channel = args[i + 1];
+      return channel && !channel.startsWith("--") ? channel : undefined;
+    }
+  }
+  return undefined;
+}
+
+function isSearchQueryHelpLiteral(args: string[]): boolean {
+  return args[0] === "search" && isHelpArg(args[1]) && !!getSearchChannel(args);
+}
+
+function validateMessagesArgs(args: string[]): void {
+  const command = args[0];
+  if (!command || !MESSAGES_COMMAND_HELP[command]) {
+    printUsageAndExit(MESSAGES_HELP);
+  }
+
+  switch (command) {
+    case "dm":
+    case "channel":
+    case "history": {
+      if (!args[1]) printUsageAndExit(MESSAGES_COMMAND_HELP[command]);
+      return;
+    }
+    case "search": {
+      if (!args[1] || !getSearchChannel(args)) {
+        printUsageAndExit(MESSAGES_COMMAND_HELP.search);
+      }
+      return;
+    }
+    case "context":
+    case "post": {
+      if (!args[1] || !args[2]) printUsageAndExit(MESSAGES_COMMAND_HELP[command]);
+      return;
+    }
+  }
+}
 
 // Extract text content from a Story
 function extractText(content: any): string {
@@ -327,6 +405,16 @@ async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
 
+  if (isHelpArg(command)) {
+    printHelpAndExit(MESSAGES_HELP);
+  }
+
+  if (wantsHelp(args.slice(1)) && !isSearchQueryHelpLiteral(args)) {
+    printHelpAndExit(getMessagesHelp(command));
+  }
+
+  validateMessagesArgs(args);
+
   await ensureClient();
 
   // Parse --limit flag
@@ -344,10 +432,7 @@ async function main() {
       case "dm": {
         const ship = args[1];
         if (!ship) {
-          console.log(
-            "Usage: npx ts-node scripts/messages.ts dm ~ship [--limit N] [--resolve-cites]"
-          );
-          process.exit(1);
+          printUsageAndExit(MESSAGES_COMMAND_HELP.dm);
         }
         await fetchDmMessages(ship, limit, resolveCites);
         break;
@@ -356,10 +441,7 @@ async function main() {
       case "channel": {
         const channelPath = args[1];
         if (!channelPath) {
-          console.log(
-            "Usage: npx ts-node scripts/messages.ts channel chat/~host/slug [--limit N] [--resolve-cites]"
-          );
-          process.exit(1);
+          printUsageAndExit(MESSAGES_COMMAND_HELP.channel);
         }
         await fetchMessages(channelPath, limit, resolveCites);
         break;
@@ -368,10 +450,7 @@ async function main() {
       case "history": {
         const channelPath = args[1];
         if (!channelPath) {
-          console.log(
-            "Usage: npx ts-node scripts/messages.ts history \"chat/~host/channel-slug\" [--limit N] [--resolve-cites]"
-          );
-          process.exit(1);
+          printUsageAndExit(MESSAGES_COMMAND_HELP.history);
         }
         await fetchMessages(channelPath, limit, resolveCites);
         break;
@@ -379,18 +458,10 @@ async function main() {
 
       case "search": {
         const query = args[1];
-        let channel: string | null = null;
-        for (let i = 2; i < args.length; i++) {
-          if (args[i] === "--channel" && args[i + 1]) {
-            channel = args[i + 1];
-          }
-        }
+        const channel = getSearchChannel(args);
 
         if (!query || !channel) {
-          console.log(
-            'Usage: npx ts-node scripts/messages.ts search "query" --channel chat/~host/slug'
-          );
-          process.exit(1);
+          printUsageAndExit(MESSAGES_COMMAND_HELP.search);
         }
         await searchMessages(query, channel);
         break;
@@ -400,10 +471,7 @@ async function main() {
         const target = args[1];
         const postId = args[2];
         if (!target || !postId) {
-          console.log(
-            "Usage: messages.ts context <channel|~ship> <postId> [--limit N] [--resolve-cites]"
-          );
-          process.exit(1);
+          printUsageAndExit(MESSAGES_COMMAND_HELP.context);
         }
         await fetchContext(target, postId, limit, resolveCites);
         break;
@@ -413,10 +481,7 @@ async function main() {
         const target = args[1];
         const postId = args[2];
         if (!target || !postId) {
-          console.log(
-            "Usage: messages.ts post <channel|~ship> <postId> [--author ~ship] [--resolve-cites]"
-          );
-          process.exit(1);
+          printUsageAndExit(MESSAGES_COMMAND_HELP.post);
         }
         let author: string | undefined;
         const authorIdx = args.indexOf("--author");
@@ -428,29 +493,11 @@ async function main() {
       }
 
       default:
-        console.log(`Usage: messages.ts <command>
-
-Commands:
-  dm ~ship                                    Show DM history
-  channel <nest>                              Show channel messages
-  history <nest>                              Alias for channel
-  search "query" --channel <nest>             Search in channel
-  context <channel|~ship> <postId>            Show messages around a post
-  post <channel|~ship> <postId>               Fetch a single post with replies
-
-Examples:
-  npx ts-node scripts/messages.ts dm ~sampel-palnet --limit 10
-  npx ts-node scripts/messages.ts channel chat/~host/channel-slug --limit 20
-  npx ts-node scripts/messages.ts search "hello" --channel chat/~host/slug
-  npx ts-node scripts/messages.ts context chat/~host/slug 170.141.184... --limit 5
-  npx ts-node scripts/messages.ts post chat/~host/slug 170.141.184...
-`);
-        process.exit(1);
+        printUsageAndExit(MESSAGES_HELP);
     }
     process.exit(0);
-  } catch (error: any) {
-    console.error(`Error: ${error.message}`);
-    process.exit(1);
+  } catch (error) {
+    printErrorAndExit(error);
   }
 }
 

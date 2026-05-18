@@ -69,9 +69,19 @@ import {
 } from "@tloncorp/api";
 import type { Group } from "@tloncorp/api";
 import { ensureClient, getCurrentShip, normalizeShip } from "./api-client";
-import { getOption, looksLikePositionalChannelKind, wantsHelp } from "./cli-utils";
+import {
+  getOption,
+  hasOptionValue,
+  isHelpArg,
+  isSubcommandHelpRequest,
+  looksLikePositionalChannelKind,
+  printErrorAndExit,
+  printHelpAndExit,
+  printUsageAndExit,
+} from "./cli-utils";
 
 const ADMIN_ROLE_ID = "admin";
+const GROUP_UPDATE_FLAGS = ["title", "description", "image", "cover"] as const;
 
 // Generate a random short ID for the group
 function generateGroupSlug(): string {
@@ -85,7 +95,7 @@ function generateGroupSlug(): string {
   return slug;
 }
 
-const GROUPS_HELP = `Usage: groups.ts <command>
+const GROUPS_HELP = `Usage: tlon groups <command>
 
 Commands:
   list
@@ -119,43 +129,140 @@ Commands:
   add-channel <group-id> "Channel Name" [--kind chat|diary|heap] [--description "..."]
 
 Examples:
-  groups.ts info ~host/group-slug
-  groups.ts add-channel ~host/group-slug "Projects" --kind chat`;
+  tlon groups info ~host/group-slug
+  tlon groups add-channel ~host/group-slug "Projects" --kind chat`;
 
 const GROUPS_COMMAND_HELP: Record<string, string> = {
-  list: `Usage: groups.ts list`,
-  create: `Usage: groups.ts create "Group Name" [--description "..."]\nExample: groups.ts create "Projects" --description "Shared work"`,
-  "create-owned": `Usage: groups.ts create-owned "Group Name" --owner <ship> [--description "..."]\nExample: groups.ts create-owned "Projects" --owner ~nec --description "Shared work"`,
-  invite: `Usage: groups.ts invite <group-id> <ship> [<ship2> ...]\nExample: groups.ts invite ~host/group-slug ~nec ~bud`,
-  info: `Usage: groups.ts info <group-id>\nExample: groups.ts info ~host/group-slug`,
-  leave: `Usage: groups.ts leave <group-id>\nExample: groups.ts leave ~host/group-slug`,
-  join: `Usage: groups.ts join <group-id>\nJoins public or invited groups. For private groups without an invite, requests an invite.\nExample: groups.ts join ~host/group-slug`,
-  "request-invite": `Usage: groups.ts request-invite <group-id>\nExample: groups.ts request-invite ~host/group-slug`,
-  "accept-invite": `Usage: groups.ts accept-invite <group-id>\nExample: groups.ts accept-invite ~host/group-slug`,
-  "reject-invite": `Usage: groups.ts reject-invite <group-id>\nExample: groups.ts reject-invite ~host/group-slug`,
-  "cancel-join": `Usage: groups.ts cancel-join <group-id>\nExample: groups.ts cancel-join ~host/group-slug`,
-  "rescind-request": `Usage: groups.ts rescind-request <group-id>\nExample: groups.ts rescind-request ~host/group-slug`,
-  "revoke-invite": `Usage: groups.ts revoke-invite <group-id> <ship> [<ship2> ...]\nExample: groups.ts revoke-invite ~host/group-slug ~nec`,
-  delete: `Usage: groups.ts delete <group-id>\nExample: groups.ts delete ~host/group-slug`,
-  update: `Usage: groups.ts update <group-id> --title "..." [--description "..."] [--image "..."] [--cover "..."]\nExample: groups.ts update ~host/group-slug --title "New Title"`,
-  kick: `Usage: groups.ts kick <group-id> <ship> [<ship2> ...]\nExample: groups.ts kick ~host/group-slug ~nec`,
-  ban: `Usage: groups.ts ban <group-id> <ship> [<ship2> ...]\nExample: groups.ts ban ~host/group-slug ~nec`,
-  unban: `Usage: groups.ts unban <group-id> <ship> [<ship2> ...]\nExample: groups.ts unban ~host/group-slug ~nec`,
-  "add-role": `Usage: groups.ts add-role <group-id> <role-id> --title "..." [--description "..."]\nExample: groups.ts add-role ~host/group-slug editors --title "Editors"`,
-  "delete-role": `Usage: groups.ts delete-role <group-id> <role-id>\nExample: groups.ts delete-role ~host/group-slug editors`,
-  "update-role": `Usage: groups.ts update-role <group-id> <role-id> --title "..." [--description "..."]\nExample: groups.ts update-role ~host/group-slug editors --title "Writers"`,
-  "assign-role": `Usage: groups.ts assign-role <group-id> <role-id> <ship> [<ship2> ...]\nExample: groups.ts assign-role ~host/group-slug editors ~nec`,
-  "remove-role": `Usage: groups.ts remove-role <group-id> <role-id> <ship> [<ship2> ...]\nExample: groups.ts remove-role ~host/group-slug editors ~nec`,
-  "set-privacy": `Usage: groups.ts set-privacy <group-id> <public|private|secret>\nExample: groups.ts set-privacy ~host/group-slug private`,
-  "accept-join": `Usage: groups.ts accept-join <group-id> <ship> [<ship2> ...]\nExample: groups.ts accept-join ~host/group-slug ~nec`,
-  "reject-join": `Usage: groups.ts reject-join <group-id> <ship> [<ship2> ...]\nExample: groups.ts reject-join ~host/group-slug ~nec`,
-  promote: `Usage: groups.ts promote <group-id> <ship> [<ship2> ...]\nExample: groups.ts promote ~host/group-slug ~nec`,
-  demote: `Usage: groups.ts demote <group-id> <ship> [<ship2> ...]\nExample: groups.ts demote ~host/group-slug ~nec`,
-  "add-channel": `Usage: groups.ts add-channel <group-id> "Channel Name" [--kind chat|diary|heap] [--description "..."]\nExample: groups.ts add-channel ~host/group-slug "Projects" --kind chat`,
+  list: `Usage: tlon groups list`,
+  create: `Usage: tlon groups create "Group Name" [--description "..."]\nExample: tlon groups create "Projects" --description "Shared work"`,
+  "create-owned": `Usage: tlon groups create-owned "Group Name" --owner <ship> [--description "..."]\nExample: tlon groups create-owned "Projects" --owner ~nec --description "Shared work"`,
+  invite: `Usage: tlon groups invite <group-id> <ship> [<ship2> ...]\nExample: tlon groups invite ~host/group-slug ~nec ~bud`,
+  info: `Usage: tlon groups info <group-id>\nExample: tlon groups info ~host/group-slug`,
+  leave: `Usage: tlon groups leave <group-id>\nExample: tlon groups leave ~host/group-slug`,
+  join: `Usage: tlon groups join <group-id>\nJoins public or invited groups. For private groups without an invite, requests an invite.\nExample: tlon groups join ~host/group-slug`,
+  "request-invite": `Usage: tlon groups request-invite <group-id>\nExample: tlon groups request-invite ~host/group-slug`,
+  "accept-invite": `Usage: tlon groups accept-invite <group-id>\nExample: tlon groups accept-invite ~host/group-slug`,
+  "reject-invite": `Usage: tlon groups reject-invite <group-id>\nExample: tlon groups reject-invite ~host/group-slug`,
+  "cancel-join": `Usage: tlon groups cancel-join <group-id>\nExample: tlon groups cancel-join ~host/group-slug`,
+  "rescind-request": `Usage: tlon groups rescind-request <group-id>\nExample: tlon groups rescind-request ~host/group-slug`,
+  "revoke-invite": `Usage: tlon groups revoke-invite <group-id> <ship> [<ship2> ...]\nExample: tlon groups revoke-invite ~host/group-slug ~nec`,
+  delete: `Usage: tlon groups delete <group-id>\nExample: tlon groups delete ~host/group-slug`,
+  update: `Usage: tlon groups update <group-id> --title "..." [--description "..."] [--image "..."] [--cover "..."]\nExample: tlon groups update ~host/group-slug --title "New Title"`,
+  kick: `Usage: tlon groups kick <group-id> <ship> [<ship2> ...]\nExample: tlon groups kick ~host/group-slug ~nec`,
+  ban: `Usage: tlon groups ban <group-id> <ship> [<ship2> ...]\nExample: tlon groups ban ~host/group-slug ~nec`,
+  unban: `Usage: tlon groups unban <group-id> <ship> [<ship2> ...]\nExample: tlon groups unban ~host/group-slug ~nec`,
+  "add-role": `Usage: tlon groups add-role <group-id> <role-id> --title "..." [--description "..."]\nExample: tlon groups add-role ~host/group-slug editors --title "Editors"`,
+  "delete-role": `Usage: tlon groups delete-role <group-id> <role-id>\nExample: tlon groups delete-role ~host/group-slug editors`,
+  "update-role": `Usage: tlon groups update-role <group-id> <role-id> --title "..." [--description "..."]\nExample: tlon groups update-role ~host/group-slug editors --title "Writers"`,
+  "assign-role": `Usage: tlon groups assign-role <group-id> <role-id> <ship> [<ship2> ...]\nExample: tlon groups assign-role ~host/group-slug editors ~nec`,
+  "remove-role": `Usage: tlon groups remove-role <group-id> <role-id> <ship> [<ship2> ...]\nExample: tlon groups remove-role ~host/group-slug editors ~nec`,
+  "set-privacy": `Usage: tlon groups set-privacy <group-id> <public|private|secret>\nExample: tlon groups set-privacy ~host/group-slug private`,
+  "accept-join": `Usage: tlon groups accept-join <group-id> <ship> [<ship2> ...]\nExample: tlon groups accept-join ~host/group-slug ~nec`,
+  "reject-join": `Usage: tlon groups reject-join <group-id> <ship> [<ship2> ...]\nExample: tlon groups reject-join ~host/group-slug ~nec`,
+  promote: `Usage: tlon groups promote <group-id> <ship> [<ship2> ...]\nExample: tlon groups promote ~host/group-slug ~nec`,
+  demote: `Usage: tlon groups demote <group-id> <ship> [<ship2> ...]\nExample: tlon groups demote ~host/group-slug ~nec`,
+  "add-channel": `Usage: tlon groups add-channel <group-id> "Channel Name" [--kind chat|diary|heap] [--description "..."]\nExample: tlon groups add-channel ~host/group-slug "Projects" --kind chat`,
 };
 
-function printGroupsHelp(command?: string) {
-  console.log(command ? GROUPS_COMMAND_HELP[command] ?? GROUPS_HELP : GROUPS_HELP);
+function getGroupsHelp(command?: string) {
+  return command ? GROUPS_COMMAND_HELP[command] ?? GROUPS_HELP : GROUPS_HELP;
+}
+
+function validateGroupsArgs(args: string[]): void {
+  const command = args[0];
+  if (!command || !GROUPS_COMMAND_HELP[command]) {
+    printUsageAndExit(GROUPS_HELP);
+  }
+
+  switch (command) {
+    case "list":
+      return;
+    case "create": {
+      const title = args[1];
+      if (title === undefined) {
+        printUsageAndExit(GROUPS_COMMAND_HELP.create);
+      }
+      return;
+    }
+    case "create-owned": {
+      const title = args[1];
+      const owner = getOption(args, "owner", 2);
+      if (title === undefined || !owner || owner.startsWith("--")) {
+        printUsageAndExit(GROUPS_COMMAND_HELP["create-owned"]);
+      }
+      return;
+    }
+    case "info":
+    case "leave":
+    case "join":
+    case "request-invite":
+    case "accept-invite":
+    case "reject-invite":
+    case "cancel-join":
+    case "rescind-request":
+    case "delete": {
+      if (!args[1]) printUsageAndExit(GROUPS_COMMAND_HELP[command]);
+      return;
+    }
+    case "update": {
+      if (!args[1]) printUsageAndExit(GROUPS_COMMAND_HELP.update);
+      if (
+        !GROUP_UPDATE_FLAGS.some((flag) =>
+          hasOptionValue(args, flag, GROUP_UPDATE_FLAGS)
+        )
+      ) {
+        printUsageAndExit(
+          `Error: At least one of --title, --description, --image, or --cover is required\n${GROUPS_COMMAND_HELP.update}`
+        );
+      }
+      return;
+    }
+    case "invite":
+    case "revoke-invite":
+    case "kick":
+    case "ban":
+    case "unban":
+    case "accept-join":
+    case "reject-join":
+    case "promote":
+    case "demote": {
+      if (!args[1] || args.slice(2).length === 0) {
+        printUsageAndExit(GROUPS_COMMAND_HELP[command]);
+      }
+      return;
+    }
+    case "add-role":
+    case "delete-role":
+    case "update-role": {
+      if (!args[1] || !args[2]) printUsageAndExit(GROUPS_COMMAND_HELP[command]);
+      return;
+    }
+    case "assign-role":
+    case "remove-role": {
+      if (!args[1] || !args[2] || args.slice(3).length === 0) {
+        printUsageAndExit(GROUPS_COMMAND_HELP[command]);
+      }
+      return;
+    }
+    case "set-privacy": {
+      const privacy = args[2];
+      if (!args[1] || !privacy || !["public", "private", "secret"].includes(privacy)) {
+        printUsageAndExit(GROUPS_COMMAND_HELP["set-privacy"]);
+      }
+      return;
+    }
+    case "add-channel": {
+      if (!args[1] || args[2] === undefined) {
+        printUsageAndExit(GROUPS_COMMAND_HELP["add-channel"]);
+      }
+      if (looksLikePositionalChannelKind(args, 2)) {
+        printUsageAndExit(
+          `Error: channel kind must be passed with --kind, not as a positional argument.\n${GROUPS_COMMAND_HELP["add-channel"]}`
+        );
+      }
+      return;
+    }
+  }
 }
 
 // List all groups
@@ -1037,15 +1144,15 @@ async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
 
-  if (!command || command === "--help" || command === "-h") {
-    printGroupsHelp();
-    process.exit(0);
+  if (isHelpArg(command)) {
+    printHelpAndExit(GROUPS_HELP);
   }
 
-  if (wantsHelp(args.slice(1))) {
-    printGroupsHelp(command);
-    process.exit(0);
+  if (isSubcommandHelpRequest(args)) {
+    printHelpAndExit(getGroupsHelp(command));
   }
+
+  validateGroupsArgs(args);
 
   await ensureClient(['groups', 'channels']);
 
@@ -1056,23 +1163,22 @@ async function main() {
 
     case "create": {
       const title = args[1];
-      if (!title) {
-        console.error('Usage: groups.ts create "Group Name" [--description "..."]');
-        process.exit(1);
+      if (title === undefined) {
+        printUsageAndExit(GROUPS_COMMAND_HELP.create);
       }
-      const description = getOption(args, "description") || "";
+      const description = getOption(args, "description", 2) || "";
       await createGroupWithChannel(title, description);
       break;
     }
 
     case "create-owned": {
       const title = args[1];
-      const owner = getOption(args, "owner");
-      if (!title || title.startsWith("--") || !owner || owner.startsWith("--")) {
+      const owner = getOption(args, "owner", 2);
+      if (title === undefined || !owner || owner.startsWith("--")) {
         console.error(GROUPS_COMMAND_HELP["create-owned"]);
         process.exit(1);
       }
-      const description = getOption(args, "description") || "";
+      const description = getOption(args, "description", 2) || "";
       await createOwnedGroup(title, owner, description);
       break;
     }
@@ -1081,8 +1187,7 @@ async function main() {
       const groupId = args[1];
       const ships = args.slice(2);
       if (!groupId || ships.length === 0) {
-        console.error("Usage: groups.ts invite <group-id> <ship> [<ship2> ...]");
-        process.exit(1);
+        printUsageAndExit(GROUPS_COMMAND_HELP.invite);
       }
       await inviteToGroup(groupId, ships);
       break;
@@ -1091,8 +1196,7 @@ async function main() {
     case "info": {
       const groupId = args[1];
       if (!groupId) {
-        console.error("Usage: groups.ts info <group-id>");
-        process.exit(1);
+        printUsageAndExit(GROUPS_COMMAND_HELP.info);
       }
       await getGroupInfo(groupId);
       break;
@@ -1101,8 +1205,7 @@ async function main() {
     case "leave": {
       const groupId = args[1];
       if (!groupId) {
-        console.error("Usage: groups.ts leave <group-id>");
-        process.exit(1);
+        printUsageAndExit(GROUPS_COMMAND_HELP.leave);
       }
       await leaveGroupById(groupId);
       break;
@@ -1182,8 +1285,7 @@ async function main() {
     case "delete": {
       const groupId = args[1];
       if (!groupId) {
-        console.error("Usage: groups.ts delete <group-id>");
-        process.exit(1);
+        printUsageAndExit(GROUPS_COMMAND_HELP.delete);
       }
       await deleteGroupById(groupId);
       break;
@@ -1192,10 +1294,7 @@ async function main() {
     case "update": {
       const groupId = args[1];
       if (!groupId) {
-        console.error(
-          'Usage: groups.ts update <group-id> --title "..." [--description "..."] [--image "..."]'
-        );
-        process.exit(1);
+        printUsageAndExit(GROUPS_COMMAND_HELP.update);
       }
       const title = getOption(args, "title");
       const description = getOption(args, "description");
@@ -1209,8 +1308,7 @@ async function main() {
       const groupId = args[1];
       const ships = args.slice(2);
       if (!groupId || ships.length === 0) {
-        console.error("Usage: groups.ts kick <group-id> <ship> [<ship2> ...]");
-        process.exit(1);
+        printUsageAndExit(GROUPS_COMMAND_HELP.kick);
       }
       await kickMembers(groupId, ships);
       break;
@@ -1220,8 +1318,7 @@ async function main() {
       const groupId = args[1];
       const ships = args.slice(2);
       if (!groupId || ships.length === 0) {
-        console.error("Usage: groups.ts ban <group-id> <ship> [<ship2> ...]");
-        process.exit(1);
+        printUsageAndExit(GROUPS_COMMAND_HELP.ban);
       }
       await banMembers(groupId, ships);
       break;
@@ -1231,8 +1328,7 @@ async function main() {
       const groupId = args[1];
       const ships = args.slice(2);
       if (!groupId || ships.length === 0) {
-        console.error("Usage: groups.ts unban <group-id> <ship> [<ship2> ...]");
-        process.exit(1);
+        printUsageAndExit(GROUPS_COMMAND_HELP.unban);
       }
       await unbanMembers(groupId, ships);
       break;
@@ -1242,10 +1338,7 @@ async function main() {
       const groupId = args[1];
       const roleId = args[2];
       if (!groupId || !roleId) {
-        console.error(
-          'Usage: groups.ts add-role <group-id> <role-id> --title "..." [--description "..."]'
-        );
-        process.exit(1);
+        printUsageAndExit(GROUPS_COMMAND_HELP["add-role"]);
       }
       const title = getOption(args, "title");
       const description = getOption(args, "description");
@@ -1257,8 +1350,7 @@ async function main() {
       const groupId = args[1];
       const roleId = args[2];
       if (!groupId || !roleId) {
-        console.error("Usage: groups.ts delete-role <group-id> <role-id>");
-        process.exit(1);
+        printUsageAndExit(GROUPS_COMMAND_HELP["delete-role"]);
       }
       await deleteRole(groupId, roleId);
       break;
@@ -1268,10 +1360,7 @@ async function main() {
       const groupId = args[1];
       const roleId = args[2];
       if (!groupId || !roleId) {
-        console.error(
-          'Usage: groups.ts update-role <group-id> <role-id> --title "..." [--description "..."]'
-        );
-        process.exit(1);
+        printUsageAndExit(GROUPS_COMMAND_HELP["update-role"]);
       }
       const title = getOption(args, "title");
       const description = getOption(args, "description");
@@ -1284,10 +1373,7 @@ async function main() {
       const roleId = args[2];
       const ships = args.slice(3);
       if (!groupId || !roleId || ships.length === 0) {
-        console.error(
-          "Usage: groups.ts assign-role <group-id> <role-id> <ship> [<ship2> ...]"
-        );
-        process.exit(1);
+        printUsageAndExit(GROUPS_COMMAND_HELP["assign-role"]);
       }
       await assignRole(groupId, roleId, ships);
       break;
@@ -1298,10 +1384,7 @@ async function main() {
       const roleId = args[2];
       const ships = args.slice(3);
       if (!groupId || !roleId || ships.length === 0) {
-        console.error(
-          "Usage: groups.ts remove-role <group-id> <role-id> <ship> [<ship2> ...]"
-        );
-        process.exit(1);
+        printUsageAndExit(GROUPS_COMMAND_HELP["remove-role"]);
       }
       await removeRole(groupId, roleId, ships);
       break;
@@ -1311,8 +1394,7 @@ async function main() {
       const groupId = args[1];
       const privacy = args[2] as "public" | "private" | "secret";
       if (!groupId || !privacy || !["public", "private", "secret"].includes(privacy)) {
-        console.error("Usage: groups.ts set-privacy <group-id> <public|private|secret>");
-        process.exit(1);
+        printUsageAndExit(GROUPS_COMMAND_HELP["set-privacy"]);
       }
       await setGroupPrivacy(groupId, privacy);
       break;
@@ -1322,8 +1404,7 @@ async function main() {
       const groupId = args[1];
       const ships = args.slice(2);
       if (!groupId || ships.length === 0) {
-        console.error("Usage: groups.ts accept-join <group-id> <ship> [<ship2> ...]");
-        process.exit(1);
+        printUsageAndExit(GROUPS_COMMAND_HELP["accept-join"]);
       }
       await acceptJoin(groupId, ships);
       break;
@@ -1333,8 +1414,7 @@ async function main() {
       const groupId = args[1];
       const ships = args.slice(2);
       if (!groupId || ships.length === 0) {
-        console.error("Usage: groups.ts reject-join <group-id> <ship> [<ship2> ...]");
-        process.exit(1);
+        printUsageAndExit(GROUPS_COMMAND_HELP["reject-join"]);
       }
       await rejectJoin(groupId, ships);
       break;
@@ -1344,8 +1424,7 @@ async function main() {
       const groupId = args[1];
       const ships = args.slice(2);
       if (!groupId || ships.length === 0) {
-        console.error("Usage: groups.ts promote <group-id> <ship> [<ship2> ...]");
-        process.exit(1);
+        printUsageAndExit(GROUPS_COMMAND_HELP.promote);
       }
       await promoteMemberToAdmin(groupId, ships);
       break;
@@ -1355,8 +1434,7 @@ async function main() {
       const groupId = args[1];
       const ships = args.slice(2);
       if (!groupId || ships.length === 0) {
-        console.error("Usage: groups.ts demote <group-id> <ship> [<ship2> ...]");
-        process.exit(1);
+        printUsageAndExit(GROUPS_COMMAND_HELP.demote);
       }
       await demoteMemberFromAdmin(groupId, ships);
       break;
@@ -1365,7 +1443,7 @@ async function main() {
     case "add-channel": {
       const groupId = args[1];
       const title = args[2];
-      if (!groupId || !title) {
+      if (!groupId || title === undefined) {
         console.error(GROUPS_COMMAND_HELP["add-channel"]);
         process.exit(1);
       }
@@ -1374,20 +1452,16 @@ async function main() {
         console.error(GROUPS_COMMAND_HELP["add-channel"]);
         process.exit(1);
       }
-      const kind = (getOption(args, "kind") as "chat" | "diary" | "heap") || "chat";
-      const description = getOption(args, "description") || "";
+      const kind = (getOption(args, "kind", 3) as "chat" | "diary" | "heap") || "chat";
+      const description = getOption(args, "description", 3) || "";
       await addChannel(groupId, title, kind, description);
       break;
     }
 
     default:
-      printGroupsHelp();
-      process.exit(1);
+      printUsageAndExit(GROUPS_HELP);
   }
   process.exit(0);
 }
 
-main().catch((err) => {
-  console.error("Error:", err);
-  process.exit(1);
-});
+main().catch(printErrorAndExit);

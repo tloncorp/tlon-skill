@@ -11,6 +11,7 @@
 
 import { getInitialActivity, getGroupAndChannelUnreads, getTextContent } from "@tloncorp/api";
 import { ensureClient } from "./api-client";
+import { isHelpArg, printErrorAndExit, printHelpAndExit, printUsageAndExit } from "./cli-utils";
 
 interface ActivityEvent {
   id: string;
@@ -33,17 +34,13 @@ interface ActivityEvent {
   contactUpdateValue?: string | null;
 }
 
-const ACTIVITY_HELP = `Usage: activity <command>
+const ACTIVITY_HELP = `Usage: tlon activity <command>
 
 Commands:
   mentions [--limit N]   Show mention activity
   replies [--limit N]    Show reply activity
   all [--limit N]        Show all activity
   unreads                Show unread counts`;
-
-function printHelp() {
-  console.log(ACTIVITY_HELP);
-}
 
 // Extract text content from a Story (which is actually an array of blocks)
 function extractText(content: any): string {
@@ -220,19 +217,34 @@ async function getUnreads() {
   }
 }
 
+const ACTIVITY_HANDLERS = {
+  mentions: (limit: number) => getActivity("mentions", limit),
+  replies: (limit: number) => getActivity("replies", limit),
+  all: (limit: number) => getActivity("all", limit),
+  unreads: (_limit: number) => getUnreads(),
+} satisfies Record<string, (limit: number) => Promise<void>>;
+
+type ActivityCommand = keyof typeof ACTIVITY_HANDLERS;
+
+function isActivityCommand(command: string): command is ActivityCommand {
+  return Object.prototype.hasOwnProperty.call(ACTIVITY_HANDLERS, command);
+}
+
 // Main
 async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
 
-  if (command === "--help" || command === "-h") {
-    printHelp();
-    process.exit(0);
+  if (isHelpArg(command)) {
+    printHelpAndExit(ACTIVITY_HELP);
   }
 
   if (!command) {
-    printHelp();
-    process.exit(1);
+    printUsageAndExit(ACTIVITY_HELP);
+  }
+
+  if (!isActivityCommand(command)) {
+    printUsageAndExit(ACTIVITY_HELP);
   }
 
   await ensureClient();
@@ -244,24 +256,8 @@ async function main() {
     limit = parseInt(args[limitIdx + 1], 10);
   }
   
-  switch (command) {
-    case 'mentions':
-      await getActivity('mentions', limit);
-      break;
-    case 'replies':
-      await getActivity('replies', limit);
-      break;
-    case 'all':
-      await getActivity('all', limit);
-      break;
-    case 'unreads':
-      await getUnreads();
-      break;
-    default:
-      printHelp();
-      process.exit(1);
-  }
+  await ACTIVITY_HANDLERS[command](limit);
   process.exit(0);
 }
 
-main().catch(console.error);
+main().catch(printErrorAndExit);

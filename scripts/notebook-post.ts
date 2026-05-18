@@ -21,7 +21,13 @@ import * as fs from "fs";
 import { getCurrentUserId, sendPost } from "@tloncorp/api";
 import type { Story } from "@tloncorp/api";
 import { ensureClient } from "./api-client";
-import { getRequiredOptionValue } from "./cli-utils";
+import {
+  getRequiredOptionValue,
+  isCommandHelpRequest,
+  printErrorAndExit,
+  printHelpAndExit,
+  printUsageAndExit,
+} from "./cli-utils";
 import { normalizeNotebookContent, type NotebookStory } from "./notebook-content";
 import { markdownToStory } from "./story";
 
@@ -30,6 +36,27 @@ interface PostResult {
   error?: string;
   messageId?: string;
 }
+
+const NOTEBOOK_HELP = `Usage: tlon notebook <nest> <title> [options]
+
+Arguments:
+  nest    Diary channel nest (e.g., diary/~host/channel-name)
+  title   Post title
+
+Options:
+  --image <url>     Cover image URL
+  --content <file>  JSON file with Story JSON
+  --stdin           Read Story JSON from stdin
+  --markdown <file> Markdown file to convert to Story
+  --markdown-stdin  Read Markdown from stdin
+
+If no content is provided, creates a post with a title and empty body.
+
+Examples:
+  tlon notebook diary/~host/notes "Hello World"
+  tlon notebook diary/~host/notes "My Post" --image https://example.com/img.png
+  echo '[{"inline":["Hello!"]}]' | tlon notebook diary/~host/notes "Test" --stdin
+  tlon notebook diary/~host/notes "Markdown Post" --markdown post.md`;
 
 function toApiStory(content: NotebookStory): Story {
   return content as unknown as Story;
@@ -68,29 +95,12 @@ export async function postToNotebook(
 async function main() {
   const args = process.argv.slice(2);
 
-  if (args.length < 2 || args.includes("--help") || args.includes("-h")) {
-    console.log(`Usage: npx ts-node scripts/notebook-post.ts <nest> <title> [options]
+  if (isCommandHelpRequest(args)) {
+    printHelpAndExit(NOTEBOOK_HELP);
+  }
 
-Arguments:
-  nest    Diary channel nest (e.g., diary/~host/channel-name)
-  title   Post title
-
-Options:
-  --image <url>     Cover image URL
-  --content <file>  JSON file with Story JSON
-  --stdin           Read Story JSON from stdin
-  --markdown <file> Markdown file to convert to Story
-  --markdown-stdin  Read Markdown from stdin
-
-If no content is provided, creates a post with a title and empty body.
-
-Examples:
-  npx ts-node scripts/notebook-post.ts diary/~host/notes "Hello World"
-  npx ts-node scripts/notebook-post.ts diary/~host/notes "My Post" --image https://example.com/img.png
-  echo '[{"inline":["Hello!"]}]' | npx ts-node scripts/notebook-post.ts diary/~host/notes "Test" --stdin
-  npx ts-node scripts/notebook-post.ts diary/~host/notes "Markdown Post" --markdown post.md
-`);
-    process.exit(args.includes("--help") || args.includes("-h") ? 0 : 1);
+  if (args.length < 2) {
+    printUsageAndExit(NOTEBOOK_HELP);
   }
 
   const nest = args[0];
@@ -161,7 +171,4 @@ Examples:
 }
 
 main()
-  .catch((err) => {
-    console.error("Error:", err);
-    process.exit(1);
-  });
+  .catch(printErrorAndExit);

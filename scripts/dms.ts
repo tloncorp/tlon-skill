@@ -26,7 +26,93 @@ import {
 } from "@tloncorp/api";
 import type { Channel } from "@tloncorp/api";
 import { ensureClient, normalizeShip } from "./api-client";
+import {
+  isHelpArg,
+  printErrorAndExit,
+  printHelpAndExit,
+  printUsageAndExit,
+  wantsHelp,
+} from "./cli-utils";
 import { markdownToStory, type Story } from "./story";
+
+const DMS_HELP = `Usage: tlon dms <command>
+
+Commands:
+  send <club-id> <message>        Send a message to a group DM
+  reply <club-id> <post-id> <msg> Reply in a group DM (post-id must include author)
+  react <ship> <post-id> <emoji>  React to a DM (post-id must include author)
+  unreact <ship> <post-id>        Remove reaction from a DM (post-id must include author)
+  delete <ship> <post-id>         Delete a DM (post-id may include author)
+  accept <ship>                   Accept a DM invite
+  decline <ship>                  Decline a DM invite`;
+
+const DMS_COMMAND_HELP: Record<string, string> = {
+  send: "Usage: tlon dms send <club-id> <message>",
+  reply: "Usage: tlon dms reply <club-id> <post-id> <message>",
+  react: "Usage: tlon dms react <ship> <post-id> <emoji>",
+  unreact: "Usage: tlon dms unreact <ship> <post-id>",
+  delete: "Usage: tlon dms delete <ship> <post-id>",
+  accept: "Usage: tlon dms accept <ship>",
+  decline: "Usage: tlon dms decline <ship>",
+};
+
+function getDmsHelp(command?: string): string {
+  return command ? DMS_COMMAND_HELP[command] ?? DMS_HELP : DMS_HELP;
+}
+
+function isDmsMessageHelpLiteral(args: string[]): boolean {
+  const command = args[0];
+  if (command === "send") {
+    return !!args[1] && wantsHelp(args.slice(2));
+  }
+  if (command === "reply") {
+    return !!args[1] && !!args[2] && wantsHelp(args.slice(3));
+  }
+  return false;
+}
+
+function validateDmsArgs(args: string[]): void {
+  const command = args[0];
+  if (!command || !DMS_COMMAND_HELP[command]) {
+    printUsageAndExit(DMS_HELP);
+  }
+
+  switch (command) {
+    case "send": {
+      const clubId = args[1];
+      const message = args.slice(2).join(" ");
+      if (!clubId || !message) printUsageAndExit(DMS_COMMAND_HELP.send);
+      if (!isClub(clubId)) {
+        printErrorAndExit("send only supports group DMs (club IDs starting with 0v)");
+      }
+      return;
+    }
+    case "reply": {
+      const clubId = args[1];
+      const postId = args[2];
+      const message = args.slice(3).join(" ");
+      if (!clubId || !postId || !message) printUsageAndExit(DMS_COMMAND_HELP.reply);
+      if (!isClub(clubId)) {
+        printErrorAndExit("reply only supports group DMs (club IDs starting with 0v)");
+      }
+      return;
+    }
+    case "react": {
+      if (!args[1] || !args[2] || !args[3]) printUsageAndExit(DMS_COMMAND_HELP.react);
+      return;
+    }
+    case "unreact":
+    case "delete": {
+      if (!args[1] || !args[2]) printUsageAndExit(DMS_COMMAND_HELP[command]);
+      return;
+    }
+    case "accept":
+    case "decline": {
+      if (!args[1]) printUsageAndExit(DMS_COMMAND_HELP[command]);
+      return;
+    }
+  }
+}
 
 // Parse content into Story format with rich markdown support
 function parseContent(message: string): Story {
@@ -216,6 +302,16 @@ async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
 
+  if (isHelpArg(command)) {
+    printHelpAndExit(DMS_HELP);
+  }
+
+  if (wantsHelp(args.slice(1)) && !isDmsMessageHelpLiteral(args)) {
+    printHelpAndExit(getDmsHelp(command));
+  }
+
+  validateDmsArgs(args);
+
   await ensureClient(['chat']);
 
   switch (command) {
@@ -223,12 +319,10 @@ async function main() {
       const clubId = args[1];
       const message = args.slice(2).join(" ");
       if (!clubId || !message) {
-        console.error("Usage: dms.ts send <club-id> <message>");
-        process.exit(1);
+        printUsageAndExit(DMS_COMMAND_HELP.send);
       }
       if (!isClub(clubId)) {
-        console.error("Error: send only supports group DMs (club IDs starting with 0v)");
-        process.exit(1);
+        printErrorAndExit("send only supports group DMs (club IDs starting with 0v)");
       }
       const result = await sendClubMessage(clubId, message);
       if (result.success) {
@@ -245,12 +339,10 @@ async function main() {
       const postId = args[2];
       const message = args.slice(3).join(" ");
       if (!clubId || !postId || !message) {
-        console.error("Usage: dms.ts reply <club-id> <post-id> <message>");
-        process.exit(1);
+        printUsageAndExit(DMS_COMMAND_HELP.reply);
       }
       if (!isClub(clubId)) {
-        console.error("Error: reply only supports group DMs (club IDs starting with 0v)");
-        process.exit(1);
+        printErrorAndExit("reply only supports group DMs (club IDs starting with 0v)");
       }
       const result = await replyToClub(clubId, postId, message);
       if (result.success) {
@@ -267,8 +359,7 @@ async function main() {
       const postId = args[2];
       const react = args[3];
       if (!ship || !postId || !react) {
-        console.error("Usage: dms.ts react <ship> <post-id> <emoji>");
-        process.exit(1);
+        printUsageAndExit(DMS_COMMAND_HELP.react);
       }
       const result = await reactToDM(ship, postId, react);
       if (result.success) {
@@ -284,8 +375,7 @@ async function main() {
       const ship = args[1];
       const postId = args[2];
       if (!ship || !postId) {
-        console.error("Usage: dms.ts unreact <ship> <post-id>");
-        process.exit(1);
+        printUsageAndExit(DMS_COMMAND_HELP.unreact);
       }
       const result = await unreactToDM(ship, postId);
       if (result.success) {
@@ -301,8 +391,7 @@ async function main() {
       const ship = args[1];
       const postId = args[2];
       if (!ship || !postId) {
-        console.error("Usage: dms.ts delete <ship> <post-id>");
-        process.exit(1);
+        printUsageAndExit(DMS_COMMAND_HELP.delete);
       }
       const result = await deleteDM(ship, postId);
       if (result.success) {
@@ -317,8 +406,7 @@ async function main() {
     case "accept": {
       const ship = args[1];
       if (!ship) {
-        console.error("Usage: dms.ts accept <ship>");
-        process.exit(1);
+        printUsageAndExit(DMS_COMMAND_HELP.accept);
       }
       const result = await acceptDM(ship);
       if (result.success) {
@@ -333,8 +421,7 @@ async function main() {
     case "decline": {
       const ship = args[1];
       if (!ship) {
-        console.error("Usage: dms.ts decline <ship>");
-        process.exit(1);
+        printUsageAndExit(DMS_COMMAND_HELP.decline);
       }
       const result = await declineDM(ship);
       if (result.success) {
@@ -347,23 +434,9 @@ async function main() {
     }
 
     default:
-      console.log(`Usage: dms.ts <command>
-
-Commands:
-  send <club-id> <message>        Send a message to a group DM
-  reply <club-id> <post-id> <msg> Reply in a group DM (post-id must include author)
-  react <ship> <post-id> <emoji>  React to a DM (post-id must include author)
-  unreact <ship> <post-id>        Remove reaction from a DM (post-id must include author)
-  delete <ship> <post-id>         Delete a DM (post-id may include author)
-  accept <ship>                   Accept a DM invite
-  decline <ship>                  Decline a DM invite
-`);
-      process.exit(1);
+      printUsageAndExit(DMS_HELP);
   }
   process.exit(0);
 }
 
-main().catch((err) => {
-  console.error("Error:", err);
-  process.exit(1);
-});
+main().catch(printErrorAndExit);

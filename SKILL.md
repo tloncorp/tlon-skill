@@ -47,11 +47,11 @@ tlon channels groups
 **Direct binary (no Node required):**
 
 ```bash
-curl -L https://registry.npmjs.org/@tloncorp/tlon-skill-darwin-arm64/-/tlon-skill-darwin-arm64-0.1.0.tgz | tar -xz
+curl -L https://registry.npmjs.org/@tloncorp/tlon-skill-darwin-arm64/-/tlon-skill-darwin-arm64-0.4.0.tgz | tar -xz
 ./package/tlon channels groups
 ```
 
-Replace `darwin-arm64` with `darwin-x64` or `linux-x64` as needed.
+Replace `darwin-arm64` with `darwin-x64`, `linux-x64`, or `linux-arm64` as needed.
 
 ## Configuration
 
@@ -143,9 +143,9 @@ If you have credentials for multiple ships, you can use this skill to operate on
 Simply pass the target ship's credentials via CLI flags:
 
 ```bash
-# Post to a channel as ~other-ship
+# Read channels as ~other-ship
 tlon --url https://other-ship.tlon.network --ship ~other-ship --code their-access-code \
-  posts send chat/~host/channel "Hello from other-ship"
+  channels groups
 
 # Or keep credentials in config files
 tlon --config ~/ships/bot.json channels groups
@@ -153,6 +153,8 @@ tlon --config ~/ships/moon.json contacts self
 ```
 
 ## Commands
+
+Help and usage errors are handled locally before credential lookup, so `tlon <command> --help` works without a configured ship.
 
 ### Activity
 
