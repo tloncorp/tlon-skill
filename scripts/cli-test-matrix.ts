@@ -174,7 +174,7 @@ export const MISSING_REQUIRED_CASES: CliCase[] = [
 
 export const SPECIAL_INPUT_CASES: CliCase[] = [
   usageErrorCase(
-    "contacts update-profile missing flag value",
+    "contacts update-profile missing option value",
     ["contacts", "update-profile", "--nickname"],
     "Usage: tlon contacts update-profile"
   ),
@@ -189,7 +189,7 @@ export const SPECIAL_INPUT_CASES: CliCase[] = [
     "Usage: tlon posts edit"
   ),
   usageErrorCase(
-    "groups update missing update flag",
+    "groups update missing update option",
     ["groups", "update", "~host/group-slug"],
     "At least one of --title, --description, --image, or --cover is required"
   ),
