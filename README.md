@@ -32,12 +32,21 @@ curl -L https://registry.npmjs.org/@tloncorp/tlon-skill-linux-arm64/-/tlon-skill
 # Cookie-based auth (fastest - ship parsed from cookie)
 tlon --url https://your-ship.tlon.network --cookie "urbauth-~your-ship=0v..." contacts self
 
+# Cookie-based auth with explicit ship and code fallback
+tlon --url https://your-ship.tlon.network --ship ~your-ship \
+  --cookie "urbauth-~your-ship=0v..." --code sampel-ticlyt-migfun-falmel contacts self
+
 # Code-based auth (requires all three)
 tlon --url https://your-ship.tlon.network --ship ~your-ship --code sampel-ticlyt-migfun-falmel contacts self
+
+# Use skill-dir or cached credentials for one ship
+tlon --ship ~your-ship contacts self
 
 # Or use a config file
 tlon --config ~/ships/my-ship.json contacts self
 ```
+
+Valid CLI credential forms are `--config <file>`, `--url <url> --cookie <cookie>` with optional `--ship` and fallback `--code`, `--url <url> --ship <ship> --code <code>`, and `--ship <ship>`. Incomplete or conflicting credential flag sets fail locally instead of merging with environment variables.
 
 Config file format:
 ```json
@@ -60,34 +69,42 @@ export URBIT_SHIP="~your-ship"
 export URBIT_CODE="sampel-ticlyt-migfun-falmel"
 ```
 
-**Option 3: OpenClaw config**
+`URBIT_*` aliases take precedence over `TLON_*` aliases for the same field. Partial ambient credentials fail locally except ship-only env, which is used for `TLON_SHIP + TLON_SKILL_DIR` or cache lookup.
 
-If you have OpenClaw configured with a Tlon channel, credentials are loaded automatically.
+**Option 3: Skill directory**
+
+When `TLON_SHIP` and `TLON_SKILL_DIR` are set, the CLI loads `ships/<ship>.json` from that skill directory before checking cached credentials.
+
+**Option 4: OpenClaw config**
+
+If you have OpenClaw configured with a Tlon channel, credentials are loaded automatically from JSON config. The default path is `~/.openclaw/openclaw.json`; `OPENCLAW_CONFIG` can point to an explicit JSON config path and is parsed as JSON regardless of extension.
+
+**Resolution order:** CLI credential flags -> `TLON_CONFIG_FILE` -> URL + cookie env -> URL + ship + code env -> `TLON_SHIP + TLON_SKILL_DIR` -> ship-only cache lookup -> OpenClaw JSON -> single cached ship.
 
 ## Cookie Caching
 
-The skill automatically caches auth cookies to `~/.tlon/cache/<ship>.json` after successful authentication.
+The skill caches fresh auth cookies from code login and code fallback to `~/.tlon/cache/<ship>.json`. Provided-cookie flows validate the cookie but do not copy that cookie into cache.
 
 ```bash
 # First time - auth and cache
 $ tlon --url https://zod.tlon.network --ship ~zod --code abcd-efgh contacts self
-Note: Credentials cached for ~zod. Next time just run: tlon <command>
+Note: Credentials cached for ~zod. Next time run: tlon --ship ~zod <command>
 
-# After that - no flags needed!
-$ tlon contacts self
+# After that - select the cached ship
+$ tlon --ship ~zod contacts self
 
 # Multiple cached ships? Specify which one:
 $ tlon --ship ~zod contacts self
 ```
 
-Clear cache: `rm ~/.tlon/cache/*.json`
+Cache entries are ship- and URL-specific. Clear cache: `rm ~/.tlon/cache/*.json`
 
 ## Cookie vs Code Authentication
 
 - **Cookie-based auth**: Uses a pre-authenticated session cookie. Faster since it skips login.
-- **Code-based auth**: Performs a login request to get a session cookie.
+- **Code-based auth**: Performs a login request to get a fresh session cookie.
 
-The ship name is embedded in the cookie (`urbauth-~ship=...`), so you don't need to specify it separately with cookie auth.
+The ship name is embedded in the cookie (`urbauth-~ship=...`), so you don't need to specify it separately with cookie auth unless you want to override it. You can provide both cookie and code; the cookie is used first and the code is fallback if the cookie has expired.
 
 ## Multi-Ship Usage
 

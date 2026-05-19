@@ -330,6 +330,11 @@ export const LITERAL_OPTION_LIKE_VALUE_CASES: CliCase[] = [
     "create",
     "--description",
   ]),
+  authRequiredCase("groups create exact global-flag-name title reaches auth", [
+    "groups",
+    "create",
+    "--ship",
+  ]),
   authRequiredCase("groups create-owned title option-like value reaches auth", [
     "groups",
     "create-owned",
