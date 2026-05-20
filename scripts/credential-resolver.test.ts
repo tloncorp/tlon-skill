@@ -111,6 +111,35 @@ describe("credential resolver", () => {
     expect(result.mayReadAuthCache).toBe(false);
   });
 
+  it("lets CLI --ship use cache when TLON_SKILL_DIR is set but the ship file is missing", () => {
+    const files = {
+      [getCachePath(CACHE_DIR, "zod")]: cacheFile("zod", "https://cache.tlon.network"),
+    };
+
+    const result = resolveCredentials({
+      ...baseInput(files, { TLON_SKILL_DIR: SKILL_DIR }),
+      cli: { kind: "ship", ship: "~zod" },
+    });
+
+    expect(result.origin).toBe("ship-cache");
+    expect(result.config.url).toBe("https://cache.tlon.network");
+    expect(result.provenance.selectedBy).toBe("cli");
+  });
+
+  it("fails when CLI --ship finds an invalid TLON_SKILL_DIR file even if cache exists", () => {
+    const files = {
+      [path.join(SKILL_DIR, "ships", "zod.json")]: json({ url: "https://skill.tlon.network" }),
+      [getCachePath(CACHE_DIR, "zod")]: cacheFile("zod", "https://cache.tlon.network"),
+    };
+
+    expect(() =>
+      resolveCredentials({
+        ...baseInput(files, { TLON_SKILL_DIR: SKILL_DIR }),
+        cli: { kind: "ship", ship: "~zod" },
+      })
+    ).toThrow("Invalid config");
+  });
+
   it("preserves URBIT_* alias precedence while allowing mixed aliases for cookie auth", () => {
     const result = resolveCredentials(
       baseInput({}, {
@@ -258,6 +287,18 @@ describe("credential resolver", () => {
 
     expect(result.origin).toBe("skill-dir");
     expect(result.config.url).toBe("https://skill.tlon.network");
+  });
+
+  it("lets TLON_SHIP use cache when TLON_SKILL_DIR is set but the ship file is missing", () => {
+    const files = {
+      [getCachePath(CACHE_DIR, "zod")]: cacheFile("zod", "https://cache.tlon.network"),
+    };
+
+    const result = resolveCredentials(baseInput(files, { TLON_SHIP: "~zod", TLON_SKILL_DIR: SKILL_DIR }));
+
+    expect(result.origin).toBe("ship-cache");
+    expect(result.config.url).toBe("https://cache.tlon.network");
+    expect(result.provenance.selectedBy).toBe("env");
   });
 
   it("loads OpenClaw JSON fallback and preserves legacy JSON fallbacks", () => {

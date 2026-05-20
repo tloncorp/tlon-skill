@@ -489,14 +489,17 @@ function resolveShipOnly(
   const normalizedShip = normalizeShipName(ship);
   const skillDir = input.env.TLON_SKILL_DIR;
   if (nonEmpty(skillDir)) {
-    return resolutionFromTopLevelConfig(
-      path.join(skillDir, "ships", `${normalizedShip}.json`),
-      input.fs,
-      "skill-dir",
-      selectedBy,
-      selectedBy === "cli" ? "cli" : "env",
-      normalizedShip
-    );
+    const skillConfigPath = path.join(skillDir, "ships", `${normalizedShip}.json`);
+    if (input.fs.exists(skillConfigPath)) {
+      return resolutionFromTopLevelConfig(
+        skillConfigPath,
+        input.fs,
+        "skill-dir",
+        selectedBy,
+        selectedBy === "cli" ? "cli" : "env",
+        normalizedShip
+      );
+    }
   }
 
   const cached = readCachedEntryForShip(input.cacheDir, normalizedShip, input.fs);
