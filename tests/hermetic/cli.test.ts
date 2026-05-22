@@ -59,7 +59,11 @@ function hermeticEnv(
   return env;
 }
 
-async function runCli(args: string[], options: RunOptions = {}): Promise<CliResult> {
+async function runBunScript(
+  entrypoint: string,
+  args: string[],
+  options: RunOptions = {}
+): Promise<CliResult> {
   const tempRoot = makeTempDir("tlon-hermetic-");
   const home = join(tempRoot, "home");
   const cacheDir = join(tempRoot, "cache");
@@ -79,7 +83,7 @@ async function runCli(args: string[], options: RunOptions = {}): Promise<CliResu
     const proc = Bun.spawn(
       [
         process.execPath,
-        "scripts/main.ts",
+        entrypoint,
         ...(prepared.argsPrefix ?? []),
         ...args,
       ],
@@ -101,7 +105,7 @@ async function runCli(args: string[], options: RunOptions = {}): Promise<CliResu
       timeout = setTimeout(() => {
         proc.kill("SIGKILL");
         output.catch(() => {});
-        reject(new Error(`CLI timed out after ${CLI_TIMEOUT_MS}ms: ${args.join(" ")}`));
+        reject(new Error(`CLI timed out after ${CLI_TIMEOUT_MS}ms: ${entrypoint} ${args.join(" ")}`));
       }, CLI_TIMEOUT_MS);
     });
 
@@ -124,6 +128,18 @@ async function runCli(args: string[], options: RunOptions = {}): Promise<CliResu
   } finally {
     prepared.cleanup?.();
   }
+}
+
+async function runCli(args: string[], options: RunOptions = {}): Promise<CliResult> {
+  return runBunScript("scripts/main.ts", args, options);
+}
+
+async function runDirectScript(
+  command: "activity" | "upload",
+  args: string[],
+  options: RunOptions = {}
+): Promise<CliResult> {
+  return runBunScript(`scripts/${command}.ts`, args, options);
 }
 
 afterEach(() => {
@@ -167,6 +183,8 @@ const hostileHelpCommands = [
   })),
 ];
 
+const directPilotCommands = ["activity", "upload"] as const;
+
 describe("CLI hermetic subprocess behavior", () => {
   it("prints source CLI version without host credentials", async () => {
     const result = await runCli(["--version"]);
@@ -206,6 +224,41 @@ describe("CLI hermetic subprocess behavior", () => {
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("Usage:");
       expect(result.stderr).toBe("");
+    });
+  }
+
+  for (const command of directPilotCommands) {
+    it(`prints direct ${command} help without host credentials`, async () => {
+      const result = await runDirectScript(command, ["--help"]);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain(`Usage: tlon ${command}`);
+      expect(result.stderr).toBe("");
+    });
+
+    it(`prints direct ${command} help with CLI --config /nonexistent`, async () => {
+      const result = await runDirectScript(command, ["--help"], {
+        prepare: ({ home }) => ({
+          argsPrefix: ["--config", join(home, "missing-ship.json")],
+        }),
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain(`Usage: tlon ${command}`);
+      expect(result.stderr).toBe("");
+    });
+
+    it(`fails malformed direct ${command} credential flags locally`, async () => {
+      const result = await runDirectScript(command, [
+        "--url",
+        "https://cli.tlon.network",
+        "--help",
+      ]);
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("Invalid credential flags");
+      expect(result.stderr).not.toContain("Missing Urbit config");
     });
   }
 

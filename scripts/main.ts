@@ -18,6 +18,10 @@
  */
 
 import { setCliCredentialOverrides } from "./api-client";
+import { createActivityDeps, createUploadDeps } from "./command-runtime";
+import { formatUnexpectedError } from "./commands/command";
+import { run as runActivityCommand } from "./commands/activity";
+import { run as runUploadCommand } from "./commands/upload";
 import { CredentialFlagError, parseGlobalCliOptions } from "./credential-flags";
 import { isTopLevelCommand } from "./top-level-commands";
 
@@ -131,68 +135,73 @@ async function main() {
     process.exit(1);
   }
 
-  // Rewrite process.argv so scripts see their args correctly
   const scriptArgs = args.slice(1);
-  process.argv = ["tlon", command, ...scriptArgs];
 
   try {
     switch (command) {
       case "activity": {
-        const mod = await import("./activity");
+        const exitCode = await runActivityCommand(scriptArgs, createActivityDeps());
+        process.exit(exitCode);
+        break;
+      }
+      case "upload": {
+        const exitCode = await runUploadCommand(scriptArgs, createUploadDeps());
+        process.exit(exitCode);
         break;
       }
       case "channels": {
+        process.argv = ["tlon", command, ...scriptArgs];
         const mod = await import("./channels");
         break;
       }
       case "contacts": {
+        process.argv = ["tlon", command, ...scriptArgs];
         const mod = await import("./contacts");
         break;
       }
       case "dms": {
+        process.argv = ["tlon", command, ...scriptArgs];
         const mod = await import("./dms");
         break;
       }
       case "expose": {
+        process.argv = ["tlon", command, ...scriptArgs];
         const mod = await import("./expose");
         break;
       }
       case "groups": {
+        process.argv = ["tlon", command, ...scriptArgs];
         const mod = await import("./groups");
         break;
       }
       case "hooks": {
+        process.argv = ["tlon", command, ...scriptArgs];
         const mod = await import("./hooks");
         break;
       }
       case "messages": {
+        process.argv = ["tlon", command, ...scriptArgs];
         const mod = await import("./messages");
         break;
       }
       case "notebook": {
+        process.argv = ["tlon", command, ...scriptArgs];
         const mod = await import("./notebook-post");
         break;
       }
       case "posts": {
+        process.argv = ["tlon", command, ...scriptArgs];
         const mod = await import("./posts");
         break;
       }
       case "settings": {
+        process.argv = ["tlon", command, ...scriptArgs];
         const mod = await import("./settings");
-        break;
-      }
-      case "upload": {
-        const mod = await import("./upload");
-        await mod.main(scriptArgs);
         break;
       }
     }
   } catch (error: any) {
-    if (error.message?.includes("Missing Urbit config")) {
-      console.error("Error:", error.message);
-    } else {
-      console.error("Error:", error.message || error);
-    }
+    process.stderr.write(formatUnexpectedError(error));
     process.exit(1);
   }
 }
