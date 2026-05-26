@@ -532,7 +532,7 @@ function resolveCli(input: CredentialResolverInput, cli: CliCredentialOverrides)
 function missingConfigError(): Error {
   return new Error(
     "Missing Urbit config. Either:\n" +
-      "  - Use CLI flags: --config <file>, --url + --cookie, --url + --ship + --code, or --ship <ship>\n" +
+      "  - Use CLI flags: --config <file>, --url + --cookie, --url + --ship + --code, or --ship <ship> when available in TLON_SKILL_DIR or cache\n" +
       "  - Set TLON_CONFIG_FILE to a JSON config file\n" +
       "  - Set URBIT_URL/TLON_URL with URBIT_COOKIE/TLON_COOKIE\n" +
       "  - Set URL + SHIP + CODE via URBIT_* or TLON_* env vars\n" +

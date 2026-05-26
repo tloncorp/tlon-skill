@@ -19,6 +19,7 @@
 
 import { setCliCredentialOverrides } from "./api-client";
 import { CredentialFlagError, parseGlobalCliOptions } from "./credential-flags";
+import { isTopLevelCommand } from "./top-level-commands";
 
 // Version is injected at build time via --define
 declare const __VERSION__: string;
@@ -55,7 +56,7 @@ Valid credential forms:
   --config <file>
   --url <url> --cookie <cookie> [--ship <ship>] [--code <code>]
   --url <url> --ship <ship> --code <code>
-  --ship <ship>
+  --ship <ship> when available in TLON_SKILL_DIR or cache
 
 Incomplete or conflicting credential flag sets fail locally instead of merging with env vars.
 
@@ -124,6 +125,12 @@ async function main() {
     process.exit(0);
   }
 
+  if (!isTopLevelCommand(command)) {
+    console.error(`Unknown command: ${command}`);
+    console.error('Run "tlon --help" for usage information.');
+    process.exit(1);
+  }
+
   // Rewrite process.argv so scripts see their args correctly
   const scriptArgs = args.slice(1);
   process.argv = ["tlon", command, ...scriptArgs];
@@ -179,10 +186,6 @@ async function main() {
         await mod.main(scriptArgs);
         break;
       }
-      default:
-        console.error(`Unknown command: ${command}`);
-        console.error('Run "tlon --help" for usage information.');
-        process.exit(1);
     }
   } catch (error: any) {
     if (error.message?.includes("Missing Urbit config")) {

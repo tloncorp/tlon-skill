@@ -1,22 +1,8 @@
 import type { CliCredentialOverrides } from "./credential-resolver";
+import { TOP_LEVEL_COMMAND_SET } from "./top-level-commands";
 
 const CREDENTIAL_FLAGS = ["config", "url", "ship", "code", "cookie"] as const;
 type CredentialFlag = (typeof CREDENTIAL_FLAGS)[number];
-
-const DEFAULT_COMMANDS = new Set([
-  "activity",
-  "channels",
-  "contacts",
-  "dms",
-  "expose",
-  "groups",
-  "hooks",
-  "messages",
-  "notebook",
-  "posts",
-  "settings",
-  "upload",
-]);
 
 export class CredentialFlagError extends Error {
   constructor(message: string) {
@@ -43,7 +29,7 @@ function invalidFormsMessage(): string {
   return (
     "Invalid credential flags: use one of " +
     "--config <file>, --url <url> --cookie <cookie> [--ship <ship>] [--code <code>], " +
-    "--url <url> --ship <ship> --code <code>, or --ship <ship>."
+    "--url <url> --ship <ship> --code <code>, or --ship <ship> when available in TLON_SKILL_DIR or cache."
   );
 }
 
@@ -83,7 +69,7 @@ function buildCredentialOverrides(flags: Partial<Record<CredentialFlag, string>>
 
 export function parseGlobalCliOptions(
   rawArgs: string[],
-  knownCommands: Set<string> = DEFAULT_COMMANDS
+  knownCommands: ReadonlySet<string> = TOP_LEVEL_COMMAND_SET
 ): ParsedGlobalCliOptions {
   const flags: Partial<Record<CredentialFlag, string>> = {};
   const seen = new Set<CredentialFlag>();

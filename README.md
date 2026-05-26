@@ -46,7 +46,7 @@ tlon --ship ~your-ship contacts self
 tlon --config ~/ships/my-ship.json contacts self
 ```
 
-Valid CLI credential forms are `--config <file>`, `--url <url> --cookie <cookie>` with optional `--ship` and fallback `--code`, `--url <url> --ship <ship> --code <code>`, and `--ship <ship>`. Incomplete or conflicting credential flag sets fail locally instead of merging with environment variables.
+Valid CLI credential forms are `--config <file>`, `--url <url> --cookie <cookie>` with optional `--ship` and fallback `--code`, `--url <url> --ship <ship> --code <code>`, and `--ship <ship>` when available in `TLON_SKILL_DIR` or cache. Incomplete or conflicting credential flag sets fail locally instead of merging with environment variables.
 
 Config file format:
 ```json
