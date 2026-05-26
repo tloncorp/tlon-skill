@@ -17,6 +17,10 @@
  *   settings     OpenClaw settings management
  */
 
+import { setCliCredentialOverrides } from "./api-client";
+import { CredentialFlagError, parseGlobalCliOptions } from "./credential-flags";
+import { isTopLevelCommand } from "./top-level-commands";
+
 // Version is injected at build time via --define
 declare const __VERSION__: string;
 const VERSION = typeof __VERSION__ !== "undefined" ? __VERSION__ : "dev";
@@ -44,9 +48,17 @@ Commands:
 Credential Options (override defaults):
   --config <file>   Path to JSON config file with url + cookie or url + ship + code
   --url <url>       Ship URL (e.g., https://your-ship.tlon.network)
-  --ship <~name>    Ship name (uses cached credentials if available)
+  --ship <~name>    Ship name (uses TLON_SKILL_DIR or cached credentials)
   --code <code>     Access code (e.g., sampel-ticlyt-migfun-falmel)
-  --cookie <cookie> Pre-authenticated cookie (ship is parsed from cookie name)
+  --cookie <cookie> Pre-authenticated cookie (ship is parsed from cookie name unless --ship is set)
+
+Valid credential forms:
+  --config <file>
+  --url <url> --cookie <cookie> [--ship <ship>] [--code <code>]
+  --url <url> --ship <ship> --code <code>
+  --ship <ship> when available in TLON_SKILL_DIR or cache
+
+Incomplete or conflicting credential flag sets fail locally instead of merging with env vars.
 
 Other Options:
   --verbose      Enable verbose subscription logging
@@ -54,14 +66,17 @@ Other Options:
   --version, -v  Show version
 
 Config Resolution (first match wins):
-  1. CLI flags (--config, or --url + --cookie, or --url + --ship + --code)
+  1. CLI credential flags
   2. TLON_CONFIG_FILE env var
-  3. URBIT_URL + URBIT_COOKIE (ship derived from cookie)
-  4. URBIT_URL + URBIT_SHIP + URBIT_CODE
-  5. --ship with cached credentials (no url/code needed)
-  6. TLON_SHIP + TLON_SKILL_DIR (loads ships/<ship>.json)
-  7. OpenClaw config (~/.openclaw/openclaw.yaml)
-  8. Cached ships (auto-select if only one)
+  3. URBIT_URL/TLON_URL + URBIT_COOKIE/TLON_COOKIE
+  4. URL + SHIP + CODE via URBIT_* or TLON_* env vars
+  5. TLON_SHIP + TLON_SKILL_DIR (loads ships/<ship>.json)
+  6. Ship-only cache lookup
+  7. OpenClaw JSON config (~/.openclaw/openclaw.json)
+  8. Single cached ship (auto-select if only one)
+
+Cache writes:
+  Code login and code fallback cache the fresh cookie. Provided-cookie flows do not copy cookies into cache.
 
 Examples:
   tlon contacts list
@@ -79,114 +94,24 @@ Examples:
 async function main() {
   const rawArgs = process.argv.slice(2);
 
-  // Parse credential flags before command
-  let urlOverride: string | null = null;
-  let shipOverride: string | null = null;
-  let codeOverride: string | null = null;
-  let cookieOverride: string | null = null;
-  let configOverride: string | null = null;
-  let verbose = false;
-  const args: string[] = [];
-
-  for (let i = 0; i < rawArgs.length; i += 1) {
-    const arg = rawArgs[i];
-
-    // --config
-    if (arg === "--config" && rawArgs[i + 1]) {
-      configOverride = rawArgs[i + 1];
-      i += 1;
-      continue;
+  let parsed;
+  try {
+    parsed = parseGlobalCliOptions(rawArgs);
+  } catch (error: any) {
+    if (error instanceof CredentialFlagError) {
+      console.error("Error:", error.message);
+      console.error('Run "tlon --help" for usage information.');
+      process.exit(1);
     }
-    if (arg.startsWith("--config=")) {
-      configOverride = arg.split("=", 2)[1] || "";
-      continue;
-    }
-
-    // --url
-    if (arg === "--url" && rawArgs[i + 1]) {
-      urlOverride = rawArgs[i + 1];
-      i += 1;
-      continue;
-    }
-    if (arg.startsWith("--url=")) {
-      urlOverride = arg.split("=", 2)[1] || "";
-      continue;
-    }
-
-    // --ship
-    if (arg === "--ship" && rawArgs[i + 1]) {
-      shipOverride = rawArgs[i + 1];
-      i += 1;
-      continue;
-    }
-    if (arg.startsWith("--ship=")) {
-      shipOverride = arg.split("=", 2)[1] || "";
-      continue;
-    }
-
-    // --code
-    if (arg === "--code" && rawArgs[i + 1]) {
-      codeOverride = rawArgs[i + 1];
-      i += 1;
-      continue;
-    }
-    if (arg.startsWith("--code=")) {
-      codeOverride = arg.split("=", 2)[1] || "";
-      continue;
-    }
-
-    // --cookie
-    if (arg === "--cookie" && rawArgs[i + 1]) {
-      cookieOverride = rawArgs[i + 1];
-      i += 1;
-      continue;
-    }
-    if (arg.startsWith("--cookie=")) {
-      cookieOverride = arg.split("=", 2)[1] || "";
-      continue;
-    }
-
-    // --verbose
-    if (arg === "--verbose") {
-      verbose = true;
-      continue;
-    }
-
-    args.push(arg);
+    throw error;
   }
 
-  if (verbose) {
+  if (parsed.verbose) {
     process.env.TLON_VERBOSE = "1";
   }
 
-  // Apply credential overrides
-  if (configOverride) {
-    process.env.TLON_CONFIG_FILE = configOverride;
-  } else if (urlOverride && cookieOverride) {
-    // URL + cookie: ship derived from cookie (or explicit --ship)
-    process.env.URBIT_URL = urlOverride;
-    process.env.URBIT_COOKIE = cookieOverride;
-    if (shipOverride) {
-      process.env.URBIT_SHIP = shipOverride.replace(/^~/, "");
-    }
-    if (codeOverride) {
-      process.env.URBIT_CODE = codeOverride;
-    }
-  } else if (urlOverride && shipOverride && codeOverride) {
-    // URL + ship + code: traditional auth
-    process.env.URBIT_URL = urlOverride;
-    process.env.URBIT_SHIP = shipOverride.replace(/^~/, "");
-    process.env.URBIT_CODE = codeOverride;
-  } else if (shipOverride && !urlOverride && !codeOverride && !cookieOverride) {
-    // Only --ship: set TLON_SHIP for cache lookup or ships/ directory
-    process.env.TLON_SHIP = shipOverride.replace(/^~/, "");
-  } else if (urlOverride || codeOverride || cookieOverride) {
-    // Partial flags - set what we have (allows merging with env vars)
-    if (urlOverride) process.env.URBIT_URL = urlOverride;
-    if (shipOverride) process.env.URBIT_SHIP = shipOverride.replace(/^~/, "");
-    if (codeOverride) process.env.URBIT_CODE = codeOverride;
-    if (cookieOverride) process.env.URBIT_COOKIE = cookieOverride;
-  }
+  setCliCredentialOverrides(parsed.credentialOverrides);
+  const args = parsed.args;
 
   const command = args[0];
 
@@ -198,6 +123,12 @@ async function main() {
   if (command === "--version" || command === "-v") {
     console.log(VERSION);
     process.exit(0);
+  }
+
+  if (!isTopLevelCommand(command)) {
+    console.error(`Unknown command: ${command}`);
+    console.error('Run "tlon --help" for usage information.');
+    process.exit(1);
   }
 
   // Rewrite process.argv so scripts see their args correctly
@@ -255,10 +186,6 @@ async function main() {
         await mod.main(scriptArgs);
         break;
       }
-      default:
-        console.error(`Unknown command: ${command}`);
-        console.error('Run "tlon --help" for usage information.');
-        process.exit(1);
     }
   } catch (error: any) {
     if (error.message?.includes("Missing Urbit config")) {

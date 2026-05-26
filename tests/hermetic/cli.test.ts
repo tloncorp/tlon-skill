@@ -209,4 +209,84 @@ describe("CLI hermetic subprocess behavior", () => {
     });
   }
 
+  describe("global credential flag validation", () => {
+    it("fails partial CLI credential flags before merging ambient env", async () => {
+      const result = await runCli(["--url", "https://cli.tlon.network", "contacts", "self"], {
+        env: {
+          URBIT_COOKIE: "urbauth-~zod=0v-cookie",
+          URBIT_SHIP: "~zod",
+          URBIT_CODE: "code",
+        },
+      });
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("Invalid credential flags");
+      expect(result.stderr).not.toContain("Missing Urbit config");
+    });
+
+    it("fails conflicting credential forms before command import/auth lookup", async () => {
+      const result = await runCli([
+        "--config",
+        "ship.json",
+        "--url",
+        "https://zod.tlon.network",
+        "--cookie",
+        "urbauth-~zod=0v-cookie",
+        "contacts",
+        "self",
+      ]);
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("--config cannot be combined");
+    });
+
+    it("fails duplicate credential flags", async () => {
+      const result = await runCli(["--ship", "~zod", "--ship", "~bus", "contacts", "self"]);
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("Duplicate credential flag: --ship");
+    });
+
+    it("fails empty credential flag values", async () => {
+      const result = await runCli(["--cookie=", "contacts", "self"]);
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("Missing value for --cookie");
+    });
+
+    it("fails missing values when the next token is absent or the command", async () => {
+      const absent = await runCli(["--url"]);
+      const command = await runCli(["--url", "contacts", "self"]);
+
+      expect(absent.exitCode).toBe(1);
+      expect(absent.stderr).toContain("Missing value for --url");
+      expect(command.exitCode).toBe(1);
+      expect(command.stderr).toContain("Missing value for --url");
+    });
+
+    it("accepts valid CLI credentials while ignoring ambient TLON_CONFIG_FILE during parsing", async () => {
+      const result = await runCli(
+        [
+          "--url",
+          "https://cli.tlon.network",
+          "--cookie",
+          "urbauth-~zod=0v-cookie",
+          "definitely-not-a-command",
+        ],
+        {
+          prepare: ({ home }) => ({
+            env: { TLON_CONFIG_FILE: join(home, "missing-ship.json") },
+          }),
+        }
+      );
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain("Unknown command: definitely-not-a-command");
+      expect(result.stderr).not.toContain("Ship config not found");
+    });
+  });
 });
