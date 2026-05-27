@@ -55,7 +55,6 @@ const SCRIPT_ERA_PATTERNS = [
   "Example: posts.ts",
   "Example: settings.ts",
   "Example: upload.ts",
-  "scripts/activity.ts",
   "scripts/channels.ts",
   "scripts/contacts.ts",
   "scripts/dms.ts",
@@ -66,7 +65,6 @@ const SCRIPT_ERA_PATTERNS = [
   "scripts/notebook-post.ts",
   "scripts/posts.ts",
   "scripts/settings.ts",
-  "scripts/upload.ts",
 ];
 
 const STACK_PATTERNS = [
@@ -174,6 +172,21 @@ export const MISSING_REQUIRED_CASES: CliCase[] = [
 
 export const SPECIAL_INPUT_CASES: CliCase[] = [
   usageErrorCase(
+    "activity unknown trailing arg",
+    ["activity", "mentions", "extra"],
+    "Unknown argument: extra"
+  ),
+  usageErrorCase(
+    "activity missing limit value",
+    ["activity", "mentions", "--limit"],
+    "--limit requires a value"
+  ),
+  usageErrorCase(
+    "activity nonnumeric limit value",
+    ["activity", "mentions", "--limit", "abc"],
+    "--limit must be a positive integer"
+  ),
+  usageErrorCase(
     "contacts update-profile missing option value",
     ["contacts", "update-profile", "--nickname"],
     "Usage: tlon contacts update-profile"
@@ -219,6 +232,16 @@ export const SPECIAL_INPUT_CASES: CliCase[] = [
       "Usage: tlon upload",
     ],
   },
+  usageErrorCase(
+    "upload stdin with positional input",
+    ["upload", "--stdin", "photo.jpg"],
+    "--stdin cannot be combined with a file or URL"
+  ),
+  usageErrorCase(
+    "upload missing type value",
+    ["upload", "photo.jpg", "--type"],
+    "--type requires a value"
+  ),
   {
     name: "notebook unknown option",
     args: [

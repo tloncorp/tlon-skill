@@ -59,7 +59,11 @@ function hermeticEnv(
   return env;
 }
 
-async function runCli(args: string[], options: RunOptions = {}): Promise<CliResult> {
+async function runBunScript(
+  entrypoint: string,
+  args: string[],
+  options: RunOptions = {}
+): Promise<CliResult> {
   const tempRoot = makeTempDir("tlon-hermetic-");
   const home = join(tempRoot, "home");
   const cacheDir = join(tempRoot, "cache");
@@ -79,7 +83,7 @@ async function runCli(args: string[], options: RunOptions = {}): Promise<CliResu
     const proc = Bun.spawn(
       [
         process.execPath,
-        "scripts/main.ts",
+        entrypoint,
         ...(prepared.argsPrefix ?? []),
         ...args,
       ],
@@ -101,7 +105,7 @@ async function runCli(args: string[], options: RunOptions = {}): Promise<CliResu
       timeout = setTimeout(() => {
         proc.kill("SIGKILL");
         output.catch(() => {});
-        reject(new Error(`CLI timed out after ${CLI_TIMEOUT_MS}ms: ${args.join(" ")}`));
+        reject(new Error(`CLI timed out after ${CLI_TIMEOUT_MS}ms: ${entrypoint} ${args.join(" ")}`));
       }, CLI_TIMEOUT_MS);
     });
 
@@ -124,6 +128,10 @@ async function runCli(args: string[], options: RunOptions = {}): Promise<CliResu
   } finally {
     prepared.cleanup?.();
   }
+}
+
+async function runCli(args: string[], options: RunOptions = {}): Promise<CliResult> {
+  return runBunScript("scripts/main.ts", args, options);
 }
 
 afterEach(() => {
@@ -210,6 +218,45 @@ describe("CLI hermetic subprocess behavior", () => {
   }
 
   describe("global credential flag validation", () => {
+    it("fails malformed global credential flags before activity dispatch", async () => {
+      const result = await runCli([
+        "--url",
+        "https://cli.tlon.network",
+        "activity",
+        "--help",
+      ]);
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("Invalid credential flags");
+      expect(result.stderr).not.toContain("Usage: tlon activity");
+      expect(result.stderr).not.toContain("Missing Urbit config");
+    });
+
+    for (const command of ["activity", "upload"] as const) {
+      it(`strips valid global credential flags before ${command} help dispatch`, async () => {
+        const result = await runCli(
+          [
+            "--url",
+            "https://cli.tlon.network",
+            "--cookie",
+            "urbauth-~zod=0v-cookie",
+            command,
+            "--help",
+          ],
+          {
+            prepare: ({ home }) => ({
+              env: { TLON_CONFIG_FILE: join(home, "missing-ship.json") },
+            }),
+          }
+        );
+
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toContain(`Usage: tlon ${command}`);
+        expect(result.stderr).toBe("");
+      });
+    }
+
     it("fails partial CLI credential flags before merging ambient env", async () => {
       const result = await runCli(["--url", "https://cli.tlon.network", "contacts", "self"], {
         env: {
