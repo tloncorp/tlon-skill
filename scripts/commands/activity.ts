@@ -6,55 +6,20 @@ import {
   writeHelp,
   writeLine,
 } from "./command";
+import type {
+  getGroupAndChannelUnreads,
+  getInitialActivity,
+} from "@tloncorp/api";
 
-export interface ActivityEvent {
-  id: string;
-  bucketId: "all" | "mentions" | "replies";
-  sourceId?: string;
-  type: string;
-  timestamp: number;
-  postId?: string | null;
-  authorId?: string | null;
-  parentId?: string | null;
-  parentAuthorId?: string | null;
-  channelId?: string | null;
-  groupId?: string | null;
-  isMention?: boolean | null;
-  shouldNotify?: boolean | null;
-  content?: unknown;
-  groupEventUserId?: string | null;
-  contactUserId?: string | null;
-  contactUpdateType?: string | null;
-  contactUpdateValue?: string | null;
-}
-
-export interface UnreadSummary {
-  count?: number | null;
-  notify?: boolean | null;
-  notifyCount?: number | null;
-}
-
-export interface BaseUnreadSummary extends UnreadSummary {}
-
-export interface GroupUnreadSummary extends UnreadSummary {
-  groupId?: string | null;
-}
-
-export interface ChannelUnreadSummary extends UnreadSummary {
-  channelId?: string | null;
-  countWithoutThreads?: number | null;
-  firstUnreadPostId?: string | null;
-}
-
-export interface ActivityUnreads {
-  baseUnread?: BaseUnreadSummary | null;
-  groupUnreads: GroupUnreadSummary[];
-  channelUnreads: ChannelUnreadSummary[];
-}
+export type ActivityInit = Awaited<ReturnType<typeof getGroupAndChannelUnreads>>;
+export type ActivityEvent = Awaited<ReturnType<typeof getInitialActivity>>["events"][number];
+export type BaseUnread = NonNullable<ActivityInit["baseUnread"]>;
+export type GroupUnread = ActivityInit["groupUnreads"][number];
+export type ChannelUnread = ActivityInit["channelUnreads"][number];
 
 export interface ActivityApi {
   getInitialActivity: () => Promise<{ events: ActivityEvent[] }>;
-  getGroupAndChannelUnreads: () => Promise<ActivityUnreads>;
+  getGroupAndChannelUnreads: () => Promise<ActivityInit>;
 }
 
 export interface ActivityFormatter {
@@ -63,9 +28,9 @@ export interface ActivityFormatter {
   event: (event: ActivityEvent) => string;
   unreadsHeader: () => string;
   noUnreads: () => string;
-  baseUnread: (summary: BaseUnreadSummary) => string;
-  groupUnread: (summary: GroupUnreadSummary) => string;
-  channelUnread: (summary: ChannelUnreadSummary) => string;
+  baseUnread: (summary: BaseUnread) => string;
+  groupUnread: (summary: GroupUnread) => string;
+  channelUnread: (summary: ChannelUnread) => string;
 }
 
 export interface ActivityDeps extends CommandDeps {
@@ -163,7 +128,7 @@ function parseArgs(args: string[]): ParsedActivityArgs {
   return { kind: "unreads" };
 }
 
-function hasUnread(summary: UnreadSummary): boolean {
+function hasUnread(summary: BaseUnread | GroupUnread | ChannelUnread): boolean {
   return (summary.count ?? 0) > 0 || !!summary.notify;
 }
 

@@ -26,7 +26,14 @@ const forbiddenPatterns = [
   { name: "global fetch calls", pattern: /(^|[^.\w])fetch\s*\(/ },
   { name: "Blob construction", pattern: /\bnew\s+Blob\b/ },
   { name: "exit helper imports", pattern: /\bprint(?:Help|Usage|Error)AndExit\b/ },
-  { name: "raw API imports", pattern: /from\s+["']@tloncorp\/api["']/ },
+  {
+    name: "raw API value imports",
+    pattern: /import\s+(?!type\b)[^;]*from\s+["']@tloncorp\/api(?:\/[^"']*)?["']/,
+  },
+  {
+    name: "raw API side-effect imports",
+    pattern: /import\s+["']@tloncorp\/api(?:\/[^"']*)?["']/,
+  },
 ];
 
 describe("migrated command source contract", () => {

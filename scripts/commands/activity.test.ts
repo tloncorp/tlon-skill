@@ -39,9 +39,32 @@ function makeDeps(options: {
         (async () => {
           calls.getGroupAndChannelUnreads += 1;
           return {
-            baseUnread: { count: 1, notifyCount: 1 },
-            groupUnreads: [{ groupId: "~zod/test", count: 2 }],
-            channelUnreads: [{ channelId: "chat/~zod/test", count: 3, countWithoutThreads: 2 }],
+            baseUnread: {
+              id: "base_unreads",
+              updatedAt: 1,
+              count: 1,
+              notify: false,
+              notifyCount: 1,
+            },
+            groupUnreads: [
+              {
+                groupId: "~zod/test",
+                updatedAt: 1,
+                count: 2,
+                notify: false,
+              },
+            ],
+            channelUnreads: [
+              {
+                channelId: "chat/~zod/test",
+                type: "channel",
+                updatedAt: 1,
+                count: 3,
+                notify: false,
+                countWithoutThreads: 2,
+              },
+            ],
+            threadActivity: [],
           };
         }),
     },
@@ -108,9 +131,9 @@ describe("activity command run", () => {
   it("authenticates once, reads activity through injected API, and formats through deps", async () => {
     const context = makeDeps({
       events: [
-        { id: "old", bucketId: "mentions", type: "post", timestamp: 1 },
-        { id: "reply", bucketId: "replies", type: "reply", timestamp: 3 },
-        { id: "new", bucketId: "mentions", type: "post", timestamp: 5 },
+        { id: "old", bucketId: "mentions", sourceId: "source-old", type: "post", timestamp: 1 },
+        { id: "reply", bucketId: "replies", sourceId: "source-reply", type: "reply", timestamp: 3 },
+        { id: "new", bucketId: "mentions", sourceId: "source-new", type: "post", timestamp: 5 },
       ],
     });
 

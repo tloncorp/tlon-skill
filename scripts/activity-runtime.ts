@@ -1,36 +1,26 @@
-import * as fs from "fs";
-import * as path from "path";
 import {
   getGroupAndChannelUnreads,
   getInitialActivity,
   getTextContent,
-  uploadFile as apiUploadFile,
+  type PostContent,
 } from "@tloncorp/api";
 import { ensureClient } from "./api-client";
 import type {
   ActivityDeps,
   ActivityEvent,
   ActivityFormatter,
-  ActivityUnreads,
-  BaseUnreadSummary,
-  ChannelUnreadSummary,
-  GroupUnreadSummary,
 } from "./commands/activity";
-import type { CommandDeps } from "./commands/command";
-import type { UploadBlobLike, UploadDeps } from "./commands/upload";
 
-const STDIN_TIMEOUT_MS = 30_000;
-
-export function createProcessCommandDeps(): CommandDeps {
+function createProcessCommandDeps() {
   return {
-    stdout: (text) => process.stdout.write(text),
-    stderr: (text) => process.stderr.write(text),
+    stdout: (text: string) => process.stdout.write(text),
+    stderr: (text: string) => process.stderr.write(text),
   };
 }
 
 function extractText(content: unknown): string {
   if (!content) return "";
-  const text = getTextContent(content as any);
+  const text = getTextContent(content as PostContent);
   return text || "";
 }
 
@@ -135,15 +125,15 @@ function createActivityFormatter(): ActivityFormatter {
     event: formatEvent,
     unreadsHeader: () => "\n=== UNREADS ===\n",
     noUnreads: () => "No unreads!",
-    baseUnread: (summary: BaseUnreadSummary) => {
+    baseUnread: (summary) => {
       const notify = summary.notify ? "🔔" : "";
       return `${notify} base\n   Count: ${summary.count ?? 0}, Notify count: ${summary.notifyCount ?? 0}`;
     },
-    groupUnread: (summary: GroupUnreadSummary) => {
+    groupUnread: (summary) => {
       const notify = summary.notify ? "🔔" : "";
       return `${notify} group/${summary.groupId}\n   Count: ${summary.count ?? 0}, Notify count: ${summary.notifyCount ?? 0}`;
     },
-    channelUnread: (summary: ChannelUnreadSummary) => {
+    channelUnread: (summary) => {
       const notify = summary.notify ? "🔔" : "";
       const lines = [
         `${notify} channel/${summary.channelId}`,
@@ -157,36 +147,6 @@ function createActivityFormatter(): ActivityFormatter {
   };
 }
 
-function bytesToBlobPart(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
-  return new Uint8Array(
-    bytes.buffer as ArrayBuffer,
-    bytes.byteOffset,
-    bytes.byteLength
-  );
-}
-
-async function readStdin(): Promise<Uint8Array> {
-  return new Promise<Uint8Array>((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    const timer = setTimeout(() => {
-      process.stdin.destroy();
-      reject(new Error("stdin read timed out after 30s - did you forget to pipe input?"));
-    }, STDIN_TIMEOUT_MS);
-
-    process.stdin.on("data", (chunk) => {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    });
-    process.stdin.on("end", () => {
-      clearTimeout(timer);
-      resolve(Buffer.concat(chunks));
-    });
-    process.stdin.on("error", (err) => {
-      clearTimeout(timer);
-      reject(err);
-    });
-  });
-}
-
 export function createActivityDeps(): ActivityDeps {
   return {
     ...createProcessCommandDeps(),
@@ -196,43 +156,12 @@ export function createActivityDeps(): ActivityDeps {
     activityApi: {
       getInitialActivity: async () => {
         const result = await getInitialActivity();
-        return { events: result.events as ActivityEvent[] };
+        return { events: result.events };
       },
       getGroupAndChannelUnreads: async () => {
-        return (await getGroupAndChannelUnreads()) as ActivityUnreads;
+        return getGroupAndChannelUnreads();
       },
     },
     format: createActivityFormatter(),
-  };
-}
-
-export function createUploadDeps(): UploadDeps {
-  return {
-    ...createProcessCommandDeps(),
-    authenticate: async () => {
-      await ensureClient();
-    },
-    readStdin,
-    fetch: (url) => fetch(url),
-    fileSystem: {
-      resolvePath: (filePath) => path.resolve(filePath),
-      exists: (filePath) => fs.existsSync(filePath),
-      readFile: (filePath) => fs.readFileSync(filePath),
-      basename: (filePath) => path.basename(filePath),
-      extension: (filePath) => path.extname(filePath),
-    },
-    createBlob: (data, contentType): UploadBlobLike => {
-      return new Blob([bytesToBlobPart(data)], { type: contentType });
-    },
-    uploadApi: {
-      uploadFile: async ({ blob, contentType, fileName }) => {
-        const result = await apiUploadFile({
-          blob: blob as Blob,
-          contentType,
-          fileName,
-        });
-        return { url: result.url };
-      },
-    },
   };
 }

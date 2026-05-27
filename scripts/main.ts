@@ -18,12 +18,13 @@
  */
 
 import { setCliCredentialOverrides } from "./api-client";
-import { createActivityDeps, createUploadDeps } from "./command-runtime";
+import { createActivityDeps } from "./activity-runtime";
 import { formatUnexpectedError } from "./commands/command";
 import { run as runActivityCommand } from "./commands/activity";
 import { run as runUploadCommand } from "./commands/upload";
 import { CredentialFlagError, parseGlobalCliOptions } from "./credential-flags";
 import { isTopLevelCommand } from "./top-level-commands";
+import { createUploadDeps } from "./upload-runtime";
 
 // Version is injected at build time via --define
 declare const __VERSION__: string;

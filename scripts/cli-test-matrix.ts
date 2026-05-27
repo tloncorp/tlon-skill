@@ -55,7 +55,6 @@ const SCRIPT_ERA_PATTERNS = [
   "Example: posts.ts",
   "Example: settings.ts",
   "Example: upload.ts",
-  "scripts/activity.ts",
   "scripts/channels.ts",
   "scripts/contacts.ts",
   "scripts/dms.ts",
@@ -66,7 +65,6 @@ const SCRIPT_ERA_PATTERNS = [
   "scripts/notebook-post.ts",
   "scripts/posts.ts",
   "scripts/settings.ts",
-  "scripts/upload.ts",
 ];
 
 const STACK_PATTERNS = [

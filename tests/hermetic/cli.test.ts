@@ -134,14 +134,6 @@ async function runCli(args: string[], options: RunOptions = {}): Promise<CliResu
   return runBunScript("scripts/main.ts", args, options);
 }
 
-async function runDirectScript(
-  command: "activity" | "upload",
-  args: string[],
-  options: RunOptions = {}
-): Promise<CliResult> {
-  return runBunScript(`scripts/${command}.ts`, args, options);
-}
-
 afterEach(() => {
   while (cleanupPaths.length > 0) {
     const dir = cleanupPaths.pop();
@@ -182,8 +174,6 @@ const hostileHelpCommands = [
     args: [family, "--help"],
   })),
 ];
-
-const directPilotCommands = ["activity", "upload"] as const;
 
 describe("CLI hermetic subprocess behavior", () => {
   it("prints source CLI version without host credentials", async () => {
@@ -227,42 +217,46 @@ describe("CLI hermetic subprocess behavior", () => {
     });
   }
 
-  for (const command of directPilotCommands) {
-    it(`prints direct ${command} help without host credentials`, async () => {
-      const result = await runDirectScript(command, ["--help"]);
-
-      expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain(`Usage: tlon ${command}`);
-      expect(result.stderr).toBe("");
-    });
-
-    it(`prints direct ${command} help with CLI --config /nonexistent`, async () => {
-      const result = await runDirectScript(command, ["--help"], {
-        prepare: ({ home }) => ({
-          argsPrefix: ["--config", join(home, "missing-ship.json")],
-        }),
-      });
-
-      expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain(`Usage: tlon ${command}`);
-      expect(result.stderr).toBe("");
-    });
-
-    it(`fails malformed direct ${command} credential flags locally`, async () => {
-      const result = await runDirectScript(command, [
+  describe("global credential flag validation", () => {
+    it("fails malformed global credential flags before activity dispatch", async () => {
+      const result = await runCli([
         "--url",
         "https://cli.tlon.network",
+        "activity",
         "--help",
       ]);
 
       expect(result.exitCode).toBe(1);
       expect(result.stdout).toBe("");
       expect(result.stderr).toContain("Invalid credential flags");
+      expect(result.stderr).not.toContain("Usage: tlon activity");
       expect(result.stderr).not.toContain("Missing Urbit config");
     });
-  }
 
-  describe("global credential flag validation", () => {
+    for (const command of ["activity", "upload"] as const) {
+      it(`strips valid global credential flags before ${command} help dispatch`, async () => {
+        const result = await runCli(
+          [
+            "--url",
+            "https://cli.tlon.network",
+            "--cookie",
+            "urbauth-~zod=0v-cookie",
+            command,
+            "--help",
+          ],
+          {
+            prepare: ({ home }) => ({
+              env: { TLON_CONFIG_FILE: join(home, "missing-ship.json") },
+            }),
+          }
+        );
+
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toContain(`Usage: tlon ${command}`);
+        expect(result.stderr).toBe("");
+      });
+    }
+
     it("fails partial CLI credential flags before merging ambient env", async () => {
       const result = await runCli(["--url", "https://cli.tlon.network", "contacts", "self"], {
         env: {
