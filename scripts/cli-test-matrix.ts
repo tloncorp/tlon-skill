@@ -272,9 +272,39 @@ export const NESTED_HELP_CASES: CliCase[] = [
     ["groups", "info", "--help"],
     "Usage: tlon groups info"
   ),
+  helpCase(
+    "posts react --help",
+    ["posts", "react", "--help"],
+    "Usage: tlon posts react"
+  ),
+  helpCase(
+    "posts react --help with global credentials",
+    [
+      "--url",
+      "https://cli.tlon.network",
+      "--cookie",
+      "urbauth-~zod=0v-cookie",
+      "posts",
+      "react",
+      "--help",
+    ],
+    "Usage: tlon posts react"
+  ),
+  helpCase(
+    "posts unreact --help",
+    ["posts", "unreact", "--help"],
+    "Usage: tlon posts unreact"
+  ),
 ];
 
 export const LITERAL_OPTION_LIKE_VALUE_CASES: CliCase[] = [
+  authRequiredCase("posts react valid args reaches auth", [
+    "posts",
+    "react",
+    "chat/~host/channel",
+    "170.141",
+    "👍",
+  ]),
   authRequiredCase("dms send message option-like value reaches auth", [
     "dms",
     "send",
