@@ -21,8 +21,10 @@ import { setCliCredentialOverrides } from "./api-client";
 import { createActivityDeps } from "./activity-runtime";
 import { formatUnexpectedError } from "./commands/command";
 import { run as runActivityCommand } from "./commands/activity";
+import { run as runPostsCommand } from "./commands/posts";
 import { run as runUploadCommand } from "./commands/upload";
 import { CredentialFlagError, parseGlobalCliOptions } from "./credential-flags";
+import { createPostsDeps } from "./posts-runtime";
 import { isTopLevelCommand } from "./top-level-commands";
 import { createUploadDeps } from "./upload-runtime";
 
@@ -191,6 +193,11 @@ async function main() {
         break;
       }
       case "posts": {
+        if (scriptArgs[0] === "react") {
+          const exitCode = await runPostsCommand(scriptArgs, createPostsDeps());
+          process.exit(exitCode);
+          break;
+        }
         process.argv = ["tlon", command, ...scriptArgs];
         const mod = await import("./posts");
         break;
